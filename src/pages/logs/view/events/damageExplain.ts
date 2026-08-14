@@ -385,8 +385,13 @@ const takenSection = (hit: ExplainHit): ExplainSection => {
 
 type StatusClassTable = Record<string, { class: string; name: string }>;
 
-/** Status ids this log applied with an IStatusAmplifyBuff-derived class —
- * the concrete classes all carry "Amplify" in their RTTI name. */
+/** Status ids this log applied with an IStatusAmplifyBuff-derived class.
+ *
+ * The post-cap chain sums BOTH signed variants of the family
+ * (ΣIStatusAmplifyBuff ±, per the RE handoff) — both concrete classes,
+ * StatusAmplifyDamageBuff and StatusAmplifyDamageDebuff, carry "Amplify" in
+ * their RTTI name and participate in the signed vfn+0xA8 walk, so the debuff
+ * side is not a spurious match, it is the negative term of the same sum. */
 export const amplifyStatusIds = (
   events: LogEvent[],
   table: StatusClassTable = statusClasses as StatusClassTable

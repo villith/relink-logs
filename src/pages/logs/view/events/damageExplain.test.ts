@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import type { LogEvent } from "@/types";
 
+import statusClasses from "../../../../../src-tauri/assets/status-classes.json";
+
 import type { ExplainHit } from "./capExplain";
 import type { CapConditions } from "./capFactors";
 import { amplifyStatusIds, explainDamageHit, type DamageTraitTable } from "./damageExplain";
@@ -205,13 +207,20 @@ describe("taken/variance section", () => {
 
 describe("postcap section", () => {
   it("substitutes the observed ratio final / min(base, cap)", () => {
-    // 1,470,000 / 1,000,000 = 1.47
-    expect(section("dmg-postcap").substituted).toContain("1.47");
+    // 1,470,000 / 1,000,000 = 1.470 (toFixed(3) of the multiplier)
+    expect(section("dmg-postcap").substituted).toContain("x1.470");
   });
 
   it("renders the overflow row only on capped hits", () => {
     expect(section("dmg-postcap").lines.some((l) => l.key === "overflow")).toBe(true);
     expect(section("dmg-postcap", { base_damage: 900_000 }).lines.some((l) => l.key === "overflow")).toBe(false);
+  });
+
+  it("degrades the ratio to absent and the section to unsubstituted when base_damage is unrecorded", () => {
+    const sec = section("dmg-postcap", { base_damage: null });
+    expect(sec.substituted).toBeNull();
+    const ratioLine = sec.lines.find((l) => l.key === "ratio")!;
+    expect(ratioLine.value).toEqual({ kind: "absent" });
   });
 
   it("lists held amplify statuses by id", () => {
@@ -228,6 +237,20 @@ describe("postcap section", () => {
     const held = postcap.lines.filter((l) => l.key.startsWith("amplify-status-"));
     expect(held).toHaveLength(1);
     expect(held[0].key).toBe("amplify-status-222");
+    // The full rendered text, not just the key — id and stack count both matter.
+    expect(held[0].value).toEqual({ kind: "text", value: "#222 x3" });
+  });
+
+  it("falls back to x1 for a held amplify status with no stacks entry", () => {
+    // buffs carries the id but `conditions.stacks` never mentions it — the
+    // `?? 1` fallback in postcapSection, exercised directly.
+    const out = explainDamageHit(
+      { hit: HIT, loadout: LOADOUT, conditions: { buffs: [222] }, amplifyStatusIds: new Set([222]) },
+      TABLE
+    );
+    const postcap = out.find((s) => s.key === "dmg-postcap")!;
+    const held = postcap.lines.find((l) => l.key === "amplify-status-222")!;
+    expect(held.value).toEqual({ kind: "text", value: "#222 x1" });
   });
 });
 
@@ -282,5 +305,73 @@ describe("amplifyStatusIds", () => {
       ],
     ] as unknown as LogEvent[];
     expect([...amplifyStatusIds(events, classTable)]).toEqual([222]);
+  });
+});
+
+describe("amplifyStatusIds against the real shipped table", () => {
+  // The "Amplify" substring matches exactly two classes in the shipped
+  // status-classes.json today: StatusAmplifyDamageBuff and
+  // StatusAmplifyDamageDebuff — the signed + and - halves of the post-cap
+  // chain's ΣIStatusAmplifyBuff ± walk, not a spurious debuff match. If a
+  // game-update regen of the asset ever adds a THIRD class whose RTTI name
+  // happens to contain "Amplify", this count assertion is what turns that
+  // silent net-widening into a failing test instead of an unnoticed change
+  // in what the post-cap section reports as held.
+  it("matches exactly the two signed Amplify classes", () => {
+    const matches = Object.values(statusClasses as Record<string, { class: string; name: string }>).filter((entry) =>
+      /Amplify/.test(entry.class)
+    );
+    expect(matches.map((m) => m.class).sort()).toEqual(["StatusAmplifyDamageBuff", "StatusAmplifyDamageDebuff"]);
+  });
+
+  it("collects both real Amplify class hashes and excludes an unrelated real class", () => {
+    // 2697949828 = StatusAmplifyDamageBuff, 2952924837 = StatusAmplifyDamageDebuff,
+    // 208567 = StatusPl0900UniqueBuffCount (a real, known non-amplify class).
+    const events = [
+      [
+        0,
+        {
+          StatusApply: {
+            actor_index: 0,
+            caster_index: null,
+            status_id: 111,
+            ability_id: null,
+            stacks: 1,
+            status_class: 2697949828,
+            caster_action_id: null,
+          },
+        },
+      ],
+      [
+        1,
+        {
+          StatusApply: {
+            actor_index: 0,
+            caster_index: null,
+            status_id: 222,
+            ability_id: null,
+            stacks: 1,
+            status_class: 2952924837,
+            caster_action_id: null,
+          },
+        },
+      ],
+      [
+        2,
+        {
+          StatusApply: {
+            actor_index: 0,
+            caster_index: null,
+            status_id: 333,
+            ability_id: null,
+            stacks: 1,
+            status_class: 208567,
+            caster_action_id: null,
+          },
+        },
+      ],
+    ] as unknown as LogEvent[];
+    // No second arg: exercises the real default table amplifyStatusIds reads.
+    expect([...amplifyStatusIds(events)]).toEqual([111, 222]);
   });
 });
