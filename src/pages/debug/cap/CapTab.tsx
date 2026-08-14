@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { abilityLabelFor } from "@/pages/logs/view/analysis/abilityLabel";
 import { explainCapHit } from "@/pages/logs/view/events/capExplain";
 import { conditionsForHit } from "@/pages/logs/view/events/capFactors/conditions";
+import { explainDamageHit } from "@/pages/logs/view/events/damageExplain";
 import { getSkillName, millisecondsToPreciseElapsedFormat, translateCharacterType } from "@/utils";
 
 import { CapDetailPanel } from "./CapDetailPanel";
@@ -80,7 +81,7 @@ export const CapTab = () => {
   const [actorIndex, setActorIndex] = useState<number | null>(null);
   const [eventIndex, setEventIndex] = useState<number | null>(null);
 
-  const { hits, players, skillsByActor, capUp, truncated, loading, error } = useCapDebugLog(logId);
+  const { hits, players, skillsByActor, capUp, amplifyStatusIds, truncated, loading, error } = useCapDebugLog(logId);
   const playersByActor = usePlayersByActor(players);
 
   // Named through the ANALYSIS view's own resolver, not a second spelling here:
@@ -135,6 +136,17 @@ export const CapTab = () => {
       conditions: conditionsForHit(selected.attacker, player?.playerStats ?? null, selected.actionId),
     });
   }, [selected, playersByActor, capUp]);
+
+  const damageSections = useMemo(() => {
+    if (selected === null) return null;
+    const player = playersByActor.get(selected.sourceIndex);
+    return explainDamageHit({
+      hit: selected.hit,
+      loadout: player,
+      conditions: conditionsForHit(selected.attacker, player?.playerStats ?? null, selected.actionId),
+      amplifyStatusIds,
+    });
+  }, [selected, playersByActor, amplifyStatusIds]);
 
   const logOptions = recent.map((log) => ({
     value: String(log.id),
@@ -233,7 +245,7 @@ export const CapTab = () => {
         </Box>
 
         <Box style={{ flex: 1, minWidth: 0 }}>
-          {selected === null || sections === null ? (
+          {selected === null || sections === null || damageSections === null ? (
             <Text size="xs" c="dimmed">
               {t("ui.debug.cap-pick-a-hit")}
             </Text>
@@ -247,9 +259,24 @@ export const CapTab = () => {
               <Text size="xs" c="dimmed" mb="sm">
                 {`${millisecondsToPreciseElapsedFormat(selected.timeMs)} · ${selected.abilityKey} · ${selected.hit.damage.toLocaleString(i18n.language)}`}
               </Text>
-              <ScrollArea h={LIST_HEIGHT} offsetScrollbars>
-                <CapDetailPanel sections={sections} />
-              </ScrollArea>
+              <Group align="flex-start" gap="md" wrap="nowrap" style={{ overflowX: "auto" }}>
+                <Box style={{ flexShrink: 0 }}>
+                  <Text size="xs" fw={700} tt="uppercase" c="dimmed" mb={4}>
+                    {t("ui.debug.cap-col-cap")}
+                  </Text>
+                  <ScrollArea h={LIST_HEIGHT} offsetScrollbars>
+                    <CapDetailPanel sections={sections} />
+                  </ScrollArea>
+                </Box>
+                <Box style={{ flexShrink: 0 }}>
+                  <Text size="xs" fw={700} tt="uppercase" c="dimmed" mb={4}>
+                    {t("ui.debug.cap-col-damage")}
+                  </Text>
+                  <ScrollArea h={LIST_HEIGHT} offsetScrollbars>
+                    <CapDetailPanel sections={damageSections} />
+                  </ScrollArea>
+                </Box>
+              </Group>
             </>
           )}
         </Box>

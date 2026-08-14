@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { AbilityLabelPlayer } from "@/pages/logs/view/analysis/abilityLabel";
+import { amplifyStatusIds } from "@/pages/logs/view/events/damageExplain";
 import type { EncounterStateResponse } from "@/stores/useEncounterStore";
 import type { EventPage, Log, PlayerCapUp, PlayerData } from "@/types";
 
@@ -27,6 +28,9 @@ export type CapDebugLog = {
   /** Captured cap-up records, keyed by the same actor index a hit's
    * `sourceIndex` carries. */
   capUp: Record<string, PlayerCapUp>;
+  /** Status ids this log applied with an Amplify status class — feeds the
+   * damage panel's post-cap held-status rows. */
+  amplifyStatusIds: Set<number>;
   /** True when the fetch hit `EVENT_FETCH_CAP` — said out loud rather than
    * letting a long fight look like it simply ended early. */
   truncated: boolean;
@@ -39,6 +43,7 @@ const EMPTY: CapDebugLog = {
   players: [],
   skillsByActor: new Map(),
   capUp: {},
+  amplifyStatusIds: new Set(),
   truncated: false,
   loading: false,
   error: null,
@@ -104,6 +109,7 @@ export const useCapDebugLog = (id: number | null): CapDebugLog => {
             ])
           ),
           capUp: page.capUp ?? {},
+          amplifyStatusIds: amplifyStatusIds(page.events),
           truncated: page.total > page.events.length,
           loading: false,
           error: null,
