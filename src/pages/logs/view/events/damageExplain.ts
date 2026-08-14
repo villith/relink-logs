@@ -3,7 +3,7 @@ import { computeCombinedTraits } from "@/utils";
 
 import type { ExplainHit, ExplainLine, ExplainSection, ExplainValue } from "./capExplain";
 import type { CapConditions } from "./capFactors";
-import type { CapLoadout } from "./capSources";
+import { capClassOf, type CapLoadout } from "./capSources";
 
 /**
  * The damage-calculation walk for one hit, in the game's own order — the
@@ -294,6 +294,93 @@ const chainSection = (
   ],
 });
 
+const critSection = (
+  hit: ExplainHit,
+  loadout: CapLoadout | undefined,
+  conditions: CapConditions,
+  table: DamageTraitTable
+): ExplainSection => ({
+  key: "dmg-crit",
+  titleKey: "ui.debug.dmg-sec-crit",
+  formula: "critMult = 1 + (crit dmg base + Critical Hit DMG + record + agg)",
+  substituted: null,
+  unavailableKey: null,
+  lines: [
+    ...traitLines("crit", hit, loadout, conditions, table),
+    {
+      key: "crit-roll",
+      name: { kind: "key", value: "ui.debug.dmg-line-crit-roll" },
+      value: absent,
+      source: { kind: "literal", value: "inst+0x15D (roll vs FUN_141f42d40 rate)" },
+      excluded: "gate-unrecorded",
+    },
+  ],
+});
+
+const classSection = (hit: ExplainHit): ExplainSection => {
+  const cls = capClassOf(hit.class_flags);
+  return {
+    key: "dmg-class",
+    titleKey: "ui.debug.dmg-sec-class",
+    formula: "x (1 + record dmg% x 0.01) x difficulty",
+    substituted: null,
+    unavailableKey: null,
+    lines: [
+      {
+        key: "attack-class",
+        name: { kind: "key", value: "ui.debug.dmg-line-attack-class" },
+        value: cls === null ? absent : { kind: "text", value: cls },
+        source: { kind: "literal", value: "class_flags 0x10000/0x40000" },
+      },
+      {
+        key: "record",
+        name: { kind: "key", value: "ui.debug.dmg-line-record" },
+        value: absent,
+        source: { kind: "literal", value: "record+0x24 (Skill) / +0x1C (SBA)" },
+        excluded: "value-unrecorded",
+      },
+      {
+        key: "difficulty",
+        name: { kind: "key", value: "ui.debug.dmg-line-difficulty" },
+        value: absent,
+        source: { kind: "literal", value: "DAT_147beb720 rows" },
+        excluded: "value-unrecorded",
+      },
+    ],
+  };
+};
+
+const takenSection = (hit: ExplainHit): ExplainSection => {
+  const base = hit.base_damage;
+  return {
+    key: "dmg-taken",
+    titleKey: "ui.debug.dmg-sec-taken",
+    formula: "precap = takenChain(d4); d4 <= precap < 1.05 x d4 (enemy targets)",
+    substituted:
+      base === null ? null : `d4 in (${Math.ceil(base / 1.05).toLocaleString()} .. ${base.toLocaleString()}]`,
+    unavailableKey: null,
+    noteKey: "ui.debug.dmg-note-variance",
+    lines: [
+      {
+        key: "variance-band",
+        name: { kind: "key", value: "ui.debug.dmg-line-variance-band" },
+        value:
+          base === null
+            ? absent
+            : { kind: "text", value: `${Math.ceil(base / 1.05).toLocaleString()} .. ${base.toLocaleString()}` },
+        source: { kind: "literal", value: "FUN_140b283d0: d4 += d4 x 0.05 x rand01" },
+      },
+      {
+        key: "taken-side",
+        name: { kind: "key", value: "ui.debug.dmg-line-taken-side" },
+        value: absent,
+        source: { kind: "literal", value: "Em vfn+0x728/+0x730; Pl DEF chain" },
+        excluded: "value-unrecorded",
+      },
+    ],
+  };
+};
+
 export const explainDamageHit = (
   input: DamageExplainInput,
   table: DamageTraitTable = DEFAULT_TABLE
@@ -302,6 +389,9 @@ export const explainDamageHit = (
   return [
     hitSection(input.hit),
     chainSection(input.hit, input.loadout, conditions, table),
-    // Later tasks append: crit, class, taken, postcap.
+    critSection(input.hit, input.loadout, conditions, table),
+    classSection(input.hit),
+    takenSection(input.hit),
+    // Later tasks append: postcap.
   ];
 };

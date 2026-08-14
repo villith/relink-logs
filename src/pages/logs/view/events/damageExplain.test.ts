@@ -140,3 +140,30 @@ describe("hp-gate gate", () => {
     expect(line("dmg-chain", "trait-0de887a0-value", {}, { hpRatio: 0.1 }).excluded).toBe("gate-unrecorded");
   });
 });
+
+describe("crit section", () => {
+  it("always shows the roll as unrecorded", () => {
+    const roll = line("dmg-crit", "crit-roll");
+    expect(roll.excluded).toBe("gate-unrecorded");
+    expect(roll.value).toEqual({ kind: "absent" });
+  });
+});
+
+describe("class section", () => {
+  it("names the attack class from class_flags", () => {
+    expect(line("dmg-class", "attack-class").value).toEqual({ kind: "text", value: "skill" });
+    expect(line("dmg-class", "attack-class", { class_flags: 0x40000 }).value).toEqual({
+      kind: "text",
+      value: "sba",
+    });
+    expect(line("dmg-class", "attack-class", { class_flags: null }).value).toEqual({ kind: "absent" });
+  });
+});
+
+describe("taken/variance section", () => {
+  it("states the one-sided variance band on the precap", () => {
+    const sec = section("dmg-taken");
+    expect(sec.formula).toContain("1.05");
+    expect(line("dmg-taken", "variance-band").value.kind).toBe("text");
+  });
+});
