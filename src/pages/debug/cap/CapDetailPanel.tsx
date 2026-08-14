@@ -56,6 +56,7 @@ const EXCLUSION_KEY: Record<ExplainReason, string> = {
   "no-action-mapping": "ui.debug.cap-excl-no-action",
   unparsed: "ui.debug.cap-excl-unparsed",
   "needs-params": "ui.debug.cap-excl-needs-params",
+  "gate-unrecorded": "ui.debug.cap-excl-gate-unrecorded",
 };
 
 /** A name resolved through whichever namespace owns it. Entities go through the

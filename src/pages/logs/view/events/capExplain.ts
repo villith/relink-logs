@@ -62,7 +62,7 @@ export type ExplainName =
 
 /** Why a line contributed nothing. The factor registry's own reasons, plus the
  * two placements only this projection knows about. */
-export type ExplainReason = CapExclusion | CapFactorReason | "needs-params";
+export type ExplainReason = CapExclusion | CapFactorReason | "needs-params" | "gate-unrecorded";
 
 export type ExplainLine = {
   key: string;
