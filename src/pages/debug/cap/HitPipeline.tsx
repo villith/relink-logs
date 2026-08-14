@@ -84,6 +84,9 @@ export const HitPipeline = ({ hit }: { hit: ExplainHit }) => {
         border: "1px solid var(--color-line)",
         borderRadius: 6,
         background: "var(--mantine-color-dark-7)",
+        // The strip keeps its natural height inside the detail flex column; a
+        // short window shortens the derivation scrollers below, never this.
+        flexShrink: 0,
       }}
     >
       <Group gap="sm" wrap="nowrap" align="center">

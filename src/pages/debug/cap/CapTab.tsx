@@ -13,18 +13,15 @@ import { HitPipeline } from "./HitPipeline";
 import { hitLabel, type CapDebugHit } from "./capHits";
 import { useCapDebugLog, usePlayersByActor, useRecentLogs } from "./useCapDebugLog";
 
-/** The hit list's height. A constant rather than a measurement, the same choice
- * the Events tab makes for the same reason. */
-const LIST_HEIGHT = 560;
 /** The hit list's width. Sized so a timestamp, a full ability key and a
  * seven-figure damage number sit on one line — at anything narrower the ability
  * column, which is the only one that says WHICH hit this is, is the one that
  * ellipsises. */
 const LIST_WIDTH = 380;
-/** The detail columns' height: LIST_HEIGHT minus the title, meta line and
- * pipeline strip that sit above them, so the right side bottom-aligns with the
- * hit list instead of growing the page. */
-const DETAIL_HEIGHT = LIST_HEIGHT - 160;
+
+/** A flex column whose children may scroll: `minHeight: 0` is what lets a
+ * scroller inside shrink to the column's height instead of overflowing it. */
+const FLEX_COLUMN = { display: "flex", flexDirection: "column", minHeight: 0 } as const;
 
 /** One row in the per-character hit list. */
 const HitRow = ({
@@ -161,7 +158,9 @@ export const CapTab = () => {
   }));
 
   return (
-    <Stack gap="sm">
+    // The page (Debug.tsx) is bounded to the viewport; this fills it, so the
+    // hit list and the derivation columns take all the height the window has.
+    <Stack gap="sm" h="100%" style={{ minHeight: 0 }}>
       <Group gap="sm" align="flex-end">
         <Select
           label={t("ui.debug.cap-log")}
@@ -227,14 +226,13 @@ export const CapTab = () => {
         </Text>
       )}
 
-      <Group align="flex-start" gap="md" wrap="nowrap">
-        <Box style={{ width: LIST_WIDTH, flexShrink: 0 }}>
+      <Group align="stretch" gap="md" wrap="nowrap" style={{ flexGrow: 1, minHeight: 0 }}>
+        <Box style={{ width: LIST_WIDTH, flexShrink: 0, ...FLEX_COLUMN }}>
           <Text size="xs" c="dimmed" mb={4}>
             {t("ui.debug.cap-hit-count", { count: shown.length })}
           </Text>
           <ScrollArea
-            h={LIST_HEIGHT}
-            style={{ border: "1px solid var(--color-line)", borderRadius: 4 }}
+            style={{ flexGrow: 1, minHeight: 0, border: "1px solid var(--color-line)", borderRadius: 4 }}
             aria-label={t("ui.debug.cap-hit-list")}
           >
             <Stack gap={0} p={2}>
@@ -251,7 +249,7 @@ export const CapTab = () => {
           </ScrollArea>
         </Box>
 
-        <Box style={{ flex: 1, minWidth: 0 }}>
+        <Box style={{ flex: 1, minWidth: 0, ...FLEX_COLUMN }}>
           {selected === null || hitPanels === null ? (
             <Text size="xs" c="dimmed">
               {t("ui.debug.cap-pick-a-hit")}
@@ -274,23 +272,23 @@ export const CapTab = () => {
                   it — the panel rows floor at MIN_ROW_WIDTH, below which each
                   column's own ScrollArea scrolls, so the page never grows a
                   horizontal scrollbar of its own. */}
-              <Group align="flex-start" gap="md" wrap="nowrap">
-                <Box style={{ flex: 1, minWidth: 0 }}>
+              <Group align="stretch" gap="md" wrap="nowrap" style={{ flexGrow: 1, minHeight: 0 }}>
+                <Box style={{ flex: 1, minWidth: 0, ...FLEX_COLUMN }}>
                   {/* One notch bigger and undimmed vs. CapDetailPanel's own
                       section headings, so "DAMAGE CALCULATION" reads as the
                       column's title rather than as its first section. */}
                   <Text size="sm" fw={700} tt="uppercase" mb={4}>
                     {t("ui.debug.cap-col-cap")}
                   </Text>
-                  <ScrollArea h={DETAIL_HEIGHT} offsetScrollbars>
+                  <ScrollArea offsetScrollbars style={{ flexGrow: 1, minHeight: 0 }}>
                     <CapDetailPanel sections={hitPanels.sections} />
                   </ScrollArea>
                 </Box>
-                <Box style={{ flex: 1, minWidth: 0 }}>
+                <Box style={{ flex: 1, minWidth: 0, ...FLEX_COLUMN }}>
                   <Text size="sm" fw={700} tt="uppercase" mb={4}>
                     {t("ui.debug.cap-col-damage")}
                   </Text>
-                  <ScrollArea h={DETAIL_HEIGHT} offsetScrollbars>
+                  <ScrollArea offsetScrollbars style={{ flexGrow: 1, minHeight: 0 }}>
                     <CapDetailPanel sections={hitPanels.damageSections} />
                   </ScrollArea>
                 </Box>
