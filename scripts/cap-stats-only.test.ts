@@ -59,7 +59,10 @@ import {
 } from "@/pages/logs/view/events/capFactors";
 import { capConsistent, gameLadderBase, ladderCurveFor } from "@/pages/logs/view/events/capLadder";
 import { capClassOf, type CapClass, type CapLoadout } from "@/pages/logs/view/events/capSources";
+import { setSkillNameSources } from "@/skillNameSources";
 import type { CharacterType } from "@/types";
+
+import shippedSkillNameSources from "../src-tauri/assets/skill-name-sources.json";
 
 type EvidenceHit = {
   t: number;
@@ -94,9 +97,18 @@ const ONLY_CHARACTER = process.env.CAP_CHARACTER ?? null;
 // Exploratory per-hit dump: offset + everything a hit carries, one TSV row
 // per scored hit, for correlating the offset scatter offline.
 const SCATTER_TSV = process.env.CAP_SCATTER_TSV ?? null;
+// Factor-resolution dump: for the FIRST scored hit of each (class, action),
+// print every factor row's state — the way to see whether a group/gated node
+// actually resolved before blaming the offset on a missing term.
+const FACTOR_DUMP = process.env.CAP_FACTOR_DUMP !== undefined;
 
 describe.skipIf(!EVIDENCE)("stats-only cap prediction", () => {
   it("scores every loadout-carrying player against their on-grid hits", () => {
+    // Ability-scoped group nodes resolve through the shipped action→hash
+    // bridge; without it every such node reads unknown and its percent lands
+    // in the offset (that artifact once masqueraded as a +45 on Heaven Comes
+    // Down).
+    setSkillNameSources(shippedSkillNameSources as Parameters<typeof setSkillNameSources>[0]);
     let scoredPlayers = 0;
     if (SCATTER_TSV !== null) {
       writeFileSync(SCATTER_TSV, "log\tactor\tclass\tt\taction\tobservedK\toffset\thp\tmaxHp\trate\tstatuses\n");
@@ -129,6 +141,7 @@ describe.skipIf(!EVIDENCE)("stats-only cap prediction", () => {
           const factorsByClass = new Map(
             CLASSES.map((capClass) => [capClass, collectCapFactors({ loadout: player, capClass })])
           );
+          const factorDumped = new Set<string>();
 
           for (const hit of log.hits) {
             if (hit.actor !== actor) continue;
@@ -183,6 +196,18 @@ describe.skipIf(!EVIDENCE)("stats-only cap prediction", () => {
             const offset = observedK - Math.round(predicted);
             const offsets = perClass.get(capClass);
             offsets?.set(offset, (offsets.get(offset) ?? 0) + 1);
+            if (FACTOR_DUMP && !factorDumped.has(`${capClass}:${hit.action}`)) {
+              factorDumped.add(`${capClass}:${hit.action}`);
+              console.log(
+                `FACTORS log ${log.id} actor 0x${actor.toString(16)} ${capClass} action ${hit.action} ` +
+                  `observedK ${observedK} predicted ${Math.round(predicted)} offset ${offset}`
+              );
+              for (const { factor, result } of totals.rows) {
+                const amount =
+                  result.state === "active" ? result.percent : result.state === "unknown" ? result.potential : 0;
+                console.log(`    ${factor.kind}:${factor.key} ${result.state} ${amount}`);
+              }
+            }
             hitRecords.get(capClass)?.push({
               offset,
               action: hit.action,
