@@ -120,33 +120,35 @@ export const CapTab = () => {
 
   const selected = useMemo(() => shown.find((hit) => hit.eventIndex === eventIndex) ?? null, [shown, eventIndex]);
 
-  const sections = useMemo(() => {
+  // One source of truth for the loadout + conditions both panels explain —
+  // computed once and fed to `explainCapHit` and `explainDamageHit` alike, so
+  // the two columns can never drift into narrating the same hit against
+  // different condition snapshots.
+  const hitPanels = useMemo(() => {
     if (selected === null) return null;
     const player = playersByActor.get(selected.sourceIndex);
-    return explainCapHit({
-      hit: selected.hit,
-      capUp: capUp[String(selected.sourceIndex)],
-      loadout: player,
-      characterType: player?.characterType,
-      // The attacker's own state at the moment of the hit, plus the stored stat
-      // block the banded traits ramp across, plus the hit's own action id for
-      // the move-scoped board nodes. A hit recorded before that capture
-      // existed supplies neither, and the factors that need them say so rather
-      // than reading as inactive.
-      conditions: conditionsForHit(selected.attacker, player?.playerStats ?? null, selected.actionId),
-    });
-  }, [selected, playersByActor, capUp]);
-
-  const damageSections = useMemo(() => {
-    if (selected === null) return null;
-    const player = playersByActor.get(selected.sourceIndex);
-    return explainDamageHit({
-      hit: selected.hit,
-      loadout: player,
-      conditions: conditionsForHit(selected.attacker, player?.playerStats ?? null, selected.actionId),
-      amplifyStatusIds,
-    });
-  }, [selected, playersByActor, amplifyStatusIds]);
+    // The attacker's own state at the moment of the hit, plus the stored stat
+    // block the banded traits ramp across, plus the hit's own action id for
+    // the move-scoped board nodes. A hit recorded before that capture existed
+    // supplies neither, and the factors that need them say so rather than
+    // reading as inactive.
+    const conditions = conditionsForHit(selected.attacker, player?.playerStats ?? null, selected.actionId);
+    return {
+      sections: explainCapHit({
+        hit: selected.hit,
+        capUp: capUp[String(selected.sourceIndex)],
+        loadout: player,
+        characterType: player?.characterType,
+        conditions,
+      }),
+      damageSections: explainDamageHit({
+        hit: selected.hit,
+        loadout: player,
+        conditions,
+        amplifyStatusIds,
+      }),
+    };
+  }, [selected, playersByActor, capUp, amplifyStatusIds]);
 
   const logOptions = recent.map((log) => ({
     value: String(log.id),
@@ -245,7 +247,7 @@ export const CapTab = () => {
         </Box>
 
         <Box style={{ flex: 1, minWidth: 0 }}>
-          {selected === null || sections === null || damageSections === null ? (
+          {selected === null || hitPanels === null ? (
             <Text size="xs" c="dimmed">
               {t("ui.debug.cap-pick-a-hit")}
             </Text>
@@ -261,19 +263,22 @@ export const CapTab = () => {
               </Text>
               <Group align="flex-start" gap="md" wrap="nowrap" style={{ overflowX: "auto" }}>
                 <Box style={{ flexShrink: 0 }}>
-                  <Text size="xs" fw={700} tt="uppercase" c="dimmed" mb={4}>
+                  {/* One notch bigger and undimmed vs. CapDetailPanel's own
+                      section headings, so "DAMAGE CALCULATION" reads as the
+                      column's title rather than as its first section. */}
+                  <Text size="sm" fw={700} tt="uppercase" mb={4}>
                     {t("ui.debug.cap-col-cap")}
                   </Text>
                   <ScrollArea h={LIST_HEIGHT} offsetScrollbars>
-                    <CapDetailPanel sections={sections} />
+                    <CapDetailPanel sections={hitPanels.sections} />
                   </ScrollArea>
                 </Box>
                 <Box style={{ flexShrink: 0 }}>
-                  <Text size="xs" fw={700} tt="uppercase" c="dimmed" mb={4}>
+                  <Text size="sm" fw={700} tt="uppercase" mb={4}>
                     {t("ui.debug.cap-col-damage")}
                   </Text>
                   <ScrollArea h={LIST_HEIGHT} offsetScrollbars>
-                    <CapDetailPanel sections={damageSections} />
+                    <CapDetailPanel sections={hitPanels.damageSections} />
                   </ScrollArea>
                 </Box>
               </Group>
