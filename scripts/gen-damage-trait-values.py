@@ -91,7 +91,7 @@ TRAITS = {
     0x73220725: {"slots": {"value": 0}},  # Celestial Ventus
     0xA898E283: {"slots": {"value": 0}},  # Celestial Aqua
     0x90F61DC3: {"slots": {"value": 0}, "key": "SKILL_168_00"},  # textless amplify
-    # Target-side (players taking hits) — cited by the taken-side section only.
+    # Target-side (players taking hits) — shipped for a future taken-side valuation; not yet read by the panel.
     0xE6CDBA9C: {"slots": {"value": 0}},  # Garrison
     0x74AA75D6: {"slots": {"value": 0}},  # Stronghold
     0x1470F860: {"slots": {"value": 0}},  # Steel Nerves

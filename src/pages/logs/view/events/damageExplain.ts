@@ -234,12 +234,19 @@ const traitLine = (
     case "hp-gate": {
       const gateRow = entry.values.hpGate ?? [];
       const threshold = gateRow[Math.min(level, gateRow.length) - 1];
-      if (conditions.hpRatio === undefined || threshold === undefined) line.excluded = "gate-unrecorded";
-      else {
+      // The threshold is a fact about the TABLE, not about this hit — show it
+      // whenever it exists, even if the hp ratio needed to evaluate the gate
+      // was never captured. Only a genuinely missing table row falls back to
+      // the generic `L<n>` source.
+      if (threshold !== undefined) {
+        line.source = { kind: "literal", value: `${entry.key} L${level}, hp ${gate.cmp} ${threshold}%` };
+      }
+      if (conditions.hpRatio === undefined || threshold === undefined) {
+        line.excluded = "gate-unrecorded";
+      } else {
         const pct = conditions.hpRatio * 100;
         const met = gate.cmp === "gte" ? pct >= threshold : pct <= threshold;
         if (!met) line.excluded = "conditional";
-        line.source = { kind: "literal", value: `${entry.key} L${level}, hp ${gate.cmp} ${threshold}%` };
       }
       break;
     }

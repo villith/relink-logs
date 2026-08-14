@@ -131,6 +131,22 @@ describe("hp-gate gate", () => {
     expect(line("dmg-chain", "trait-a7726190-value").excluded).toBe("gate-unrecorded");
   });
 
+  it("still shows the threshold-bearing source when only the hp ratio is missing", () => {
+    // The threshold is a fact about the table, not about this hit — it should
+    // read regardless of whether hpRatio was captured for this hit.
+    const gated = line("dmg-chain", "trait-a7726190-value");
+    expect(gated.excluded).toBe("gate-unrecorded");
+    expect(gated.source).toEqual({ kind: "literal", value: "SKILL_321_00 L1, hp gte 75%" });
+  });
+
+  it("falls back to the default source when the table has no threshold row", () => {
+    // Celestial Nyx's fake table row omits hpGate — with no threshold to show,
+    // the generic `L<n>` source is what's left.
+    const gated = line("dmg-chain", "trait-0de887a0-value", {}, { hpRatio: 0.1 });
+    expect(gated.excluded).toBe("gate-unrecorded");
+    expect(gated.source).toEqual({ kind: "literal", value: "SKILL_320_00 L1" });
+  });
+
   it("applies when the hp ratio clears the gate", () => {
     const gated = line("dmg-chain", "trait-a7726190-value", {}, { hpRatio: 0.8 });
     expect(gated.excluded).toBeUndefined();
