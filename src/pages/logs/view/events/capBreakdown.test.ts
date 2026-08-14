@@ -35,7 +35,7 @@ const hit = {
 
 const context = (over: Partial<CapContext> = {}): CapContext => ({
   ladderBase: null,
-  consistent: null,
+  verdict: null,
   record: null,
   recordComponents: [],
   dmgCapTrait: 0,
@@ -77,22 +77,36 @@ describe("capCardRows", () => {
     const real = { ...hit, damage_cap: 152_737 };
 
     it("reports the real base and the game's per-hit total", () => {
-      const rows = capCardRows(real, context({ ladderBase: 5399, consistent: true }));
+      const rows = capCardRows(real, context({ ladderBase: 5399, verdict: "pass" }));
       const byKey = Object.fromEntries(rows.map((r) => [r.key, r.value]));
       expect(byKey["basecap"]).toBe(5399);
       expect(byKey["gamecapup"]).toBeCloseTo(2729, 0);
     });
 
     it("carries the formula verdict as its own row", () => {
-      const rows = capCardRows(real, context({ ladderBase: 5399, consistent: true }));
+      const rows = capCardRows(real, context({ ladderBase: 5399, verdict: "pass" }));
       expect(rows.find((r) => r.key === "verdict")).toEqual({
         key: "verdict",
         labelKey: "ui.logs.cap-formula-check",
         value: 1,
         kind: "verdict",
       });
-      const bad = capCardRows(real, context({ ladderBase: 5399, consistent: false }));
+      const bad = capCardRows(real, context({ ladderBase: 5399, verdict: "fail" }));
       expect(bad.find((r) => r.key === "verdict")?.value).toBe(0);
+    });
+
+    it("renders the ease as its own verdict state and relabels the remainder", () => {
+      // A mid-ease hit is the game's own arithmetic passing between the
+      // actor's grid states: value 2 (the ⇄ mark), and what the attribution
+      // cannot explain is the easing gap, not an unaccounted term.
+      for (const verdict of ["transition", "settling"] as const) {
+        const rows = capCardRows(real, context({ ladderBase: 5399, verdict }));
+        expect(rows.find((r) => r.key === "verdict")?.value).toBe(2);
+        const remainder = rows.find((r) => r.key === "unaccounted");
+        expect(remainder?.labelKey).toBe("ui.logs.cap-easing-gap");
+      }
+      const passing = capCardRows(real, context({ ladderBase: 5399, verdict: "pass" }));
+      expect(passing.find((r) => r.key === "unaccounted")?.labelKey).toBe("ui.logs.cap-unaccounted");
     });
 
     it("attributes the captured record and the DMG Cap trait against the game total", () => {
@@ -100,7 +114,7 @@ describe("capCardRows", () => {
         real,
         context({
           ladderBase: 5399,
-          consistent: true,
+          verdict: "pass",
           record: 18.96,
           dmgCapTrait: 2.38,
           recordComponents: [{ key: "overmastery", labelKey: "ui.logs.cap-source-overmastery", value: 0.2 }],
@@ -121,7 +135,7 @@ describe("capCardRows", () => {
         real,
         context({
           ladderBase: 5399,
-          consistent: true,
+          verdict: "pass",
           record: 18.96,
           conditional: [{ key: "conditional-1e1cecce", labelKey: "", traitId: 0x1e1cecce, value: 5.0 }],
         })
@@ -134,7 +148,7 @@ describe("capCardRows", () => {
     });
 
     it("shows the unaccounted row even when nothing is attributed", () => {
-      const rows = capCardRows(real, context({ ladderBase: 5399, consistent: true }));
+      const rows = capCardRows(real, context({ ladderBase: 5399, verdict: "pass" }));
       expect(rows.find((r) => r.key === "unaccounted")?.value).toBeCloseTo(2729, 0);
     });
 
@@ -146,7 +160,7 @@ describe("capCardRows", () => {
         real,
         context({
           ladderBase: 5399,
-          consistent: true,
+          verdict: "pass",
           record: 18.96,
           channel: [{ key: "channel", labelKey: "ui.logs.cap-term-channel", value: 4.35 }],
         })

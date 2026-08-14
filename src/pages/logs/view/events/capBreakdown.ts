@@ -50,10 +50,12 @@ export type CapSource = {
  * pre-ladder behaviour. */
 export type CapContext = {
   ladderBase: number | null;
-  /** Whether the logged cap sits on the integer-percent grid the formula
-   * produces from `ladderBase` — the per-hit validity check. `null` when the
-   * ladder cannot say. */
-  consistent: boolean | null;
+  /** The per-hit grid check, refined by the residual-scan classification when
+   * it fails: `pass` sits on the integer-percent grid, `transition`/`settling`
+   * are a state-gated term's ease judged against the actor's own grid states
+   * (both render as one "state transition" mark), `fail` is genuinely
+   * unexplained. `null` when the ladder cannot say. */
+  verdict: CapVerdict | null;
   /** The captured per-player record channel for this hit's class — the fused
    * loadout total the game computed at load (overmasteries, summon bonuses,
    * every cap trait except plain DMG Cap, board nodes). */
@@ -70,6 +72,8 @@ export type CapContext = {
    * fallback total never contained them. */
   channel?: CapSource[];
 };
+
+export type CapVerdict = "pass" | "transition" | "settling" | "fail";
 
 /** Mirrors the Rust `PlayerCapUp`. */
 export type PlayerCapUp = {
@@ -121,14 +125,15 @@ const capUpRows = (cap: number, context: CapContext): CapRow[] => {
   const total = gameTotal ?? record;
   if (total === null || 1 + total <= 0) return rows;
 
+  const easing = context.verdict === "transition" || context.verdict === "settling";
   if (gameTotal !== null) {
     rows.push({ key: "basecap", labelKey: "ui.logs.cap-base", value: ladderBase!, kind: "count" });
     rows.push(asPercent("gamecapup", "ui.logs.cap-game-capup", gameTotal));
-    if (context.consistent !== null) {
+    if (context.verdict !== null) {
       rows.push({
         key: "verdict",
         labelKey: "ui.logs.cap-formula-check",
-        value: context.consistent ? 1 : 0,
+        value: context.verdict === "pass" ? 1 : easing ? 2 : 0,
         kind: "verdict",
       });
     }
@@ -176,7 +181,10 @@ const capUpRows = (cap: number, context: CapContext): CapRow[] => {
   // badly is when the reader most needs it.
   const unaccounted =
     gameTotal !== null ? gameTotal - attributed : total - context.recordComponents.reduce((sum, c) => sum + c.value, 0);
-  rows.push(asPercent("unaccounted", "ui.logs.cap-unaccounted", unaccounted));
+  // On an eased hit the remainder IS the ease — the gap between the game's
+  // mid-transition multiplier and the attributed resting terms. Same number,
+  // honest name.
+  rows.push(asPercent("unaccounted", easing ? "ui.logs.cap-easing-gap" : "ui.logs.cap-unaccounted", unaccounted));
   return rows;
 };
 
