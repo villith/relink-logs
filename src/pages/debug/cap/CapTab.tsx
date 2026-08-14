@@ -9,6 +9,7 @@ import { explainDamageHit } from "@/pages/logs/view/events/damageExplain";
 import { getSkillName, millisecondsToPreciseElapsedFormat, translateCharacterType } from "@/utils";
 
 import { CapDetailPanel } from "./CapDetailPanel";
+import { HitPipeline } from "./HitPipeline";
 import { hitLabel, type CapDebugHit } from "./capHits";
 import { useCapDebugLog, usePlayersByActor, useRecentLogs } from "./useCapDebugLog";
 
@@ -20,6 +21,10 @@ const LIST_HEIGHT = 560;
  * column, which is the only one that says WHICH hit this is, is the one that
  * ellipsises. */
 const LIST_WIDTH = 380;
+/** The detail columns' height: LIST_HEIGHT minus the title, meta line and
+ * pipeline strip that sit above them, so the right side bottom-aligns with the
+ * hit list instead of growing the page. */
+const DETAIL_HEIGHT = LIST_HEIGHT - 160;
 
 /** One row in the per-character hit list. */
 const HitRow = ({
@@ -257,10 +262,14 @@ export const CapTab = () => {
                 {hitLabel(selected, nameOf(selected))}
               </Text>
               {/* The wire key alongside the name: this is a debug panel, and
-                  the raw action id is what a finding gets quoted by. */}
+                  the raw action id is what a finding gets quoted by. The damage
+                  itself is not repeated here — it is the pipeline's Final cell. */}
               <Text size="xs" c="dimmed" mb="sm">
-                {`${millisecondsToPreciseElapsedFormat(selected.timeMs)} · ${selected.abilityKey} · ${selected.hit.damage.toLocaleString(i18n.language)}`}
+                {`${millisecondsToPreciseElapsedFormat(selected.timeMs)} · ${selected.abilityKey}`}
               </Text>
+              {/* What happened to this hit, before either column's working:
+                  pre-cap -> cap -> post-cap -> final, with the clamp drawn. */}
+              <HitPipeline hit={selected.hit} />
               {/* Both columns split the detail area evenly and compress with
                   it — the panel rows floor at MIN_ROW_WIDTH, below which each
                   column's own ScrollArea scrolls, so the page never grows a
@@ -273,7 +282,7 @@ export const CapTab = () => {
                   <Text size="sm" fw={700} tt="uppercase" mb={4}>
                     {t("ui.debug.cap-col-cap")}
                   </Text>
-                  <ScrollArea h={LIST_HEIGHT} offsetScrollbars>
+                  <ScrollArea h={DETAIL_HEIGHT} offsetScrollbars>
                     <CapDetailPanel sections={hitPanels.sections} />
                   </ScrollArea>
                 </Box>
@@ -281,7 +290,7 @@ export const CapTab = () => {
                   <Text size="sm" fw={700} tt="uppercase" mb={4}>
                     {t("ui.debug.cap-col-damage")}
                   </Text>
-                  <ScrollArea h={LIST_HEIGHT} offsetScrollbars>
+                  <ScrollArea h={DETAIL_HEIGHT} offsetScrollbars>
                     <CapDetailPanel sections={hitPanels.damageSections} />
                   </ScrollArea>
                 </Box>
