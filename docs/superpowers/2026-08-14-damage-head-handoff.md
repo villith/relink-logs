@@ -57,6 +57,49 @@ summary in the `damage-head-formula-re` memory.
    critdmg 135% — the remaining 20 points are the crit base
    (`slice+0x140`) + Lucky Charge; verify once slot values are swept.
 
+## Milestone 2 — target-side PDE decompile (2026-08-14 pm, static, DONE)
+
+The whole ProcessDamageEvent pipeline is now mapped (detail + decompile
+paths in the gitignored formula-tree spec, "PDE FUN_141fb82d0" section).
+Headlines:
+
+- **Architecture settled.** PDE's a1 is the target's **ExDamage**
+  component (per-class 26-slot vftables, 371 total: 121 Em-base / 36
+  Pl-base / 53 stage-object / 133 stub / ~15 boss overrides). The hook's
+  "specified instance" actor ptr is a subobject at **holder+0xD00**; its
+  25-slot vftable carries the damage builder at +0x58 and the stun
+  builder at +0x60 — **both are called INSIDE PDE** (step 3), after the
+  Em gate-byte writer (step 1) refreshes `+0x15E..0x163/0x168` from live
+  target state. Weak point = authored part flag by part id `inst+0x148`;
+  back attack = the <90° angle test; `+0x160` = target action inside an
+  authored vulnerable window.
+- **The ×1.37–1.79 final/precap gap is the post-cap chain**, now fully
+  decomposed: elemental advantage mult (`1 + base@+0x2488 + agg(0x1A)
+  pair + record+0x5964%`), × the **Amplify chain** (ΣIStatusAmplifyBuff
+  ± , Celestial Aqua/Ventus + textless SKILL_168_00 traits, EDL_CHAOS
+  per-action row, agg ids 3/0x23/0x30), + the **at-cap-only overflow**:
+  `cap × k@+0x249C × (ATK-buff-chain − 1)` — ATK buffs pierce the cap on
+  capped hits. Sync-quest min-clamp last (`inst+0x154`, quest row).
+- **Variance site corrected**: for enemy targets the +0–5% roll is in the
+  Em taken-chain (`FUN_140b283d0`), not the builder's flag-gated copy
+  (which never fired in round 1). Two unknown Em-actor virtuals
+  (+0x728/+0x730) run just before it — the only still-unread pre-precap
+  step.
+- **Player-taken damage** (`FUN_1409b85f0`): DEF aggregator pair (ids
+  1/0x21), per-element taken-trait table `DAT_1459b0bd0`, Garrison +
+  Stronghold as HP-curve DEF traits, %-max-HP damage on flags bit 0x3A,
+  and a hard 999,999 clamp on player-taken hits.
+- **New trait names**: Garrison, Stronghold, Steel Nerves, Steady Focus,
+  Celestial Aqua {amplify, Break/mode-gated}, Celestial Ventus
+  {amplify}, textless SKILL_026_00 / SKILL_035_00 / SKILL_168_00.
+  New aggregator param ids: 1/0x21 DEF, 3/0x23 amplify, 0x1A elemental,
+  0x30 amplify-conditional.
+
+Still open in milestone 2: Em +0x728/+0x730, the ~15 boss-specific taken
+overrides, provenance of `+0x2488/+0x248C/+0x2490/+0x249C`, live
+verification of the post-cap decomposition (extend the oracle to log
+elem/amplify/overflow terms per hit), and the original items 2–5 below.
+
 ## Tooling (copy, don't re-derive)
 
 Capture: dev hook (`hookdiag` build) → play a NON-SYNC quest → extract
