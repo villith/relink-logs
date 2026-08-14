@@ -39,7 +39,9 @@ type DamageTraitSpec = {
   id: number;
   section: "chain" | "crit" | "postcap" | "taken";
   /** One row per labeled slot; a slot named `hpGate`/`rateMin`/`rateMax` is a
-   * threshold, rendered as depth-1 context under its trait, never a value row. */
+   * threshold, meant to render as depth-1 context under its trait rather than
+   * as a value row of its own — not yet rendered; `CONTEXT_SLOTS` only
+   * suppresses it from the value list today. */
   gates: Record<string, Gate>;
 };
 
@@ -118,8 +120,9 @@ export type DamageExplainInput = {
   amplifyStatusIds?: ReadonlySet<number>;
 };
 
-/** min(base, cap) — what the post-cap chain starts from. Null when either
- * half is unrecorded. */
+/** min(base, cap) — what the post-cap chain starts from. Null when
+ * `base_damage` itself is unrecorded; falls back to `base_damage` alone when
+ * only `damage_cap` is missing, since an uncapped precap is its own bound. */
 const clampedPrecap = (hit: ExplainHit): number | null => {
   if (hit.base_damage === null) return null;
   if (hit.damage_cap === null) return hit.base_damage;

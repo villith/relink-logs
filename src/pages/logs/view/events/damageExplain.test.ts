@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ExplainHit } from "./capExplain";
+import type { CapConditions } from "./capFactors";
 import { explainDamageHit, type DamageTraitTable } from "./damageExplain";
 
 /** A tiny fake value table so tests never depend on the generated asset. */
@@ -13,14 +14,32 @@ const TABLE: DamageTraitTable = {
     "1c360c63": { key: "SKILL_004_00", name: "Charged Attack DMG", values: { value: [10, 12] } },
     // Weak Point DMG (gate-byte trait).
     "6b694d6d": { key: "SKILL_020_00", name: "Weak Point DMG", values: { weakpoint: [15], backattack: [8] } },
+    // Concentrated Fire (flags-bit trait, bit 0x8).
+    b360801d: { key: "SKILL_018_00", name: "Concentrated Fire", values: { value: [10] } },
+    // Celestial Lumen (hp-gate trait, gte 75%).
+    a7726190: { key: "SKILL_321_00", name: "Celestial Lumen", values: { value: [30], hpGate: [75] } },
+    // Celestial Nyx (hp-gate trait, lte 25% in the real tables) — this fake
+    // row omits `hpGate` on purpose, to cover the missing-threshold-row case.
+    "0de887a0": { key: "SKILL_320_00", name: "Celestial Nyx", values: { value: [16] } },
   },
 };
 
-/** Loadout with Skilled Assault L2 (sigil) + Charged Attack DMG L1 + Weak Point L1. */
+/**
+ * Loadout exercising every gate kind the registry covers:
+ *  - Skilled Assault L2, split across TWO sigils at L1 each — only summing
+ *    through `computeCombinedTraits` reaches L2 (and thus the table's +25%
+ *    row); reading either sigil's own field would stop at L1's +20%.
+ *  - Charged Attack DMG L1 + Weak Point L1 (class-flag / gate-byte, existing coverage).
+ *  - Concentrated Fire L1 (flags-bit) + Celestial Lumen L1 (hp-gate, gte).
+ *  - Celestial Nyx L1 (hp-gate, lte) — table row has no `hpGate` slot.
+ */
 const LOADOUT = {
   sigils: [
-    { sigilId: 1, firstTraitId: 0xeae321eb, firstTraitLevel: 2, secondTraitId: 0, secondTraitLevel: 0 },
-    { sigilId: 2, firstTraitId: 0x1c360c63, firstTraitLevel: 1, secondTraitId: 0x6b694d6d, secondTraitLevel: 1 },
+    { sigilId: 1, firstTraitId: 0xeae321eb, firstTraitLevel: 1, secondTraitId: 0, secondTraitLevel: 0 },
+    { sigilId: 2, firstTraitId: 0xeae321eb, firstTraitLevel: 1, secondTraitId: 0, secondTraitLevel: 0 },
+    { sigilId: 3, firstTraitId: 0x1c360c63, firstTraitLevel: 1, secondTraitId: 0x6b694d6d, secondTraitLevel: 1 },
+    { sigilId: 4, firstTraitId: 0xb360801d, firstTraitLevel: 1, secondTraitId: 0xa7726190, secondTraitLevel: 1 },
+    { sigilId: 5, firstTraitId: 0x0de887a0, firstTraitLevel: 1, secondTraitId: 0, secondTraitLevel: 0 },
   ],
   summons: [],
   weaponState: null,
@@ -37,17 +56,17 @@ const HIT: ExplainHit = {
   flags: 0,
 };
 
-const sections = (over: Partial<typeof HIT> = {}) =>
-  explainDamageHit({ hit: { ...HIT, ...over }, loadout: LOADOUT, conditions: {} }, TABLE);
+const sections = (over: Partial<typeof HIT> = {}, conditions: CapConditions = {}) =>
+  explainDamageHit({ hit: { ...HIT, ...over }, loadout: LOADOUT, conditions }, TABLE);
 
-const section = (key: string, over: Partial<typeof HIT> = {}) => {
-  const found = sections(over).find((s) => s.key === key);
+const section = (key: string, over: Partial<typeof HIT> = {}, conditions: CapConditions = {}) => {
+  const found = sections(over, conditions).find((s) => s.key === key);
   expect(found).toBeDefined();
   return found!;
 };
 
-const line = (sectionKey: string, lineKey: string, over: Partial<typeof HIT> = {}) => {
-  const found = section(sectionKey, over).lines.find((l) => l.key === lineKey);
+const line = (sectionKey: string, lineKey: string, over: Partial<typeof HIT> = {}, conditions: CapConditions = {}) => {
+  const found = section(sectionKey, over, conditions).lines.find((l) => l.key === lineKey);
   expect(found).toBeDefined();
   return found!;
 };
@@ -65,6 +84,8 @@ describe("hit section", () => {
 
 describe("attack chain", () => {
   it("values an equipped trait at its combined level when its class gate fires", () => {
+    // eae321eb is split L1 + L1 across two sigils; only the combined L2 row
+    // (+25%) is right — a bug reading a single sigil's slot would give +20%.
     const skilled = line("dmg-chain", "trait-eae321eb-value");
     expect(skilled.excluded).toBeUndefined();
     expect(skilled.value).toEqual({ kind: "percent", value: 25 });
@@ -83,5 +104,39 @@ describe("attack chain", () => {
 
   it("marks class gates unresolvable when class_flags is null", () => {
     expect(line("dmg-chain", "trait-eae321eb-value", { class_flags: null }).excluded).toBe("gate-unrecorded");
+  });
+});
+
+describe("flags-bit gate", () => {
+  it("includes the trait when its flags bit is set", () => {
+    const included = line("dmg-chain", "trait-b360801d-value", { flags: 0x8 });
+    expect(included.excluded).toBeUndefined();
+    expect(included.value).toEqual({ kind: "percent", value: 10 });
+  });
+
+  it("excludes the trait as conditional when the flags bit is clear", () => {
+    expect(line("dmg-chain", "trait-b360801d-value", { flags: 0 }).excluded).toBe("conditional");
+  });
+});
+
+describe("hp-gate gate", () => {
+  it("is gate-unrecorded when the hp ratio is not known", () => {
+    expect(line("dmg-chain", "trait-a7726190-value").excluded).toBe("gate-unrecorded");
+  });
+
+  it("applies when the hp ratio clears the gate", () => {
+    const gated = line("dmg-chain", "trait-a7726190-value", {}, { hpRatio: 0.8 });
+    expect(gated.excluded).toBeUndefined();
+    expect(gated.value).toEqual({ kind: "percent", value: 30 });
+  });
+
+  it("excludes as conditional when the hp ratio misses the gate", () => {
+    expect(line("dmg-chain", "trait-a7726190-value", {}, { hpRatio: 0.5 }).excluded).toBe("conditional");
+  });
+
+  it("is gate-unrecorded when the table carries no hpGate row for the trait", () => {
+    // Celestial Nyx's fake table row omits hpGate on purpose — even a known
+    // hp ratio cannot resolve a gate with no threshold to compare against.
+    expect(line("dmg-chain", "trait-0de887a0-value", {}, { hpRatio: 0.1 }).excluded).toBe("gate-unrecorded");
   });
 });

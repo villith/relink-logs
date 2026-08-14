@@ -609,7 +609,9 @@ const clampSection = (hit: ExplainHit): ExplainSection => {
       source: literal("min(base_damage, damage_cap)"),
       emphasis: "total",
     },
-    { key: "capped", name: key("ui.debug.cap-was-capped"), value: verdict(base > cap), depth: 1 },
+    // >= : a hit exactly at cap IS at cap — matches hitSection's own verdict
+    // in damageExplain.ts, so the two panels never disagree on the same hit.
+    { key: "capped", name: key("ui.debug.cap-was-capped"), value: verdict(base >= cap), depth: 1 },
     {
       key: "overcap",
       name: key("ui.debug.cap-overcap"),
