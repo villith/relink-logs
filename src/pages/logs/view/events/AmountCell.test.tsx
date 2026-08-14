@@ -268,6 +268,17 @@ describe("AmountCell", () => {
     expect(card.querySelector('[data-cap-row="channel"]')?.textContent).toContain("15%");
   });
 
+  it.skipIf(!SHOWS_CAP_CARD)("predicts a summon-class capless hit as the bare ladder base", () => {
+    // Ground truth: log 2654's 52 summon hits at rate f32(98.883) log cap
+    // 1,186,595 — exactly the SO0000 curve base, no player multiplier.
+    renderCell({ ...remoteProps, capHit: { ...remoteHit, attack_rate: 98.883003234863281, class_flags: 0x81 } });
+    hover("80,000");
+    const card = screen.getByTestId("cap-card");
+    expect(card.querySelector('[data-cap-row="predicted"]')?.textContent).toContain("≈ 1,186,595");
+    expect(card.querySelector('[data-cap-row="capup"]')).toBeNull();
+    expect(card.querySelector('[data-cap-row="dmgcap"]')).toBeNull();
+  });
+
   it("shows no predicted card without the captured store", () => {
     renderCell({ ...remoteProps, playerCapUp: undefined });
     hover("80,000");
@@ -283,8 +294,8 @@ describe("AmountCell", () => {
   it("withholds the prediction for a denylisted character", () => {
     renderCell({
       ...remoteProps,
-      characterType: "Pl2900" as const,
-      loadout: { ...remoteProps.loadout, characterType: "Pl2900" },
+      characterType: "Pl0600" as const,
+      loadout: { ...remoteProps.loadout, characterType: "Pl0600" },
     });
     hover("80,000");
     expect(screen.queryByTestId("cap-card")).toBeNull();

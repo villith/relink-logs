@@ -242,6 +242,7 @@ describe("capPredictableKey", () => {
 describe("predictedCapRows", () => {
   const capless = { damage: 80_000, damage_cap: null, base_damage: null, attack_rate: 0.54, class_flags: 0x1 };
   const predictedContext = {
+    summonClass: false,
     ladderBase: 5_399,
     record: 13.13,
     dmgCapTrait: 2.5,
@@ -291,6 +292,17 @@ describe("predictedCapRows", () => {
       conditional: [],
     });
     expect(rows.map((row) => row.key)).toEqual(["damage", "predicted", "mv", "basecap", "capup"]);
+  });
+
+  it("predicts a summon-class hit as the bare ladder base, no multiplier rows", () => {
+    // Every summon-class capped hit in the corpus (57 hits, log 2654, three
+    // rates) logs cap == trunc(base): the attacker-side terms belong to the
+    // summon actor, which has no store, traits or channel. None of the
+    // player's terms may appear — not even as unresolved potentials.
+    const summon = { ...capless, class_flags: 0x81 };
+    const rows = predictedCapRows(summon, { ...predictedContext, summonClass: true, channelUnresolved: 0.3 });
+    expect(rows.find((row) => row.key === "predicted")).toMatchObject({ value: 5_399, kind: "count", approx: true });
+    expect(rows.map((row) => row.key)).toEqual(["damage", "predicted", "mv", "basecap"]);
   });
 
   it("returns nothing for a base or total the formula cannot have used", () => {

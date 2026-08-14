@@ -265,6 +265,10 @@ export const PREDICTED_CAP_DENYLIST: ReadonlySet<string> = new Set(["Pl0600"]);
  * required — the caller gates on having them, because a predicted figure built
  * on a substituted term would be a guess wearing a formula's clothes. */
 export type PredictedCapContext = {
+  /** `isSummonClass(class_flags)` — a summon-class hit predicts the bare
+   * ladder base: the multiplier terms are the attacker's, and the summon
+   * actor has none (see the helper's provenance note). */
+  summonClass: boolean;
   ladderBase: number;
   /** The captured per-class store (`selectCapUp`), as a fraction. */
   record: number;
@@ -285,8 +289,8 @@ export type PredictedCapContext = {
  * rows (logged cap, formula check, pre-cap base, overcap, post-cap multiplier)
  * are deliberately absent — nothing exists to check a prediction against. */
 export const predictedCapRows = (hit: CapHit, context: PredictedCapContext): CapRow[] => {
-  const { ladderBase, record, dmgCapTrait, channelActive, channelUnresolved } = context;
-  const total = 1 + record + dmgCapTrait + channelActive;
+  const { summonClass, ladderBase, record, dmgCapTrait, channelActive, channelUnresolved } = context;
+  const total = summonClass ? 1 : 1 + record + dmgCapTrait + channelActive;
   if (ladderBase <= 0 || total <= 0) return [];
 
   const rows: CapRow[] = [
@@ -303,6 +307,9 @@ export const predictedCapRows = (hit: CapHit, context: PredictedCapContext): Cap
     rows.push({ key: "mv", labelKey: "ui.logs.cap-mv", value: hit.attack_rate, kind: "rate" });
   }
   rows.push({ key: "basecap", labelKey: "ui.logs.cap-base", value: ladderBase, kind: "count" });
+  // A summon-class prediction is the base alone — none of the player's terms
+  // apply, so none may render, not even as potentials.
+  if (summonClass) return rows;
   rows.push(asPercent("capup", "ui.logs.cap-term-record", record));
   for (const component of context.recordComponents) {
     rows.push(asPercent(component.key, component.labelKey, component.value, { variant: "sub" }));

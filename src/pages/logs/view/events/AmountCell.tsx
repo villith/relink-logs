@@ -21,7 +21,7 @@ import {
 } from "./capBreakdown";
 import { deriveChannelBreakdown, deriveChannelTotal, type CapConditions } from "./capFactors";
 import { capBucketOf, classifyOffGrid, type CapBucket, type GridKStates } from "./capGridStates";
-import { capConsistent, gameLadderBase, ladderCurveFor } from "./capLadder";
+import { capConsistent, gameLadderBase, isSummonClass, ladderCurveFor } from "./capLadder";
 import {
   capClassOf,
   deriveConditionalSources,
@@ -147,6 +147,7 @@ export const AmountCell = ({
       return {
         predicted: true,
         rows: predictedCapRows(capHit, {
+          summonClass: isSummonClass(capHit.class_flags),
           ladderBase: predictedBase,
           record,
           dmgCapTrait: dmgCapTraitValue(loadout, capClass),

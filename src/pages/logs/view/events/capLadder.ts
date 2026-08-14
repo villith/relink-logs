@@ -102,12 +102,20 @@ export const gameLadderBase = (points: LadderPoint[], rate: number): number => g
  * when the arts bit is also set; only then does `0x40000` choose the arts map,
  * keyed by the attacker's character.
  */
+/** The builder's summon test — the sign of the class-flag byte. A summon-class
+ * hit reads the shared `SO0000` curve AND takes none of the player's cap-up
+ * terms: the additive terms are the ATTACKER's, and the summon actor carries no
+ * store, traits or channel. Every summon-class capped hit in the capture-era
+ * corpus logs `cap == trunc(base)` exactly (57 hits, log 2654, three distinct
+ * rates — one character so far; the blind sweep re-verifies as more land). */
+export const isSummonClass = (classFlags: number | null): boolean => classFlags !== null && (classFlags & 0x80) !== 0;
+
 export const ladderCurveFor = (
   characterType: CharacterType | undefined,
   classFlags: number | null
 ): LadderPoint[] | null => {
   if (classFlags === null) return null;
-  if (classFlags & 0x80) return CURVES.normal[SUMMON_CURVE_KEY] ?? null;
+  if (isSummonClass(classFlags)) return CURVES.normal[SUMMON_CURVE_KEY] ?? null;
   if (typeof characterType !== "string") return null;
   const hash = HASH_BY_CHARACTER.get(characterType);
   if (hash === undefined) return null;
