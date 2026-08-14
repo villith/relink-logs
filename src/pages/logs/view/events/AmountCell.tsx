@@ -140,7 +140,7 @@ export const AmountCell = ({
       if (capHit.attack_rate === null || curve === null) return NONE;
       const record = selectCapUp(playerCapUp, capHit.class_flags);
       if (record === null || loadout === undefined) return NONE;
-      if (characterType === undefined || PREDICTED_CAP_DENYLIST.has(characterType)) return NONE;
+      if (typeof characterType !== "string" || PREDICTED_CAP_DENYLIST.has(characterType)) return NONE;
       const predictedBase = gameLadderBase(curve, capHit.attack_rate);
       if (predictedBase <= 0) return NONE;
       const channel = deriveChannelBreakdown(loadout, capClass, conditions ?? {});

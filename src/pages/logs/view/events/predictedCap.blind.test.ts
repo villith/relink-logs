@@ -60,7 +60,9 @@ describe.skipIf(fixture === undefined)("blind local prediction sweep", () => {
       const player = players.get(`${line.log}:${line.actor}`);
       if (player === undefined) continue;
       const characterType = player.loadout.characterType;
-      if (characterType === undefined || PREDICTED_CAP_DENYLIST.has(characterType)) continue;
+      // The union's `{ Unknown: n }` arm has no ladder and no denylist row —
+      // narrowing to string is the same "named character" gate the card uses.
+      if (typeof characterType !== "string" || PREDICTED_CAP_DENYLIST.has(characterType)) continue;
       const record = selectCapUp(player.capUp, line.classFlags);
       const curve = ladderCurveFor(characterType, line.classFlags);
       if (record === null || curve === null) continue;
