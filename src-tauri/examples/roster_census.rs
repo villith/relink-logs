@@ -18,6 +18,11 @@
 //! Run: cargo run --release -p gbfr-logs --example roster_census -- [--db path] [--last N] [--dump]
 //!   --dump prints every player row; default prints only lobby logs plus the
 //!   corpus summary.
+//!   --predictor instead emits one TSV row per player slot that captured the
+//!   limit-bonus store: the account values next to every visible account
+//!   PROXY (master level, weapon stars, transcendence/awakening, plus
+//!   marks) — the dataset for testing whether any proxy combination
+//!   predicts the store for pre-capture logs.
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -29,12 +34,14 @@ fn main() -> Result<()> {
     let mut db = PathBuf::from("src-tauri/logs.db");
     let mut last = usize::MAX;
     let mut dump = false;
+    let mut predictor = false;
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--db" => db = PathBuf::from(args.next().context("--db needs a path")?),
             "--last" => last = args.next().context("--last needs N")?.parse()?,
             "--dump" => dump = true,
+            "--predictor" => predictor = true,
             other => anyhow::bail!("unknown argument {other}"),
         }
     }
@@ -52,6 +59,13 @@ fn main() -> Result<()> {
     let mut online_signatures: BTreeMap<String, usize> = BTreeMap::new();
     let (mut n_solo, mut n_enlist, mut n_lobby) = (0usize, 0usize, 0usize);
     let mut lobby_ids: Vec<i64> = Vec::new();
+
+    if predictor {
+        println!(
+            "log\tkind\tactor\tcharacter\tname\tonline\tmasterLevel\tstarLevel\tawakeningLevel\tplusMarks\t\
+             lbcapNormal\tlbcapSkill\tlbcapSba\tcapUpNormal\tcapUpSkill\tcapUpSba"
+        );
+    }
 
     for id in log_ids {
         let Ok((blob, version)) = conn.query_row(
@@ -101,6 +115,31 @@ fn main() -> Result<()> {
 
         for player in &players {
             let online = player["isOnline"].as_bool() == Some(true);
+            if predictor {
+                if player["limitBonusCapNormal"].is_null() {
+                    continue;
+                }
+                let num = |v: &serde_json::Value| {
+                    v.as_f64().map_or_else(|| "".into(), |n| format!("{n}"))
+                };
+                println!(
+                    "{id}\t{kind}\t{:#x}\t{}\t{}\t{online}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                    player["actorIndex"].as_u64().unwrap_or(0),
+                    player["characterType"].as_str().unwrap_or("?"),
+                    player["displayName"].as_str().unwrap_or(""),
+                    num(&player["masterLevel"]),
+                    num(&player["weaponState"]["starLevel"]),
+                    num(&player["weaponState"]["awakeningLevel"]),
+                    num(&player["weaponState"]["plusMarks"]),
+                    num(&player["limitBonusCapNormal"]),
+                    num(&player["limitBonusCapSkill"]),
+                    num(&player["limitBonusCapSba"]),
+                    num(&player["capUpNormal"]),
+                    num(&player["capUpSkill"]),
+                    num(&player["capUpSba"]),
+                );
+                continue;
+            }
             if !online && !dump {
                 continue;
             }
@@ -144,6 +183,9 @@ fn main() -> Result<()> {
         }
     }
 
+    if predictor {
+        return Ok(());
+    }
     println!("\nlogs: {n_solo} solo, {n_enlist} with enlisted characters, {n_lobby} true lobbies");
     if !lobby_ids.is_empty() {
         println!("multi-online log ids: {lobby_ids:?}");
