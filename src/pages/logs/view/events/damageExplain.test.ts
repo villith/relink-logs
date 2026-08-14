@@ -183,12 +183,13 @@ describe("taken/variance section", () => {
   });
 
   it("pins the band endpoint to floor(base/1.05), never excluding the true d4", () => {
-    // 1050 / 1.05 = 1000 exactly, so the floor-vs-ceil distinction doesn't
-    // hide behind rounding — this is the case the fix-first review named.
-    const lower = Math.floor(1050 / 1.05).toLocaleString();
-    const upper = (1050).toLocaleString();
-    expect(section("dmg-taken", { base_damage: 1050 }).substituted).toBe(`d4 in (${lower} .. ${upper}]`);
-    expect(line("dmg-taken", "variance-band", { base_damage: 1050 }).value).toEqual({
+    // 1000 / 1.05 is deliberately fractional (~952.38) so floor and ceil land
+    // on different integers and cannot alias — floor(952.38) = 952,
+    // ceil(952.38) = 953. A ceil regression here would show up as "953".
+    const lower = Math.floor(1000 / 1.05).toLocaleString();
+    const upper = (1000).toLocaleString();
+    expect(section("dmg-taken", { base_damage: 1000 }).substituted).toBe(`d4 in (${lower} .. ${upper}]`);
+    expect(line("dmg-taken", "variance-band", { base_damage: 1000 }).value).toEqual({
       kind: "text",
       value: `${lower} .. ${upper}`,
     });
