@@ -106,6 +106,17 @@ CJK names — default Windows codec eats them silently.
    proxy-only slots. Remaining lead: extract `chara_level_sync.tbl` to key
    sync quests structurally (and test Unk19/20/21 as the cap clamps).
 
+7. (added 2026-08-13, evening) **Buff cap-term field RE'd** — every
+   cap-contributing buff caches its live term as f32 at
+   `IStatusDamageLimitBuff`-subobject+8 (per-class offsets vary; see the
+   `cap-buff-term-field` memory). The hookdiag cap-oracle already logs
+   these terms per hit (`buffs=[id:value]`); the proposed PRODUCTION
+   capture (vtable→offset table + one guarded read in the snapshot walk
+   + a `SourceStatus` extension) needs a design pass — protocol and
+   stored-log versioning — plus a live verify round. This would make
+   every leveled/eased buff term exact per hit.
+
 Memory: `cap-off-grid-residual`, `cap-stats-only-probe` (both updated with
-today's corrections), MEMORY.md indexed. Older cap memories mislabel
-Pl0300 as "Katalina" — trust `lang/en/characters.json`.
+today's corrections), `quest-level-sync`, `cap-buff-term-field`,
+MEMORY.md indexed. Older cap memories mislabel Pl0300 as "Katalina" —
+trust `lang/en/characters.json`.
