@@ -22,7 +22,7 @@ import {
 } from "../analysis/chipAnatomy";
 import type { StreamContext } from "../analysis/model/bodyContext";
 import { AmountCell } from "./AmountCell";
-import type { PlayerCapUp } from "./capBreakdown";
+import { capPredictableKey, type PlayerCapUp } from "./capBreakdown";
 import { buildGridStates, type GridStateMap } from "./capGridStates";
 import type { CapLoadout } from "./capSources";
 import { ColumnFilterMenu } from "./ColumnFilterMenu";
@@ -449,6 +449,7 @@ export const EventRowsTable = ({
                 <AmountCell
                   amount={row.amount}
                   capHit={row.capHit}
+                  predictable={capPredictableKey(row.abilityKey)}
                   playerCapUp={actor === null ? undefined : capUp?.[String(actor)]}
                   loadout={build}
                   gridStates={actor === null ? undefined : gridStates?.get(actor)}
