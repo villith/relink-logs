@@ -90,9 +90,14 @@ CJK names — default Windows codec eats them silently.
    `quest-level-sync` memory. No live round or Scott needed.
 3. Fediel's constant K≈307.3 (needs a new Fediel log with loadout capture).
 4. Rosetta's half-percent source (needs a Rosetta log with overmasteries).
-5. Events-card verdict still renders transition hits ✗ + Unaccounted; a
-   "state transition" verdict in `capLadder.ts` needs the per-actor
-   grid-state set.
+5. ~~Events-card verdict renders transition hits ✗ + Unaccounted~~
+   **SHIPPED 2026-08-13** (`4daef123`..`aadff5bd`): `capGridStates.ts`
+   builds the per-actor on-grid K registry from the full event stream and
+   mirrors the residual scan's transition/settling classes; the cap card
+   renders "⇄ State transition" with the remainder relabeled "Easing gap",
+   and the debug panel gains a grid-transition line. `SHOWS_CAP_CARD`
+   stays off; half-grid/Cobalt classes still render ✗ (out of scope).
+   Design: `docs/superpowers/specs/2026-08-13-cap-transition-verdict-design.md`.
 6. ~~Predictor sweep~~ **RUN 2026-08-13** (`971662fd`,
    `roster_census --predictor`): ML55 + 6★ + awakening 10 ⇒ lbcap 684 in
    311/317 rows over 96 logs; misses are sync-quest rows plus ONE
