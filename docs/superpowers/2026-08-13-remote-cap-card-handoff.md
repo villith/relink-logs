@@ -1,5 +1,37 @@
 # Handoff — the remote-prediction cap card, 2026-08-13 (evening)
 
+> **SHIPPED 2026-08-13 (late evening)** through `feat/remote-sba-gains`.
+> Design + plan in `docs/superpowers/{specs,plans}/2026-08-13-remote-cap-card*`
+> (gitignored). The open questions below resolved as: (1) remote hits carry
+> everything except the cap fields, so the prediction is per-hit; (2) title
+> "Predicted cap" + `≈`, computed Unresolved row; (3) capture-era only — no
+> 684 rule, no sync detection; (4) card only; (5) deferred with (3). The
+> blind-local sweep (86,440 hits) proved the arithmetic exact for complete
+> factor models, put Rosetta (constant ~27% undershoot) and Seofon (~5x
+> OVERprediction, cause unknown) on the denylist beside Fediel, and measured
+> the Eustace/Zeta/Id/Rackam undershoots at p50 1–3%. Still pending: a manual
+> eyeball of the predicted card on lobby log 2654, and the Seofon cause.
+>
+> **FOLLOW-UP 2026-08-14** — the requested Rosetta/Fediel/Seofon local
+> capture landed as log 2655 (4,255/1,406/2,326 captioned hits) and shrank
+> the denylist to Rosetta alone:
+> - **Seofon cleared.** Exact on 2,326/2,326 non-SBA hits. The "~5x
+>   overprediction" was ENTIRELY level-sync contamination: his only prior
+>   hits were 78 in sync quest 2622. The blind sweep now evaluates first and
+>   drops any log whose median hit OVERSHOOTS (>10%) whole — that caught
+>   exactly 2619/2621/2622, the known sync family, and nothing else.
+> - **Fediel cleared.** Median ratio 1.000 on both her logs; the coverage
+>   doc's "stable unknown cap source" (off-grid K≈307.3) is just her
+>   off-grid capUp store, which the prediction consumes directly. Misses are
+>   transient additive +10%/+30% undershoots (p50 6.6%), the Zeta class.
+> - **Rosetta measured, still denylisted.** One flat class-independent term
+>   the model doesn't carry: +2.33 (log 2567) / +2.635 (log 2655) of ladder
+>   base — per-loadout, on the half-percent grid — plus status-correlated
+>   increments (+0.05/+0.10/+0.25/+0.30/+0.45; statuses 7/42/57 implicated).
+>   Same shape as the buff-carried terms ([[cap-buff-term-field]]).
+> Still pending: the manual card eyeball on lobby log 2654, and naming
+> Rosetta's flat term.
+
 Branch `feat/remote-sba-gains`, continuing from
 `2026-08-13-cap-validation-handoff.md` (all its workable items closed).
 Scott approved this feature as the next session's item 1. **Start with the

@@ -46,15 +46,14 @@ describe.skipIf(fixture === undefined)("blind local prediction sweep", () => {
     const players = new Map<string, PlayerLine>();
     for (const line of lines) if (line.t === "player") players.set(`${line.log}:${line.actor}`, line);
 
-    // per character: [hits, exact, open-channel, mismatched]
-    const byCharacter = new Map<string, [number, number, number, number]>();
-    // Relative undershoot of every mismatched hit, per character — the size of
-    // the error the card's ≈ stands for where the model has known gaps.
-    const missSizes = new Map<string, number[]>();
-    let considered = 0;
-    let exact = 0;
-    let open = 0;
-
+    // Evaluate first, score second: a level-sync quest clamps every account
+    // store below its captured value, so predictions overshoot for EVERY
+    // character in that log (2622 read as "Seofon ~5x" until this pass).
+    // Unmodeled terms are additive — a legitimate steady-state miss can only
+    // undershoot — so a log whose MEDIAN hit overshoots is contaminated and
+    // is dropped whole, never read as per-character model drift.
+    type Evaluated = { log: number; characterType: string; predicted: number; cap: number; unresolved: number };
+    const evaluated: Evaluated[] = [];
     for (const line of lines) {
       if (line.t !== "hit") continue;
       const player = players.get(`${line.log}:${line.actor}`);
@@ -83,15 +82,46 @@ describe.skipIf(fixture === undefined)("blind local prediction sweep", () => {
       const predicted = Math.trunc(
         ladderBase * (1 + record + dmgCapTraitValue(player.loadout, capClass) + channel.active)
       );
+      evaluated.push({ log: line.log, characterType, predicted, cap: line.cap, unresolved: channel.unresolved });
+    }
+
+    const ratiosByLog = new Map<number, number[]>();
+    for (const hit of evaluated) {
+      const ratios = ratiosByLog.get(hit.log) ?? [];
+      ratios.push(hit.cap / hit.predicted);
+      ratiosByLog.set(hit.log, ratios);
+    }
+    const synced = new Set<number>();
+    for (const [log, ratios] of ratiosByLog) {
+      const median = ratios.sort((a, b) => a - b)[Math.floor(ratios.length / 2)];
+      if (median < 0.9) synced.add(log);
+    }
+    if (synced.size > 0) {
+      // eslint-disable-next-line no-console -- a sweep exists to be read
+      console.log(`dropped as level-sync contaminated: logs ${[...synced].sort((a, b) => a - b).join(", ")}`);
+    }
+
+    // per character: [hits, exact, open-channel, mismatched]
+    const byCharacter = new Map<string, [number, number, number, number]>();
+    // Relative undershoot of every mismatched hit, per character — the size of
+    // the error the card's ≈ stands for where the model has known gaps.
+    const missSizes = new Map<string, number[]>();
+    let considered = 0;
+    let exact = 0;
+    let open = 0;
+
+    for (const hit of evaluated) {
+      if (synced.has(hit.log)) continue;
+      const { characterType, predicted, cap, unresolved } = hit;
 
       considered += 1;
       const stats = byCharacter.get(characterType) ?? [0, 0, 0, 0];
       stats[0] += 1;
       // ±1 absorbs the f32-sum drift the measured card's grid check also allows.
-      if (Math.abs(predicted - line.cap) <= 1) {
+      if (Math.abs(predicted - cap) <= 1) {
         exact += 1;
         stats[1] += 1;
-      } else if (channel.unresolved > 0) {
+      } else if (unresolved > 0) {
         // An open channel factor: the prediction knowingly undershoots and its
         // card would carry the Unresolved row. Not a failure of the formula.
         open += 1;
@@ -99,7 +129,7 @@ describe.skipIf(fixture === undefined)("blind local prediction sweep", () => {
       } else {
         stats[3] += 1;
         const sizes = missSizes.get(characterType) ?? [];
-        sizes.push((line.cap - predicted) / line.cap);
+        sizes.push((cap - predicted) / cap);
         missSizes.set(characterType, sizes);
       }
       byCharacter.set(characterType, stats);
@@ -130,8 +160,10 @@ describe.skipIf(fixture === undefined)("blind local prediction sweep", () => {
     //    may only ever UNDERSHOOT. Transient overshoots exist — a state buff
     //    dropping eases the game's cap DOWN over ~1.3s while the prediction
     //    stays at the resting value — but they must stay a small minority. A
-    //    character that overshoots systematically (Seofon: every hit, ~5x)
-    //    belongs on PREDICTED_CAP_DENYLIST, not in the card.
+    //    character that overshoots systematically belongs on
+    //    PREDICTED_CAP_DENYLIST — unless the overshoot is log-wide, which is
+    //    level-sync contamination and is dropped by the guard above (that
+    //    guard is what cleared Seofon's phantom "~5x overprediction").
     for (const [character, sizes] of missSizes) {
       const overshoots = sizes.filter((size) => size < 0).length;
       const hits = byCharacter.get(character)![0];

@@ -302,11 +302,13 @@ describe("predictedCapRows", () => {
 
 describe("PREDICTED_CAP_DENYLIST", () => {
   it("withholds the characters the formula is known-incomplete for", () => {
-    // Fediel (unknown constant source), Rosetta (constant ~27% undershoot),
-    // Seofon (~5x overprediction) — the 2026-08-13 blind sweep's verdicts.
-    expect(PREDICTED_CAP_DENYLIST.has("Pl2900")).toBe(true);
+    // Rosetta: a large flat unmodeled term (+233%..+263.5% of ladder base,
+    // per-loadout) — the 2026-08-14 local capture's verdict. Fediel and
+    // Seofon were cleared by the same capture: her store carries her
+    // off-grid record, his old ~5x overshoot was level-sync contamination.
     expect(PREDICTED_CAP_DENYLIST.has("Pl0600")).toBe(true);
-    expect(PREDICTED_CAP_DENYLIST.has("Pl2200")).toBe(true);
+    expect(PREDICTED_CAP_DENYLIST.has("Pl2900")).toBe(false);
+    expect(PREDICTED_CAP_DENYLIST.has("Pl2200")).toBe(false);
     expect(PREDICTED_CAP_DENYLIST.has("Pl0300")).toBe(false);
   });
 });

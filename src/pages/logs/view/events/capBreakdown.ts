@@ -247,14 +247,18 @@ export const capPredictableKey = (key: string | null): boolean => {
 };
 
 /** Characters the prediction is withheld for, because for them the formula is
- * known-wrong rather than approximately right (blind sweep, 2026-08-13):
- * - Fediel (Pl2900): every logged fight sits under one stable unknown cap
- *   source (docs/damage-cap-coverage.md).
- * - Rosetta (Pl0600): a constant ~27% undershoot on essentially every hit —
- *   one large stable term the factor model does not carry.
- * - Seofon (Pl2200): consistent ~5x OVERprediction; a predicted cap must
- *   never overstate, so he stays dark until the cause is understood. */
-export const PREDICTED_CAP_DENYLIST: ReadonlySet<string> = new Set(["Pl2900", "Pl0600", "Pl2200"]);
+ * known-wrong rather than approximately right (blind sweep, re-measured
+ * 2026-08-14 on a dedicated local capture, log 2655):
+ * - Rosetta (Pl0600): one large flat term the factor model does not carry, on
+ *   every hit of every class — measured +233%..+263.5% of ladder base across
+ *   her two logs (per-loadout, half-percent grid), plus smaller
+ *   status-correlated increments on top.
+ * Fediel and Seofon were cleared by the same capture: Fediel predicts exactly
+ * at rest (median ratio 1.000, both logs; misses are transient +10%/+30%
+ * additive undershoots, the tolerated Zeta class), and Seofon's old ~5x
+ * overprediction was entirely level-sync contamination from log 2622 — on
+ * clean data he is exact on 2,326/2,326 non-SBA hits. */
+export const PREDICTED_CAP_DENYLIST: ReadonlySet<string> = new Set(["Pl0600"]);
 
 /** Everything the caller resolved for a hit with NO captured cap: the
  * independent ladder base plus the terms of the game's own multiplier. All
