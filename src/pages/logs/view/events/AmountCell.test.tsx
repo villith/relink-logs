@@ -224,4 +224,77 @@ describe("AmountCell", () => {
     hover("12");
     expect(screen.queryByTestId("cap-card")).toBeNull();
   });
+
+  // ---- the predicted card (remote rows: cap fields absent, inputs captured) ----
+
+  const remoteHit = { damage: 80_000, damage_cap: null, base_damage: null, attack_rate: 0.54, class_flags: 0x1 };
+  const remoteProps = {
+    amount: 80_000,
+    capHit: remoteHit,
+    predictable: true,
+    playerCapUp: { normal: 13.13, skill: 15.18, sba: 12.16 },
+    loadout: { ...sigilLoadout(0xdc584f60, 65), characterType: "Pl0300" },
+    characterType: "Pl0300" as const,
+    conditions: {},
+    width: 78,
+  };
+
+  it.skipIf(!SHOWS_CAP_CARD)("predicts a capless hit from the store, the ladder and the loadout", () => {
+    renderCell(remoteProps);
+    hover("80,000");
+    const card = screen.getByTestId("cap-card");
+    // Title + ≈: unmistakably a prediction, on the same surface.
+    expect(card.textContent).toContain("ui.logs.cap-predicted-title");
+    // 5,399 × (1 + 13.13 + 2.50) = 5,399 × 16.63 = 89,785.37 → ≈ 89,785
+    expect(card.querySelector('[data-cap-row="predicted"]')?.textContent).toContain("≈ 89,785");
+    expect(card.querySelector('[data-cap-row="basecap"]')?.textContent).toContain("5,399");
+    expect(card.querySelector('[data-cap-row="capup"]')?.textContent).toContain("1,313%");
+    expect(card.querySelector('[data-cap-row="dmgcap"]')?.textContent).toContain("250%");
+    // No ground truth → none of the measured-only rows.
+    expect(card.querySelector('[data-cap-row="cap"]')).toBeNull();
+    expect(card.querySelector('[data-cap-row="verdict"]')).toBeNull();
+    expect(card.querySelector('[data-cap-row="overcap"]')).toBeNull();
+  });
+
+  it.skipIf(!SHOWS_CAP_CARD)("credits active channel terms into the predicted figure", () => {
+    renderCell({
+      ...remoteProps,
+      loadout: { ...sigilLoadout(0xdc584f60, 65), characterType: "Pl0300", skillboard: [0x0c] },
+    });
+    hover("80,000");
+    const card = screen.getByTestId("cap-card");
+    // 5,399 × (16.63 + 0.15) = 5,399 × 16.78 = 90,595.22 → ≈ 90,595
+    expect(card.querySelector('[data-cap-row="predicted"]')?.textContent).toContain("≈ 90,595");
+    expect(card.querySelector('[data-cap-row="channel"]')?.textContent).toContain("15%");
+  });
+
+  it("shows no predicted card without the captured store", () => {
+    renderCell({ ...remoteProps, playerCapUp: undefined });
+    hover("80,000");
+    expect(screen.queryByTestId("cap-card")).toBeNull();
+  });
+
+  it("shows no predicted card for a kind that never carries a cap", () => {
+    renderCell({ ...remoteProps, predictable: false });
+    hover("80,000");
+    expect(screen.queryByTestId("cap-card")).toBeNull();
+  });
+
+  it("withholds the prediction for a denylisted character", () => {
+    renderCell({
+      ...remoteProps,
+      characterType: "Pl2900" as const,
+      loadout: { ...remoteProps.loadout, characterType: "Pl2900" },
+    });
+    hover("80,000");
+    expect(screen.queryByTestId("cap-card")).toBeNull();
+  });
+
+  it.skipIf(!SHOWS_CAP_CARD)("keeps the measured card measured even when the row is predictable", () => {
+    renderCell({ amount: 1_500_000, capHit, predictable: true, width: 78 });
+    hover("1,500,000");
+    const card = screen.getByTestId("cap-card");
+    expect(card.querySelector('[data-cap-row="cap"]')).not.toBeNull();
+    expect(card.textContent).not.toContain("ui.logs.cap-predicted-title");
+  });
 });
