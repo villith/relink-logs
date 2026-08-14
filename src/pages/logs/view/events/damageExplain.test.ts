@@ -21,6 +21,8 @@ const TABLE: DamageTraitTable = {
     // Celestial Nyx (hp-gate trait, lte 25% in the real tables) — this fake
     // row omits `hpGate` on purpose, to cover the missing-threshold-row case.
     "0de887a0": { key: "SKILL_320_00", name: "Celestial Nyx", values: { value: [16] } },
+    // Lucky Charge (crit section, class-flag bit 0x2 — charged attack).
+    c35b111b: { key: "SKILL_030_00", name: "Lucky Charge", values: { value: [5] } },
   },
 };
 
@@ -40,6 +42,7 @@ const LOADOUT = {
     { sigilId: 3, firstTraitId: 0x1c360c63, firstTraitLevel: 1, secondTraitId: 0x6b694d6d, secondTraitLevel: 1 },
     { sigilId: 4, firstTraitId: 0xb360801d, firstTraitLevel: 1, secondTraitId: 0xa7726190, secondTraitLevel: 1 },
     { sigilId: 5, firstTraitId: 0x0de887a0, firstTraitLevel: 1, secondTraitId: 0, secondTraitLevel: 0 },
+    { sigilId: 6, firstTraitId: 0xc35b111b, firstTraitLevel: 1, secondTraitId: 0, secondTraitLevel: 0 },
   ],
   summons: [],
   weaponState: null,
@@ -147,6 +150,18 @@ describe("crit section", () => {
     expect(roll.excluded).toBe("gate-unrecorded");
     expect(roll.value).toEqual({ kind: "absent" });
   });
+
+  it("includes a crit trait when its class gate fires", () => {
+    // c35b111b (Lucky Charge) gates on bit 0x2 (charged attack); default
+    // HIT.class_flags is 0x10000 (Skill) with bit 0x2 clear.
+    const included = line("dmg-crit", "trait-c35b111b-value", { class_flags: 0x10000 | 0x2 });
+    expect(included.excluded).toBeUndefined();
+    expect(included.value).toEqual({ kind: "percent", value: 5 });
+  });
+
+  it("excludes the crit trait as conditional when its class gate does not fire", () => {
+    expect(line("dmg-crit", "trait-c35b111b-value").excluded).toBe("conditional");
+  });
 });
 
 describe("class section", () => {
@@ -165,5 +180,22 @@ describe("taken/variance section", () => {
     const sec = section("dmg-taken");
     expect(sec.formula).toContain("1.05");
     expect(line("dmg-taken", "variance-band").value.kind).toBe("text");
+  });
+
+  it("pins the band endpoint to floor(base/1.05), never excluding the true d4", () => {
+    // 1050 / 1.05 = 1000 exactly, so the floor-vs-ceil distinction doesn't
+    // hide behind rounding — this is the case the fix-first review named.
+    const lower = Math.floor(1050 / 1.05).toLocaleString();
+    const upper = (1050).toLocaleString();
+    expect(section("dmg-taken", { base_damage: 1050 }).substituted).toBe(`d4 in (${lower} .. ${upper}]`);
+    expect(line("dmg-taken", "variance-band", { base_damage: 1050 }).value).toEqual({
+      kind: "text",
+      value: `${lower} .. ${upper}`,
+    });
+  });
+
+  it("degrades to absent on an old log, never to zero", () => {
+    expect(section("dmg-taken", { base_damage: null }).substituted).toBeNull();
+    expect(line("dmg-taken", "variance-band", { base_damage: null }).value).toEqual({ kind: "absent" });
   });
 });

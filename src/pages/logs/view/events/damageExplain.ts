@@ -304,7 +304,7 @@ const critSection = (
   titleKey: "ui.debug.dmg-sec-crit",
   formula: "critMult = 1 + (crit dmg base + Critical Hit DMG + record + agg)",
   substituted: null,
-  unavailableKey: null,
+  unavailableKey: loadout === undefined ? "ui.debug.cap-no-loadout" : null,
   lines: [
     ...traitLines("crit", hit, loadout, conditions, table),
     {
@@ -352,22 +352,22 @@ const classSection = (hit: ExplainHit): ExplainSection => {
 
 const takenSection = (hit: ExplainHit): ExplainSection => {
   const base = hit.base_damage;
+  // d4 is f32-valued, so floor (not ceil) of the open lower bound is the
+  // conservative display: it can only widen the shown band, never exclude
+  // the true d4 that produced this base_damage.
+  const band = base === null ? null : `${Math.floor(base / 1.05).toLocaleString()} .. ${base.toLocaleString()}`;
   return {
     key: "dmg-taken",
     titleKey: "ui.debug.dmg-sec-taken",
     formula: "precap = takenChain(d4); d4 <= precap < 1.05 x d4 (enemy targets)",
-    substituted:
-      base === null ? null : `d4 in (${Math.ceil(base / 1.05).toLocaleString()} .. ${base.toLocaleString()}]`,
+    substituted: band === null ? null : `d4 in (${band}]`,
     unavailableKey: null,
     noteKey: "ui.debug.dmg-note-variance",
     lines: [
       {
         key: "variance-band",
         name: { kind: "key", value: "ui.debug.dmg-line-variance-band" },
-        value:
-          base === null
-            ? absent
-            : { kind: "text", value: `${Math.ceil(base / 1.05).toLocaleString()} .. ${base.toLocaleString()}` },
+        value: band === null ? absent : { kind: "text", value: band },
         source: { kind: "literal", value: "FUN_140b283d0: d4 += d4 x 0.05 x rand01" },
       },
       {
