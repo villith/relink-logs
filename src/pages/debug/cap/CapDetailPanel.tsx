@@ -93,21 +93,18 @@ const NUMERIC = { ...MONO, fontVariantNumeric: "tabular-nums" } as const;
  * because the one time it matters is exactly when the long one shows up. */
 const VALUE_WIDTH = 165;
 /**
- * The provenance column, sized to the longest thing it actually holds: a
- * 49-character prose annotation ("first row whose x strictly exceeds the rate
- * (f32)") in the proportional font, about 270px.
- *
- * Prose is why this was too narrow before. The column was styled monospace
- * throughout, which is right for `min(base_damage, damage_cap)` and wrong for a
- * sentence — the same 49 characters need ~350px in monospace against ~270 in
- * the body font. Only literals wear the monospace face now (see `LineRow`), and
- * the column wraps rather than truncating, so a translation longer than the
- * English still costs a second line instead of disappearing.
+ * The provenance column flexes with the panel (it takes the larger share of
+ * whatever the value column leaves — see `LineRow`) but never squeezes below
+ * this. It wraps rather than truncating, so a narrow panel costs extra lines,
+ * not hidden provenance: this column is the whole point of the panel, and an
+ * ellipsised provenance answers nothing. Only literals wear the monospace face
+ * (see `LineRow`) — a 49-character prose annotation needs ~350px in monospace
+ * against ~270 in the body font, for no legibility at all.
  */
-const SOURCE_WIDTH = 340;
-/** The name column never squeezes below this — a label crushed to an ellipsis
- * identifies nothing, which defeats the row. */
-const NAME_MIN_WIDTH = 190;
+const SOURCE_MIN_WIDTH = 170;
+/** The name column never squeezes below this. Below its natural width a name
+ * ellipsises; the `title` tooltip is then the way to read the rest. */
+const NAME_MIN_WIDTH = 120;
 /** The two `gap="xs"` gutters between the three columns. */
 const GUTTERS = 20;
 /** The deepest indent a line can carry (`depth: 2`, an itemized contributor).
@@ -116,11 +113,10 @@ const GUTTERS = 20;
  * row. */
 const MAX_INDENT = 32;
 
-/** Below this the row scrolls rather than compresses. The logs window's minimum
- * is 800px wide and the hit list takes its share of that, so at the low end
- * these three columns genuinely do not fit — and a value bleeding over its
- * neighbour is a worse answer than a scrollbar. Above ~1150px nothing scrolls. */
-export const MIN_ROW_WIDTH = NAME_MIN_WIDTH + VALUE_WIDTH + SOURCE_WIDTH + GUTTERS + MAX_INDENT;
+/** The row's hard floor: name and source compress (truncate / wrap) down to
+ * their minimums, and only below this sum does the enclosing ScrollArea scroll
+ * rather than let a value bleed over its neighbour. */
+export const MIN_ROW_WIDTH = NAME_MIN_WIDTH + VALUE_WIDTH + SOURCE_MIN_WIDTH + GUTTERS + MAX_INDENT;
 
 const LineRow = ({ line }: { line: ExplainLine }) => {
   const { t, i18n } = useTranslation();
@@ -182,16 +178,19 @@ const LineRow = ({ line }: { line: ExplainLine }) => {
       </Text>
 
       {/* The "says who?" column. Either the reason it contributed nothing, or
-          the field / table / expression the number came from.
-
-          Wraps rather than truncating: this column is the whole point of the
-          panel, and an ellipsised provenance answers nothing. A second line is
-          cheap; a hidden one is not. */}
+          the field / table / expression the number came from. Flexes at 1.6x
+          the name column's share (the old fixed layout's 216/340 proportion)
+          and wraps rather than truncating — a second line is cheap; a hidden
+          one is not. */}
       <Text
         size="xs"
         c="dimmed"
-        w={SOURCE_WIDTH}
-        style={{ ...(sourceIsCode ? MONO : {}), flexShrink: 0, overflowWrap: "anywhere" }}
+        style={{
+          ...(sourceIsCode ? MONO : {}),
+          flex: "1.6 1 0",
+          minWidth: SOURCE_MIN_WIDTH,
+          overflowWrap: "anywhere",
+        }}
       >
         {source}
       </Text>

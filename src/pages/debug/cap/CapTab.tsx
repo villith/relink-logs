@@ -261,8 +261,12 @@ export const CapTab = () => {
               <Text size="xs" c="dimmed" mb="sm">
                 {`${millisecondsToPreciseElapsedFormat(selected.timeMs)} · ${selected.abilityKey} · ${selected.hit.damage.toLocaleString(i18n.language)}`}
               </Text>
-              <Group align="flex-start" gap="md" wrap="nowrap" style={{ overflowX: "auto" }}>
-                <Box style={{ flexShrink: 0 }}>
+              {/* Both columns split the detail area evenly and compress with
+                  it — the panel rows floor at MIN_ROW_WIDTH, below which each
+                  column's own ScrollArea scrolls, so the page never grows a
+                  horizontal scrollbar of its own. */}
+              <Group align="flex-start" gap="md" wrap="nowrap">
+                <Box style={{ flex: 1, minWidth: 0 }}>
                   {/* One notch bigger and undimmed vs. CapDetailPanel's own
                       section headings, so "DAMAGE CALCULATION" reads as the
                       column's title rather than as its first section. */}
@@ -273,7 +277,7 @@ export const CapTab = () => {
                     <CapDetailPanel sections={hitPanels.sections} />
                   </ScrollArea>
                 </Box>
-                <Box style={{ flexShrink: 0 }}>
+                <Box style={{ flex: 1, minWidth: 0 }}>
                   <Text size="sm" fw={700} tt="uppercase" mb={4}>
                     {t("ui.debug.cap-col-damage")}
                   </Text>
