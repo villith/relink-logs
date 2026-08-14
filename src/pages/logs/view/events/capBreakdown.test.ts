@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { capCardRows, selectCapUp, type CapContext } from "./capBreakdown";
+import {
+  PREDICTED_CAP_DENYLIST,
+  capCardRows,
+  capPredictableKey,
+  predictedCapRows,
+  selectCapUp,
+  type CapContext,
+} from "./capBreakdown";
 
 describe("selectCapUp", () => {
   const capUp = { normal: 13.13, skill: 15.18, sba: 12.16 };
@@ -213,5 +220,89 @@ describe("capCardRows", () => {
       expect(capCardRows(hit).some((r) => r.key === "unaccounted")).toBe(false);
       expect(capCardRows(hit, context()).some((r) => r.key === "unaccounted")).toBe(false);
     });
+  });
+});
+
+describe("capPredictableKey", () => {
+  it("accepts exactly the kinds that locally always carry cap fields", () => {
+    expect(capPredictableKey("Normal:100")).toBe(true);
+    expect(capPredictableKey("LinkAttack")).toBe(true);
+    expect(capPredictableKey("SBA")).toBe(true);
+  });
+
+  it("rejects the kinds that never do", () => {
+    expect(capPredictableKey("SupplementaryDamage:100")).toBe(false);
+    expect(capPredictableKey("DamageOverTime:1")).toBe(false);
+    expect(capPredictableKey("PerfectGuard")).toBe(false);
+    expect(capPredictableKey(null)).toBe(false);
+    expect(capPredictableKey("garbage")).toBe(false);
+  });
+});
+
+describe("predictedCapRows", () => {
+  const capless = { damage: 80_000, damage_cap: null, base_damage: null, attack_rate: 0.54, class_flags: 0x1 };
+  const predictedContext = {
+    ladderBase: 5_399,
+    record: 13.13,
+    dmgCapTrait: 2.5,
+    channelActive: 0.15,
+    channelUnresolved: 0,
+    recordComponents: [{ key: "trait", labelKey: "ui.logs.cap-family-traits", value: 0.5 }],
+    conditional: [{ key: "conditional-1e1cecce", labelKey: "", traitId: 0x1e1cecce, value: 5 }],
+  };
+
+  it("predicts trunc(base x (1 + record + dmgCap + activeChannel))", () => {
+    const rows = predictedCapRows(capless, predictedContext);
+    const predicted = rows.find((row) => row.key === "predicted");
+    // 5399 x (1 + 13.13 + 2.5 + 0.15) = 5399 x 16.78 = 90,595.22
+    expect(predicted).toMatchObject({ value: 90_595, kind: "count", approx: true });
+  });
+
+  it("renders the terms it summed and the potentials it did not", () => {
+    const keys = predictedCapRows(capless, predictedContext).map((row) => row.key);
+    expect(keys).toEqual([
+      "damage",
+      "predicted",
+      "mv",
+      "basecap",
+      "capup",
+      "trait",
+      "dmgcap",
+      "channel",
+      "conditional-1e1cecce",
+    ]);
+  });
+
+  it("adds the unresolved row only when channel factors are actually open", () => {
+    const rows = predictedCapRows(capless, { ...predictedContext, channelUnresolved: 0.3 });
+    const unresolved = rows.find((row) => row.key === "unresolved");
+    // Rendered as a potential (the conditional grammar), never summed into the
+    // predicted figure, which stays the resolved-terms product.
+    expect(unresolved).toMatchObject({ value: 30, kind: "percent", variant: "conditional" });
+    expect(rows.find((row) => row.key === "predicted")?.value).toBe(90_595);
+  });
+
+  it("omits the zero-value optional rows rather than claiming zeroes", () => {
+    const rows = predictedCapRows(capless, {
+      ...predictedContext,
+      dmgCapTrait: 0,
+      channelActive: 0,
+      recordComponents: [],
+      conditional: [],
+    });
+    expect(rows.map((row) => row.key)).toEqual(["damage", "predicted", "mv", "basecap", "capup"]);
+  });
+
+  it("returns nothing for a base or total the formula cannot have used", () => {
+    expect(predictedCapRows(capless, { ...predictedContext, ladderBase: 0 })).toEqual([]);
+    // 1 + (-4) + 2.5 + 0.15 <= 0: a multiplier the formula cannot produce.
+    expect(predictedCapRows(capless, { ...predictedContext, record: -4 })).toEqual([]);
+  });
+});
+
+describe("PREDICTED_CAP_DENYLIST", () => {
+  it("withholds Fediel — the one character the formula is known-incomplete for", () => {
+    expect(PREDICTED_CAP_DENYLIST.has("Pl2900")).toBe(true);
+    expect(PREDICTED_CAP_DENYLIST.has("Pl0300")).toBe(false);
   });
 });

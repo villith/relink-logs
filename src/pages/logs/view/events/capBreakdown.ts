@@ -1,3 +1,5 @@
+import { parseAbilityKey } from "../abilityKey";
+
 /** What a cap-card row renders as. The card formats by kind rather than
  * pre-formatting here, so the projection stays a pure numeric fact and the
  * locale decides how it reads. `verdict` renders as a pass/fail mark. */
@@ -18,6 +20,9 @@ export type CapRow = {
   /** For rows named after a trait rather than a fixed label — the renderer
    * translates the trait id and ignores `labelKey`. */
   traitId?: number;
+  /** Rendered with a leading `≈`: the figure is a model's estimate, not a
+   * number the game logged. Set only by the predicted projection. */
+  approx?: boolean;
 };
 
 /** The fields of a damage event this card reads. Narrower than the wire type on
@@ -227,5 +232,81 @@ export const capCardRows = (hit: CapHit, context?: CapContext): CapRow[] => {
     kind: "multiplier",
   });
 
+  return rows;
+};
+
+/** Whether a row's ability key names a hit kind the game runs through the cap
+ * builder. Locally every Normal/LinkAttack/SBA hit carries cap fields and
+ * DoT/supplementary hits never do (lobby-log census, 2654/2619), so this is
+ * exactly the set a missing cap can honestly be predicted for. */
+export const capPredictableKey = (key: string | null): boolean => {
+  if (key === null) return false;
+  const action = parseAbilityKey(key);
+  if (action === null) return false;
+  return action === "LinkAttack" || action === "SBA" || (typeof action === "object" && "Normal" in action);
+};
+
+/** Characters the prediction is withheld for. Fediel's every logged fight sits
+ * under one stable unknown cap source (docs/damage-cap-coverage.md), so the
+ * formula below would be known-wrong for her rather than approximately right. */
+export const PREDICTED_CAP_DENYLIST: ReadonlySet<string> = new Set(["Pl2900"]);
+
+/** Everything the caller resolved for a hit with NO captured cap: the
+ * independent ladder base plus the terms of the game's own multiplier. All
+ * required — the caller gates on having them, because a predicted figure built
+ * on a substituted term would be a guess wearing a formula's clothes. */
+export type PredictedCapContext = {
+  ladderBase: number;
+  /** The captured per-class store (`selectCapUp`), as a fraction. */
+  record: number;
+  dmgCapTrait: number;
+  /** Active channel-placement terms (`deriveChannelBreakdown().active`). */
+  channelActive: number;
+  /** Open channel potentials (`deriveChannelBreakdown().unresolved`) — the
+   * prediction's honest uncertainty, rendered but never summed. */
+  channelUnresolved: number;
+  recordComponents: CapSource[];
+  conditional: CapSource[];
+};
+
+/** The rows for a hit whose cap is PREDICTED rather than logged.
+ *
+ * The same formula the residual scan verified against 99.65% of local capped
+ * hits: `trunc(base × (1 + record + dmgCapTrait + activeChannel))`. Ground-truth
+ * rows (logged cap, formula check, pre-cap base, overcap, post-cap multiplier)
+ * are deliberately absent — nothing exists to check a prediction against. */
+export const predictedCapRows = (hit: CapHit, context: PredictedCapContext): CapRow[] => {
+  const { ladderBase, record, dmgCapTrait, channelActive, channelUnresolved } = context;
+  const total = 1 + record + dmgCapTrait + channelActive;
+  if (ladderBase <= 0 || total <= 0) return [];
+
+  const rows: CapRow[] = [
+    { key: "damage", labelKey: "ui.logs.cap-damage-dealt", value: hit.damage, kind: "count" },
+    {
+      key: "predicted",
+      labelKey: "ui.logs.cap-predicted",
+      value: Math.trunc(ladderBase * total),
+      kind: "count",
+      approx: true,
+    },
+  ];
+  if (hit.attack_rate !== null) {
+    rows.push({ key: "mv", labelKey: "ui.logs.cap-mv", value: hit.attack_rate, kind: "rate" });
+  }
+  rows.push({ key: "basecap", labelKey: "ui.logs.cap-base", value: ladderBase, kind: "count" });
+  rows.push(asPercent("capup", "ui.logs.cap-term-record", record));
+  for (const component of context.recordComponents) {
+    rows.push(asPercent(component.key, component.labelKey, component.value, { variant: "sub" }));
+  }
+  if (dmgCapTrait > 0) rows.push(asPercent("dmgcap", "ui.logs.cap-source-dmg-cap", dmgCapTrait));
+  if (channelActive > 0) rows.push(asPercent("channel", "ui.logs.cap-term-channel", channelActive));
+  for (const source of context.conditional) {
+    rows.push(
+      asPercent(source.key, source.labelKey, source.value, { variant: "conditional", traitId: source.traitId })
+    );
+  }
+  if (channelUnresolved > 0) {
+    rows.push(asPercent("unresolved", "ui.logs.cap-unresolved", channelUnresolved, { variant: "conditional" }));
+  }
   return rows;
 };
