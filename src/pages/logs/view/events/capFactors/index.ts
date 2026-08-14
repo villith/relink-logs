@@ -66,24 +66,46 @@ export const evaluateCapFactors = (factors: CapFactor[], conditions: CapConditio
   return { rows, attributed, unresolved, missing: [...missing].sort() };
 };
 
-/** The derived per-hit channel total, as the fraction the formula adds (0.35 =
- * +35%): the sum of the ACTIVE channel-placement factors under these
- * conditions. Record-side factors never count here — the captured record
- * already holds them — and an unresolved factor contributes nothing rather
- * than its potential. This is the one number the hover card credits; the
- * debug panel itemizes the same rows. */
+export type ChannelBreakdown = {
+  /** Sum of ACTIVE channel-placement factors, as the fraction the formula
+   * adds (0.35 = +35%). */
+  active: number;
+  /** Sum of the POTENTIALS of channel factors whose gates could not be
+   * evaluated — the size of a prediction's honest uncertainty. Record-side
+   * unknowns are excluded on purpose: the captured record already contains
+   * them, so they blur itemization, never a predicted total. */
+  unresolved: number;
+};
+
+/** The per-hit channel, split into what applied and what is still open.
+ * Channel-placement factors ride OUTSIDE the captured record (log 2573
+ * reconciliation), so they are the only factors whose state moves a predicted
+ * cap total. Record-side factors never count here, and an unresolved factor
+ * contributes its potential to `unresolved` rather than anything to
+ * `active`. */
+export const deriveChannelBreakdown = (
+  loadout: CapLoadout | undefined,
+  capClass: CapClass | null,
+  conditions: CapConditions
+): ChannelBreakdown => {
+  if (loadout === undefined || capClass === null) return { active: 0, unresolved: 0 };
+  let active = 0;
+  let unresolved = 0;
+  for (const { factor, result } of evaluateCapFactors(collectCapFactors({ loadout, capClass }), conditions).rows) {
+    if (factor.placement !== "channel") continue;
+    if (result.state === "active") active += result.percent;
+    else if (result.state === "unknown") unresolved += result.potential;
+  }
+  return { active: active / 100, unresolved: unresolved / 100 };
+};
+
+/** The derived per-hit channel total — the one number the measured hover card
+ * credits; the debug panel itemizes the same rows. */
 export const deriveChannelTotal = (
   loadout: CapLoadout | undefined,
   capClass: CapClass | null,
   conditions: CapConditions
-): number => {
-  if (loadout === undefined || capClass === null) return 0;
-  let total = 0;
-  for (const { factor, result } of evaluateCapFactors(collectCapFactors({ loadout, capClass }), conditions).rows) {
-    if (factor.placement === "channel" && result.state === "active") total += result.percent;
-  }
-  return total / 100;
-};
+): number => deriveChannelBreakdown(loadout, capClass, conditions).active;
 
 export { DMG_CAP_TRAIT } from "./traits";
 export type { CapConditions, CapFactor, CapFactorReason, CapFactorResult, CapFactorState, CapParamKey } from "./types";
