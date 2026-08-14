@@ -76,15 +76,30 @@ CJK names — default Windows codec eats them silently.
 
 ## Open items, in rough priority
 
-1. Identify the ~11-step per-hit scatter term in the stats-only offset
-   (correlate offset × per-hit statuses inside the probe).
-2. Name the 2619 synced mode (ask Scott / check quest id in that log).
+1. ~~Identify the ~11-step per-hit scatter term~~ **SOLVED 2026-08-13**
+   (`892d3d93`): offset = 784 account + per-action attack-group term
+   (130/140 +25, 1700 "Heaven Comes Down" +45, 112 +70) + 11 per Flamek
+   Unleashed level (status 118, levels 1–3, rises monotonically per
+   episode). The snapshot's `stacks` field reads the authored max, not the
+   live level — leveled statuses can't be priced from the snapshot alone.
+   The probe now prints per-action and per-status cross-tabs itself.
+2. ~~Name the 2619 synced mode~~ **SOLVED 2026-08-13**: quest 4231961
+   "Shadows of the Past: Dread" runs the game's LEVEL SYNC
+   (`chara_level_sync.tbl` clamps ML / AP trees / likely cap store);
+   quest 4207378 "Drumsticks au Griffin" (log 2622) syncs too. See the
+   `quest-level-sync` memory. No live round or Scott needed.
 3. Fediel's constant K≈307.3 (needs a new Fediel log with loadout capture).
 4. Rosetta's half-percent source (needs a Rosetta log with overmasteries).
 5. Events-card verdict still renders transition hits ✗ + Unaccounted; a
    "state transition" verdict in `capLadder.ts` needs the per-actor
    grid-state set.
-6. Predictor sweep for the maxed-account heuristic (item 6 above).
+6. ~~Predictor sweep~~ **RUN 2026-08-13** (`971662fd`,
+   `roster_census --predictor`): ML55 + 6★ + awakening 10 ⇒ lbcap 684 in
+   311/317 rows over 96 logs; misses are sync-quest rows plus ONE
+   per-character case (Tweyen AI 331, log 2560). Io is excluded by the
+   awakening-0 proxy, so she is not a counterexample. Domain: 4,136
+   proxy-only slots. Remaining lead: extract `chara_level_sync.tbl` to key
+   sync quests structurally (and test Unk19/20/21 as the cap clamps).
 
 Memory: `cap-off-grid-residual`, `cap-stats-only-probe` (both updated with
 today's corrections), MEMORY.md indexed. Older cap memories mislabel
