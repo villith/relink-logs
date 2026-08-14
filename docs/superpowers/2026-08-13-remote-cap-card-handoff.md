@@ -1,5 +1,10 @@
 # Handoff — the remote-prediction cap card, 2026-08-13 (evening)
 
+> **SUPERSEDED 2026-08-14** by `2026-08-14-cap-explainability-handoff.md` —
+> start there. This file is the history: the feature as designed, plus the
+> banners below recording how its open items resolved. The body's "open
+> questions" and "Also open" lists are all settled or carried forward.
+
 > **SHIPPED 2026-08-13 (late evening)** through `feat/remote-sba-gains`.
 > Design + plan in `docs/superpowers/{specs,plans}/2026-08-13-remote-cap-card*`
 > (gitignored). The open questions below resolved as: (1) remote hits carry
