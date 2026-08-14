@@ -11,6 +11,7 @@ import { translateTraitId } from "@/utils";
 import { HOVER_PANEL_CLASS } from "../analysis/HoverCard";
 import { capCardRows, selectCapUp, type CapContext, type CapHit, type CapRow, type PlayerCapUp } from "./capBreakdown";
 import { deriveChannelTotal, type CapConditions } from "./capFactors";
+import { capBucketOf, classifyOffGrid, type CapBucket, type GridKStates } from "./capGridStates";
 import { capConsistent, gameLadderBase, ladderCurveFor } from "./capLadder";
 import {
   capClassOf,
@@ -27,7 +28,7 @@ import {
  * short-circuits on it so the hidden card costs nothing per rendered row. */
 export const SHOWS_CAP_CARD = false;
 
-const format = (row: CapRow, locale: string): string => {
+const format = (row: CapRow, locale: string, t: (key: string) => string): string => {
   switch (row.kind) {
     case "count":
       return row.value.toLocaleString(locale);
@@ -41,6 +42,9 @@ const format = (row: CapRow, locale: string): string => {
     case "multiplier":
       return `x${row.value.toLocaleString(locale, { minimumFractionDigits: 3 })}`;
     case "verdict":
+      // 2 is the ease: the game's own multiplier passing between the actor's
+      // grid states, neither a pass nor a failure.
+      if (row.value === 2) return `⇄ ${t("ui.logs.cap-verdict-transition")}`;
       return row.value === 1 ? "✓" : "✗";
   }
 };
@@ -64,6 +68,10 @@ export type AmountCellCapFacts = {
    * .capConditions`) — what the channel derivation resolves board nodes
    * against. Undefined leaves the channel underived, never zero. */
   conditions?: CapConditions;
+  /** The acting player's observed on-grid K sets per attack-class bucket
+   * (`capGridStates`), which refine a failed grid check into the transition
+   * verdict. Undefined keeps a failed check at ✗. */
+  gridStates?: ReadonlyMap<CapBucket, GridKStates>;
 };
 
 /** The Amount cell. A damage row's amount is the END of a calculation the log
@@ -80,6 +88,7 @@ export const AmountCell = ({
   loadout,
   characterType,
   conditions,
+  gridStates,
   width,
   connector,
   share,
@@ -114,9 +123,19 @@ export const AmountCell = ({
     // debug panel. Zero renders nothing — an underived channel stays part of
     // the unaccounted remainder rather than reading as "nothing applied".
     const channel = conditions === undefined ? 0 : deriveChannelTotal(loadout, capClass, conditions);
+    // The grid check, refined on failure by the actor's own observed states:
+    // a K strictly inside their bracket (or on the settling tail) is the
+    // game's own ease, not a formula violation.
+    const verdict = (() => {
+      if (!hasLadder) return null;
+      if (capConsistent(capHit.damage_cap!, ladderBase)) return "pass" as const;
+      const bucket = capBucketOf(capHit.class_flags);
+      const kFloat = (100 * capHit.damage_cap!) / ladderBase;
+      return classifyOffGrid(kFloat, bucket === null ? undefined : gridStates?.get(bucket)) ?? ("fail" as const);
+    })();
     const context: CapContext = {
       ladderBase: hasLadder ? ladderBase : null,
-      consistent: hasLadder ? capConsistent(capHit.damage_cap!, ladderBase) : null,
+      verdict,
       record: selectCapUp(playerCapUp, capHit.class_flags),
       recordComponents: deriveRecordComponents(loadout, capClass),
       dmgCapTrait: dmgCapTraitValue(loadout, capClass),
@@ -124,7 +143,7 @@ export const AmountCell = ({
       ...(channel > 0 ? { channel: [{ key: "channel", labelKey: "ui.logs.cap-term-channel", value: channel }] } : {}),
     };
     return capCardRows(capHit, context);
-  }, [capHit, playerCapUp, loadout, characterType, conditions]);
+  }, [capHit, playerCapUp, loadout, characterType, conditions, gridStates]);
   // A card needs more than the one row that restates the cell.
   const shows = rows.length > 1;
 
@@ -143,7 +162,7 @@ export const AmountCell = ({
           >
             <Label>{row.traitId === undefined ? t(row.labelKey) : translateTraitId(row.traitId)}</Label>
             <Text className="text-sm text-white" style={{ fontVariantNumeric: "tabular-nums" }}>
-              {format(row, i18n.language)}
+              {format(row, i18n.language, t)}
             </Text>
           </Box>
         ))}

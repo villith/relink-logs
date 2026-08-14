@@ -93,6 +93,33 @@ describe("AmountCell", () => {
     expect(card.querySelector('[data-cap-row="basecap"]')?.textContent).toContain("70,771");
   });
 
+  // A failed grid check refined by the actor's own observed states: a K
+  // strictly inside their bracket renders the ease, and the remainder is the
+  // easing gap rather than an unaccounted term.
+  it.skipIf(!SHOWS_CAP_CARD)("renders a mid-ease hit as a state transition", async () => {
+    const { gameLadderBase, ladderCurveFor } = await import("./capLadder");
+    const base = gameLadderBase(ladderCurveFor("Pl1900", 0)!, 0.5);
+    renderCell({
+      amount: 1_500_000,
+      capHit: { ...capHit, damage_cap: Math.trunc(base * 24.115), attack_rate: 0.5, class_flags: 0 },
+      characterType: "Pl1900",
+      gridStates: new Map([
+        [
+          "normal",
+          new Map([
+            [2401, 2],
+            [2426, 1],
+          ]),
+        ],
+      ]),
+      width: 78,
+    });
+    hover("1,500,000");
+    const card = screen.getByTestId("cap-card");
+    expect(card.querySelector('[data-cap-row="verdict"]')?.textContent).toContain("ui.logs.cap-verdict-transition");
+    expect(card.querySelector('[data-cap-row="unaccounted"]')?.textContent).toContain("ui.logs.cap-easing-gap");
+  });
+
   // Selection is by the hit's OWN class. A Skybound Art must not be explained
   // with the Normal total, which is a different number entirely.
   it.skipIf(!SHOWS_CAP_CARD)("picks the cap-up matching the hit's attack class", () => {
