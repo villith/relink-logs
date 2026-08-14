@@ -31,6 +31,19 @@
 >   Same shape as the buff-carried terms ([[cap-buff-term-field]]).
 > Still pending: the manual card eyeball on lobby log 2654, and naming
 > Rosetta's flat term.
+>
+> **AUDIT + TIGHTENING, same day (`641c466d`)** — Scott asked whether the
+> sweep's tolerance buckets hid shortcuts; two did. (1) The "Zeta ~5x
+> transients" were 57 summon-class hits whose cap is exactly the bare
+> SO0000 ladder base — now modeled (`isSummonClass` → predict base only,
+> card + sweep; all 57 exact). (2) The open-channel bucket exempted any
+> mismatch with an open potential; it now only excuses undershoots within
+> unresolved × base, moving the error bars to honest values (Rackam p50
+> 2.8%→7.4%, Io 19.4%; bucket 56k→32k hits). The direction gate gained a
+> worst-overshoot <50% magnitude ceiling. Corpus sweep green on merit.
+> North star recorded: EVERY damage event should be explainable — the cap
+> forward-model is ~closed; the damage-AMOUNT forward model (motion value ×
+> attack × multipliers) is not built and is the next big arc.
 
 Branch `feat/remote-sba-gains`, continuing from
 `2026-08-13-cap-validation-handoff.md` (all its workable items closed).
