@@ -301,8 +301,12 @@ describe("predictedCapRows", () => {
 });
 
 describe("PREDICTED_CAP_DENYLIST", () => {
-  it("withholds Fediel — the one character the formula is known-incomplete for", () => {
+  it("withholds the characters the formula is known-incomplete for", () => {
+    // Fediel (unknown constant source), Rosetta (constant ~27% undershoot),
+    // Seofon (~5x overprediction) — the 2026-08-13 blind sweep's verdicts.
     expect(PREDICTED_CAP_DENYLIST.has("Pl2900")).toBe(true);
+    expect(PREDICTED_CAP_DENYLIST.has("Pl0600")).toBe(true);
+    expect(PREDICTED_CAP_DENYLIST.has("Pl2200")).toBe(true);
     expect(PREDICTED_CAP_DENYLIST.has("Pl0300")).toBe(false);
   });
 });

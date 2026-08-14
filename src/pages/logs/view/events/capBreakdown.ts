@@ -246,10 +246,15 @@ export const capPredictableKey = (key: string | null): boolean => {
   return action === "LinkAttack" || action === "SBA" || (typeof action === "object" && "Normal" in action);
 };
 
-/** Characters the prediction is withheld for. Fediel's every logged fight sits
- * under one stable unknown cap source (docs/damage-cap-coverage.md), so the
- * formula below would be known-wrong for her rather than approximately right. */
-export const PREDICTED_CAP_DENYLIST: ReadonlySet<string> = new Set(["Pl2900"]);
+/** Characters the prediction is withheld for, because for them the formula is
+ * known-wrong rather than approximately right (blind sweep, 2026-08-13):
+ * - Fediel (Pl2900): every logged fight sits under one stable unknown cap
+ *   source (docs/damage-cap-coverage.md).
+ * - Rosetta (Pl0600): a constant ~27% undershoot on essentially every hit —
+ *   one large stable term the factor model does not carry.
+ * - Seofon (Pl2200): consistent ~5x OVERprediction; a predicted cap must
+ *   never overstate, so he stays dark until the cause is understood. */
+export const PREDICTED_CAP_DENYLIST: ReadonlySet<string> = new Set(["Pl2900", "Pl0600", "Pl2200"]);
 
 /** Everything the caller resolved for a hit with NO captured cap: the
  * independent ladder base plus the terms of the game's own multiplier. All
