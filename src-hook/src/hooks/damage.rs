@@ -1954,6 +1954,23 @@ const HOLDER_PLAYER_RECORD_SLOT: usize = 0x9f0;
 pub(crate) const RECORD_SNAPSHOT_START: usize = 0x18;
 pub(crate) const RECORD_SNAPSHOT_LEN: usize = 0x10;
 
+/// The span above `MODULE_BASE` that still counts as "inside the game
+/// module" — the same test `diag.rs`'s `log_callers_depth` uses to keep stack
+/// frames to the exe and skip system DLLs (exe is ~123 MB; 256 MB gives it
+/// room). A bare `checked_sub(module_base)` only rejects addresses BELOW the
+/// module — an ordinary heap pointer sits far ABOVE it and would pass that
+/// check, so on a future patch a garbage-but-mapped chain (`attacker+0x2300`
+/// resolving to unrelated heap data with some non-zero value at what used to
+/// be +0x9F0) would transmute-call through an arbitrary address on the game
+/// thread instead of failing closed.
+const MODULE_IMAGE_SPAN: usize = 0x1000_0000;
+
+/// Floor-and-span "is this address inside the game module" test, shared by
+/// both pointers `resolve_player_record` is about to call through.
+fn within_module_image(addr: usize, module_base: usize) -> bool {
+    addr > module_base && addr - module_base < MODULE_IMAGE_SPAN
+}
+
 /// Resolve the attacker's player-record pointer from its specified-instance
 /// pointer, two guarded hops: a pointer dereference (`RECORD_HOLDER_OFFSET`)
 /// then a bounds-checked `this`-only virtual call (`HOLDER_PLAYER_RECORD_SLOT`)
@@ -1961,9 +1978,11 @@ pub(crate) const RECORD_SNAPSHOT_LEN: usize = 0x10;
 /// `slice`, folded here to start from `attacker` directly (`slice` itself is
 /// never dereferenced, only offset, so the two are the same pointer chain).
 ///
-/// Bounds-checks the vtable and the slot against the module image before the
-/// transmuted call, exactly as the oracle does: a garbage vtable pointer
-/// (unfamiliar actor class, shifted layout) must never be called through.
+/// Checks the vtable pointer AND the slot value against
+/// [`within_module_image`] before the transmuted call, not merely "not below
+/// the module": a garbage vtable pointer (unfamiliar actor class, shifted
+/// layout) must never be called through, and an ordinary heap address is
+/// exactly the shape that check has to catch.
 fn resolve_player_record(attacker: usize) -> Option<usize> {
     use crate::hooks::diag::{read_ptr_guarded, MODULE_BASE};
 
@@ -1973,9 +1992,13 @@ fn resolve_player_record(attacker: usize) -> Option<usize> {
     }
     let holder = read_ptr_guarded(attacker, RECORD_HOLDER_OFFSET).filter(|h| *h != 0)?;
     let vtable = read_ptr_guarded(holder, 0).filter(|v| *v != 0)?;
-    vtable.checked_sub(module_base)?;
+    if !within_module_image(vtable, module_base) {
+        return None;
+    }
     let slot = read_ptr_guarded(vtable, HOLDER_PLAYER_RECORD_SLOT).filter(|s| *s != 0)?;
-    slot.checked_sub(module_base)?;
+    if !within_module_image(slot, module_base) {
+        return None;
+    }
     let get_record: unsafe extern "system" fn(usize) -> usize =
         unsafe { std::mem::transmute(slot) };
     let record = unsafe { get_record(holder) };
@@ -2222,5 +2245,29 @@ mod tests {
         // Unmapped low address: the readability probe must fail closed.
         assert_eq!(snapshot_window(0x10, 0x40, 0x20), None);
         assert_eq!(snapshot_window(usize::MAX - 0x100, 0x40, 0x20), None);
+    }
+
+    /// The check `resolve_player_record` uses to keep its transmuted virtual
+    /// call inside the game module. A bare `checked_sub` only rejects
+    /// addresses BELOW the base — this must ALSO reject an address far above
+    /// it, which is exactly where an ordinary heap pointer sits (the failure
+    /// mode a garbage-but-mapped record chain would produce on a future
+    /// patch).
+    #[test]
+    fn within_module_image_rejects_below_and_far_above_accepts_inside() {
+        let base = 0x1_4000_0000usize;
+        // Inside: just above base, and just under the span ceiling.
+        assert!(within_module_image(base + 1, base));
+        assert!(within_module_image(base + MODULE_IMAGE_SPAN - 1, base));
+        // At the floor (not strictly above) and below it: rejected.
+        assert!(!within_module_image(base, base));
+        assert!(!within_module_image(base - 1, base));
+        assert!(!within_module_image(0, base));
+        // At and past the span ceiling: rejected.
+        assert!(!within_module_image(base + MODULE_IMAGE_SPAN, base));
+        // A typical heap address is far above a typical module base (heap
+        // allocations commonly sit multiple GB above the exe's load
+        // address) — exactly the case a bare `checked_sub` would miss.
+        assert!(!within_module_image(base + 0x10_0000_0000, base));
     }
 }

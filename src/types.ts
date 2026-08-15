@@ -1062,12 +1062,13 @@ export type LogEventPayload =
         source_snapshot: number[] | null;
         /** Raw player-record window `record+0x18..0x28` (16 bytes), captured
          * pre-call alongside `source_snapshot` — same player-family gate.
-         * Known residents: `+0x1C` SBA class dmg%, `+0x24` Skill class
-         * dmg% (integer percent). `null` on old logs, on non-player
-         * attackers, and when the pointer chain or read fails. Mirrors
-         * `protocol::DamageEvent::record_snapshot`; see
-         * `src/pages/logs/view/events/recordSnapshot.ts` for the offset map
-         * — there is no Rust-side interpreter for this window yet. */
+         * Known residents: `+0x1C` SBA class dmg%, `+0x24` Skill class dmg%
+         * (both `f32`, applied by the game as `1 + v * 0.01` — the float
+         * itself IS the percent number, not an integer reinterpreted).
+         * `null` on old logs, on non-player attackers, and when the pointer
+         * chain or read fails. Mirrors `protocol::DamageEvent::record_snapshot`;
+         * see `src/pages/logs/view/events/recordSnapshot.ts` for the offset
+         * map — there is no Rust-side interpreter for this window yet. */
         record_snapshot: number[] | null;
       };
     }
