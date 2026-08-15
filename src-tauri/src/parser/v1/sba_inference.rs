@@ -364,9 +364,21 @@ impl<'a> HitShares<'a> {
     }
 }
 
-fn is_flat_grant(amount: f64) -> bool {
+/// Whether `amount` is exactly a flat chain grant (100.0, or 130.0 with an
+/// Alpha trait). Public for `examples/sba_share_check.rs`, which must exclude
+/// these rises from a weight fit the same way the pipeline names them.
+pub fn is_flat_grant(amount: f64) -> bool {
     (amount - CHAIN_GRANT).abs() < VALUE_EPSILON
         || (amount - CHAIN_GRANT_ALPHA).abs() < VALUE_EPSILON
+}
+
+/// The authored weight of one hit, resolved exactly the way [`HitShares`]
+/// prices it. `None` means the table has no entry for the action — the
+/// pipeline assumes [`sba_weights::DEFAULT_ACTION_WEIGHT`] there, but a
+/// scoring tool wants to see the hole instead. Public for
+/// `examples/sba_share_check.rs`.
+pub fn authored_hit_weight(character: Option<CharacterType>, action: ActionType) -> Option<f64> {
+    sba_weights::hit_weight(character.and_then(sba_weights::for_character), action)
 }
 
 /// Names what it can of the gauge in `events`, at the shipped windows.

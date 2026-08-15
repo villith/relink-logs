@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { Sigil } from "@/types";
 
 import type { CapLoadout } from "../capSources";
-import { collectCapFactors, deriveChannelTotal, evaluateCapFactors } from "./index";
+import { collectCapFactors, deriveChannelBreakdown, deriveChannelTotal, evaluateCapFactors } from "./index";
 
 /** Unconditional, +50% to every class at level 15. */
 const FATEBREAKER = 0xd029fe08;
@@ -109,5 +109,30 @@ describe("deriveChannelTotal", () => {
     expect(deriveChannelTotal(loadout(), "normal", {})).toBe(0);
     expect(deriveChannelTotal(undefined, "normal", {})).toBe(0);
     expect(deriveChannelTotal(loadout(), null, {})).toBe(0);
+  });
+});
+
+describe("deriveChannelBreakdown", () => {
+  it("splits the channel into active and unresolved fractions", () => {
+    // pl0300_000c (+15, always) is active; pl0300_001f (+35, attack-group 1)
+    // cannot be settled without the hit's action id, and its potential is the
+    // prediction's honest uncertainty.
+    const player = loadout({ characterType: "Pl0300", skillboard: [0x0c, 0x1f] });
+    const { active, unresolved } = deriveChannelBreakdown(player, "normal", {});
+    expect(active).toBeCloseTo(0.15, 6);
+    expect(unresolved).toBeCloseTo(0.35, 6);
+  });
+
+  it("ignores record-side unknowns — the captured record already holds them", () => {
+    // Celestial Lumen (conditional trait) is unresolved without hpRatio, but it
+    // is record-placement: it must not leak into the channel's uncertainty.
+    const { active, unresolved } = deriveChannelBreakdown(loadout(), "normal", {});
+    expect(active).toBe(0);
+    expect(unresolved).toBe(0);
+  });
+
+  it("is empty with nothing derivable", () => {
+    expect(deriveChannelBreakdown(undefined, "normal", {})).toEqual({ active: 0, unresolved: 0 });
+    expect(deriveChannelBreakdown(loadout(), null, {})).toEqual({ active: 0, unresolved: 0 });
   });
 });

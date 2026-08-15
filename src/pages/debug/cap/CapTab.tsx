@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { abilityLabelFor } from "@/pages/logs/view/analysis/abilityLabel";
 import { explainCapHit } from "@/pages/logs/view/events/capExplain";
 import { conditionsForHit } from "@/pages/logs/view/events/capFactors/conditions";
+import { buildGridStates } from "@/pages/logs/view/events/capGridStates";
 import { explainDamageHit } from "@/pages/logs/view/events/damageExplain";
 import { getSkillName, millisecondsToPreciseElapsedFormat, translateCharacterType } from "@/utils";
 
@@ -124,6 +125,17 @@ export const CapTab = () => {
 
   const selected = useMemo(() => shown.find((hit) => hit.eventIndex === eventIndex) ?? null, [shown, eventIndex]);
 
+  // The party's observed on-grid K sets, from every hit in the log — what
+  // refines a failed grid check into the transition/settling naming.
+  const gridStates = useMemo(
+    () =>
+      buildGridStates(
+        hits.map((hit) => ({ sourceIndex: hit.sourceIndex, capHit: hit.hit })),
+        (actor) => playersByActor.get(actor)?.characterType
+      ),
+    [hits, playersByActor]
+  );
+
   // One source of truth for the loadout + conditions both panels explain —
   // computed once and fed to `explainCapHit` and `explainDamageHit` alike, so
   // the two columns can never drift into narrating the same hit against
@@ -148,6 +160,7 @@ export const CapTab = () => {
         capUp: capUp[String(selected.sourceIndex)],
         loadout: player,
         characterType: player?.characterType,
+        gridStates: gridStates.get(selected.sourceIndex),
         conditions,
       }),
       damageSections: explainDamageHit({
@@ -158,7 +171,7 @@ export const CapTab = () => {
         modeInference,
       }),
     };
-  }, [selected, playersByActor, capUp, amplifyStatusIds, chartWindows]);
+  }, [selected, playersByActor, capUp, gridStates, amplifyStatusIds, chartWindows]);
 
   const logOptions = recent.map((log) => ({
     value: String(log.id),

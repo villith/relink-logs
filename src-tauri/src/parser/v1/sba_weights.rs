@@ -25,6 +25,14 @@ use crate::parser::constants::CharacterType;
 /// does not cover is assumed to grant at.
 pub(super) const DEFAULT_ACTION_WEIGHT: f64 = 1.0;
 
+/// The hook reports every summon and primal-burst hit under this one action id
+/// (see `is_summon_body` in the hook's damage path) — it is not any
+/// character's own action, so it is priced here rather than in the table.
+/// Corpus-measured zero: 317 such hits across the captioned local slots of
+/// four characters (Pl0300/Pl1000/Pl1600/Pl2700) produced no captioned gauge
+/// grant at all.
+const SUMMON_ATTACK_ID: u32 = 80_000;
+
 /// Link attack weight, identical for every character in the shipped table;
 /// the fallback when a character is not in the table at all.
 pub(super) const LINK_ATTACK_WEIGHT: f64 = 5.0;
@@ -91,6 +99,7 @@ pub(super) fn hit_weight(weights: Option<&CharacterWeights>, action: ActionType)
         ActionType::LinkAttack => {
             Some(weights.map_or(LINK_ATTACK_WEIGHT, |weights| weights.link_attack))
         }
+        ActionType::Normal(SUMMON_ATTACK_ID) => Some(0.0),
         ActionType::Normal(id) => weights.and_then(|weights| weights.actions.get(&id).copied()),
         // Everything else — supplementary damage, DoT ticks, SBA hits, and the
         // parser-synthesized zero-damage variants — grants no gauge (see the
@@ -148,6 +157,22 @@ mod tests {
             assert_eq!(hit_weight(Some(gran), action), Some(0.0));
             assert_eq!(hit_weight(None, action), Some(0.0));
         }
+    }
+
+    /// Corpus-verified like the variant policy: 317 summon/primal-burst hits
+    /// (all reported as action 80000) in captioned local slots granted zero
+    /// gauge, for every character measured.
+    #[test]
+    fn summon_hits_weigh_zero_for_every_character() {
+        let gran = for_character(CharacterType::Pl0000).unwrap();
+        assert_eq!(
+            hit_weight(Some(gran), ActionType::Normal(SUMMON_ATTACK_ID)),
+            Some(0.0)
+        );
+        assert_eq!(
+            hit_weight(None, ActionType::Normal(SUMMON_ATTACK_ID)),
+            Some(0.0)
+        );
     }
 
     #[test]

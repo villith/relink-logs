@@ -151,6 +151,40 @@ describe("the cap-up section", () => {
     expect(line(explainCapHit(off), "capup", "grid-verdict").value).toEqual({ kind: "verdict", value: false });
   });
 
+  describe("the grid transition line", () => {
+    // The acting player's observed on-grid K sets, as the events tab's
+    // registry hands them over (bucket → K → count). class_flags 0x1 reads
+    // the normal bucket.
+    const states = (ks: number[]) => new Map([["normal" as const, new Map(ks.map((k) => [k, 1]))]]);
+
+    it("names an off-grid K inside the actor's own bracket", () => {
+      // 46,773 at base 5399 is K 866.33, strictly between 800 and 900.
+      const off = input({ hit: { ...input().hit, damage_cap: 46_773 }, gridStates: states([800, 900]) });
+      expect(line(explainCapHit(off), "capup", "grid-transition").value).toEqual({
+        kind: "text",
+        value: "transition",
+      });
+    });
+
+    it("names the settling tail near a single state", () => {
+      // 46,758 at base 5399 is K 866.05 — off-grid, within 0.15 of 866.
+      const off = input({ hit: { ...input().hit, damage_cap: 46_758 }, gridStates: states([866]) });
+      expect(line(explainCapHit(off), "capup", "grid-transition").value).toEqual({
+        kind: "text",
+        value: "settling",
+      });
+    });
+
+    it("stays silent without states, outside every bracket, and on-grid", () => {
+      const noStates = input({ hit: { ...input().hit, damage_cap: 46_773 } });
+      expect(section(explainCapHit(noStates), "capup").lines.some((l) => l.key === "grid-transition")).toBe(false);
+      const outside = input({ hit: { ...input().hit, damage_cap: 46_773 }, gridStates: states([2000, 2100]) });
+      expect(section(explainCapHit(outside), "capup").lines.some((l) => l.key === "grid-transition")).toBe(false);
+      const onGrid = input({ gridStates: states([800, 2900]) });
+      expect(section(explainCapHit(onGrid), "capup").lines.some((l) => l.key === "grid-transition")).toBe(false);
+    });
+  });
+
   it("itemizes the record into every contributor it considered", () => {
     const sections = explainCapHit(
       input({

@@ -445,8 +445,8 @@
       "neededGroups": [],
       "groups": {
         "0": {
-          "actionIds": [110, 115, 120, 121, 125, 130, 140, 300, 400],
-          "evidence": "manual:button-map 2026-08-10; engine:action-branch 2026-08-10; caporacle join, logs 2571"
+          "actionIds": [110, 112, 115, 120, 121, 125, 130, 140, 300, 400],
+          "evidence": "manual:button-map 2026-08-10; engine:action-branch 2026-08-10; caporacle join, logs 2571; corpus offset arithmetic, logs 2612/2617/2618 (112 residual = exactly the two owned group-0 nodes)"
         },
         "15": {
           "actionIds": [121, 122, 301],
