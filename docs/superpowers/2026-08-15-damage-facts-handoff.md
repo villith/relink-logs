@@ -65,6 +65,13 @@ new fields (decode errors are swallowed).
   new resolver's span-checked reads — candidate for the same treatment.
 - Crit clustering's residual in-band mis-accept surfaces are documented in
   `damage_facts.rs` and validated by live gate (b) above.
+- Deliberately deferred: the panel's raw-value rows — the elemental/overflow
+  (`+0x248x`) rows and the status-term row — do not yet display the
+  captured `source_snapshot` values or `term_bits`. The wire already
+  carries them (nothing is lost; they're retroactively displayable from any
+  log captured on this branch), but no `src/` code reads them yet.
+  Displaying them labeled-as-raw is a follow-up round once their
+  provenance interpretation is settled.
 
 ## Commits (`6aa417e4..HEAD`)
 
