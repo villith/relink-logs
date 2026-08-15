@@ -528,6 +528,59 @@ mod tests {
     }
 
     #[test]
+    fn a_repeated_mode_extends_nothing() {
+        // Pins the doc claim directly: two OVERDRIVE events in a row for the
+        // same actor must not open a second window or move the start — only
+        // the eventual transition to NORMAL closes the one window.
+        let events = vec![
+            mode(1_000, 7, EnemyModeEvent::MODE_OVERDRIVE),
+            mode(2_000, 7, EnemyModeEvent::MODE_OVERDRIVE),
+            mode(5_000, 7, EnemyModeEvent::MODE_NORMAL),
+        ];
+        let windows = assemble_chart_windows(&events, 0, 8_000);
+        assert_eq!(
+            windows,
+            vec![ChartWindow {
+                kind: ChartWindowKind::Overdrive,
+                start_ms: 1_000,
+                end_ms: 5_000,
+                actor_index: Some(7)
+            }]
+        );
+    }
+
+    #[test]
+    fn break_to_overdrive_closes_break_and_opens_overdrive_at_the_same_step() {
+        // The mirror of `overdrive_and_break_are_separate_windows_that_hand_off_directly`:
+        // the game re-enters Overdrive after a Break in real fights, so the
+        // 2->1 hand-off must close Break and open Overdrive in the same step,
+        // not merge the two kinds into one span.
+        let events = vec![
+            mode(1_000, 7, EnemyModeEvent::MODE_BREAK),
+            mode(2_000, 7, EnemyModeEvent::MODE_OVERDRIVE),
+            mode(5_000, 7, EnemyModeEvent::MODE_NORMAL),
+        ];
+        let windows = assemble_chart_windows(&events, 0, 8_000);
+        assert_eq!(
+            windows,
+            vec![
+                ChartWindow {
+                    kind: ChartWindowKind::Break,
+                    start_ms: 1_000,
+                    end_ms: 2_000,
+                    actor_index: Some(7)
+                },
+                ChartWindow {
+                    kind: ChartWindowKind::Overdrive,
+                    start_ms: 2_000,
+                    end_ms: 5_000,
+                    actor_index: Some(7)
+                },
+            ]
+        );
+    }
+
+    #[test]
     fn an_unclosed_window_runs_to_the_fight_end() {
         let events = vec![link(6_000, true)];
         let windows = assemble_chart_windows(&events, 0, 9_000);
