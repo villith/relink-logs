@@ -1,11 +1,10 @@
 import { useMemo } from "react";
 
-import { PLAYER_COLORS } from "@/utils";
+import { PLAYER_COLORS, millisecondsToElapsedFormat } from "@/utils";
 
 import type { Label } from "../DetailCharts";
 import { DPS_BUCKET_MS } from "../DetailCharts";
 
-import { millisecondsToElapsedFormat } from "@/utils";
 import { DpsChart, type DpsChartProps } from "./DpsChart";
 import { compareChartData, compareSeriesKey } from "./compareSeries";
 
