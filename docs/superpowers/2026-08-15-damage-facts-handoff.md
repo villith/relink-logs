@@ -47,6 +47,26 @@ new fields (decode errors are swallowed).
   especially). Outcomes: stamped → a follow-up can widen the measured
   boundary per-fact; zero → inference stands as designed. Also eyeball
   remote crit-rate columns (inferred, `~` marker) for plausibility.
+
+  **ANSWERED 2026-08-15 by online log 2657** (4-player lobby, 3 remote,
+  ~24.7k remote hits): every target-state gate byte (weak point, back
+  attack, vuln, debuffed, OD, Break) is an unstamped ZERO on remote hits
+  (the local player hitting the same targets read debuffed on 87% of
+  hits), so inference stands as designed — with one correction: remote
+  hits arrive with **d0 (+0xD0) NONZERO** (network-carried) and the cap
+  slot at the 99,999,999 no-cap sentinel; only precap (+0x2D4) is zero.
+  The `d0 || precap` builder-populated rule therefore misread ALL remote
+  hits as measured (asserting measured "no" for every gate and starving
+  the window-inferred OD/Break fallback); fixed same day to precap-only
+  in both copies (`damage_facts.rs`, `damageSnapshot.ts`). The remote
+  CRIT byte does look stamped (~94% set vs local 91%) — a candidate for
+  per-fact measured-boundary widening after a cluster cross-check, per
+  the outcome rule above. Remote `source_snapshot` elemental (+0x2488)
+  reads 0 on every remote hit (local: 0 / 0.3 varying by target), so the
+  deferred elemental row would be local-only. Separately: `record_snapshot`
+  was `None` on EVERY hit of 2657 including the local player's — either
+  the injected hook predated `7d7e7f2d` or the record resolver fails
+  live; needs one confirmed fresh-hook solo run to distinguish.
 - **(c) Re-parse old log 2656.** Panel rows unchanged except
   window-inferred OD/Break verdicts; new columns show dashes/inferred
   only; OD/Break hover split backfilled from mode windows; nothing

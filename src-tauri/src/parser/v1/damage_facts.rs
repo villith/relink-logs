@@ -123,12 +123,14 @@ impl<'a> InstSnapshot<'a> {
     pub fn gate(&self, byte: GateByte) -> bool {
         self.0[byte.offset() - SNAPSHOT_BASE] != 0
     }
-    /// Whether the DamageInstance BUILDER ran for this hit — d0 (+0xD0) or
-    /// precap (+0x2D4) nonzero. Remote players' hits arrive deserialized with
-    /// both zero (online log 405), so their gate bytes may mean "not computed
+    /// Whether the DamageInstance BUILDER ran for this hit — precap (+0x2D4)
+    /// nonzero. Remote players' hits arrive deserialized with precap 0.0 and
+    /// the cap slot at the 99,999,999 no-cap sentinel, but with d0 (+0xD0)
+    /// NONZERO (online log 2657, all 24,729 remote hits) — so d0 is no proof
+    /// the local builder ran, and their gate bytes may mean "not computed
     /// here" rather than "no": only a populated snapshot's bytes are MEASURED.
     pub fn builder_populated(&self) -> bool {
-        self.u32_at(0xD0) != 0 || self.u32_at(0x2D4) != 0
+        self.u32_at(0x2D4) != 0
     }
 }
 
@@ -363,7 +365,7 @@ mod tests {
             (0x15D, &[1]), // crit
             (0x15F, &[1]), // back attack
             (0x163, &[1]), // break
-            (0xD0, &1000u32.to_le_bytes()),
+            (0x2D4, &1000.0f32.to_le_bytes()),
         ]);
         let snap = InstSnapshot::parse(Some(&blob)).expect("well-formed");
         assert!(snap.gate(GateByte::Crit));
@@ -395,6 +397,19 @@ mod tests {
     fn a_remote_style_snapshot_is_not_builder_populated() {
         // d0 == 0 and precap == 0.0 — the log-405 remote signature.
         let blob = blob_with(&[(0x15D, &[1])]);
+        let snap = InstSnapshot::parse(Some(&blob)).expect("well-formed");
+        assert!(!snap.builder_populated());
+    }
+
+    #[test]
+    fn a_remote_snapshot_with_network_carried_d0_is_not_builder_populated() {
+        // Online log 2657 (every remote hit, 24,729/24,729): d0 (+0xD0)
+        // arrives NONZERO over the network while precap (+0x2D4) stays 0.0
+        // and the cap slot holds the 99,999,999 no-cap sentinel. The target-
+        // state gate bytes on those hits are unstamped zeros (the local
+        // player hitting the same target reads debuffed on 87% of hits;
+        // remotes read 0%), so d0 must not count as proof the builder ran.
+        let blob = blob_with(&[(0x15D, &[1]), (0xD0, &196_266u32.to_le_bytes())]);
         let snap = InstSnapshot::parse(Some(&blob)).expect("well-formed");
         assert!(!snap.builder_populated());
     }
@@ -471,13 +486,13 @@ mod tests {
     #[test]
     fn populated_snapshot_resolves_all_six_facts_as_measured() {
         let blob = blob_with(&[
-            (0x15D, &[1]),                   // crit: set
-            (0x15E, &[0]),                   // weak point: clear
-            (0x15F, &[1]),                   // back attack: set
-            (0x161, &[1]),                   // debuffed: set
-            (0x162, &[0]),                   // overdrive: clear
-            (0x163, &[1]),                   // break: set
-            (0xD0, &1_000u32.to_le_bytes()), // builder ran
+            (0x15D, &[1]),                      // crit: set
+            (0x15E, &[0]),                      // weak point: clear
+            (0x15F, &[1]),                      // back attack: set
+            (0x161, &[1]),                      // debuffed: set
+            (0x162, &[0]),                      // overdrive: clear
+            (0x163, &[1]),                      // break: set
+            (0x2D4, &1_000.0f32.to_le_bytes()), // builder ran (precap stamped)
         ]);
         let event = DamageEvent {
             instance_snapshot: Some(blob),

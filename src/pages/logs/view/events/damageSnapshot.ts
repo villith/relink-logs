@@ -9,15 +9,17 @@
  * (`src-hook/src/hooks/damage.rs`) — three copies of one fact; change them
  * together.
  *
- * A hit whose snapshot is BUILDER-POPULATED (`u32@0xD0 != 0 || u32@0x2D4 !=
- * 0`) has MEASURED gate verdicts. An unpopulated snapshot — the remote-player
- * case, both zero — means the bytes may mean "not computed here" rather than
- * "no", so its gates must not be read as measured.
+ * A hit whose snapshot is BUILDER-POPULATED (`u32@0x2D4 != 0`, the precap)
+ * has MEASURED gate verdicts. An unpopulated snapshot — the remote-player
+ * case, precap zero — means the bytes may mean "not computed here" rather
+ * than "no", so its gates must not be read as measured. d0 (`+0xD0`) is NOT
+ * part of the test: remote hits arrive with it nonzero off the network
+ * (online log 2657), so it proves nothing about the local builder.
  *
  * Snapshots from the damage-TAKEN stream only prove bytes up to `+0x2D8` (the
  * apply path builds its instance on the stack) — every offset this reader
- * touches (`0x15D..0x163`, `0xD0`, `0x2D4`) sits inside that proven span, so
- * this reader is unaffected by that caveat.
+ * touches (`0x15D..0x163`, `0x2D4`) sits inside that proven span, so this
+ * reader is unaffected by that caveat.
  */
 
 const BASE = 0xc0;
@@ -72,10 +74,11 @@ export const parseInstSnapshot = (bytes: number[] | null | undefined): ParsedSna
       overdrive: gate(GATE_BYTE_OFFSET.overdrive),
       breakMode: gate(GATE_BYTE_OFFSET.breakMode),
     },
-    // d0 (+0xD0) or precap (+0x2D4) nonzero — remote players' hits arrive
-    // deserialized with both zero, so their gate bytes may mean "not
-    // computed here" rather than "no": only a populated snapshot's bytes are
-    // MEASURED.
-    builderPopulated: u32At(bytes, 0xd0) !== 0 || u32At(bytes, 0x2d4) !== 0,
+    // Precap (+0x2D4) nonzero. Remote players' hits arrive deserialized
+    // with precap zero but d0 (+0xD0) NONZERO (online log 2657), so d0 is
+    // no proof the local builder ran and their gate bytes may mean "not
+    // computed here" rather than "no": only a populated snapshot's bytes
+    // are MEASURED.
+    builderPopulated: u32At(bytes, 0x2d4) !== 0,
   };
 };

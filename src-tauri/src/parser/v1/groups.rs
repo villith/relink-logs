@@ -1502,14 +1502,14 @@ mod tests {
         // this is deliberately unambiguous: A's overdrive gate is measured
         // clear on both hits, never Unknown, never inferred.
         let a_crit = snapshot_blob(&[
-            (0x15D, &[1]),                   // crit: measured yes
-            (0x162, &[0]),                   // overdrive: measured no
-            (0xD0, &1_000u32.to_le_bytes()), // builder ran
+            (0x15D, &[1]),                      // crit: measured yes
+            (0x162, &[0]),                      // overdrive: measured no
+            (0x2D4, &1_000.0f32.to_le_bytes()), // builder ran (precap stamped)
         ]);
         let a_no_crit = snapshot_blob(&[
             (0x15D, &[0]),
             (0x162, &[0]),
-            (0xD0, &1_000u32.to_le_bytes()),
+            (0x2D4, &1_000.0f32.to_le_bytes()),
         ]);
         // Player B: two hits with UNPOPULATED (all-zero) snapshots — falls
         // back to inference — onto an enemy a prior `EnemyMode` put in

@@ -16,7 +16,7 @@ describe("parseInstSnapshot", () => {
     const snap = parseInstSnapshot(
       blob([
         [0x15d, [1]],
-        [0xd0, [0xe8, 0x03, 0, 0]],
+        [0x2d4, [0, 0, 0x7a, 0x44]], // precap = 1000.0f32
       ])
     );
     expect(snap?.gates.crit).toBe(true);
@@ -26,6 +26,20 @@ describe("parseInstSnapshot", () => {
 
   it("treats a remote-style snapshot as unpopulated", () => {
     const snap = parseInstSnapshot(blob([[0x15d, [1]]]));
+    expect(snap?.builderPopulated).toBe(false);
+  });
+
+  it("treats a remote snapshot with a network-carried d0 as unpopulated", () => {
+    // Online log 2657: every remote hit arrives with a NONZERO d0 (+0xD0) —
+    // it rides the network deserialization — while precap (+0x2D4) stays
+    // zero and the gate bytes are unstamped. d0 is not proof the local
+    // builder ran; only precap discriminates.
+    const snap = parseInstSnapshot(
+      blob([
+        [0x15d, [1]],
+        [0xd0, [0xaa, 0xfe, 0x02, 0]],
+      ])
+    );
     expect(snap?.builderPopulated).toBe(false);
   });
 

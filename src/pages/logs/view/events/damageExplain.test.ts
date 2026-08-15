@@ -10,12 +10,14 @@ import { amplifyStatusIds, explainDamageHit, type DamageExplainInput, type Damag
 import { blob } from "./damageSnapshot.test";
 import { f32Bytes, blob as recordBlob } from "./recordSnapshot.test";
 
-/** A blob that PROVES the builder ran: nonzero `+0xD0` (d0). */
-const populatedBlob = (entries: Array<[number, number[]]>): number[] => blob([[0xd0, [0xe8, 0x03, 0, 0]], ...entries]); // d0 = 1000
+/** A blob that PROVES the builder ran: nonzero precap `+0x2D4`. */
+const populatedBlob = (entries: Array<[number, number[]]>): number[] => blob([[0x2d4, [0, 0, 0x7a, 0x44]], ...entries]); // precap = 1000.0f32
 
-/** A blob shaped like a remote player's hit: gate bytes present but `+0xD0`
- * and `+0x2D4` both zero, so it must read as unpopulated. */
-const unpopulatedBlob = (entries: Array<[number, number[]]>): number[] => blob(entries);
+/** A blob shaped like a remote player's hit: gate bytes present but precap
+ * `+0x2D4` zero, so it must read as unpopulated — even with a nonzero d0
+ * `+0xD0`, which rides the network deserialization (online log 2657). */
+const unpopulatedBlob = (entries: Array<[number, number[]]>): number[] =>
+  blob([[0xd0, [0xaa, 0xfe, 0x02, 0]], ...entries]);
 
 /** A tiny fake value table so tests never depend on the generated asset. */
 const TABLE: DamageTraitTable = {
@@ -162,8 +164,8 @@ describe("gate-byte trait: measured verdict from a recorded snapshot", () => {
   });
 
   it("falls back to gate-unrecorded for an unpopulated (remote-style) snapshot", () => {
-    // Gate byte set, but +0xD0/+0x2D4 both zero — the log-405 remote
-    // signature. Its bytes may mean "not computed here", not "no".
+    // Gate byte set and d0 nonzero, but precap +0x2D4 zero — the online-log
+    // 2657 remote signature. Its bytes may mean "not computed here", not "no".
     const weak = line("dmg-chain", "trait-6b694d6d-weakpoint", {
       instance_snapshot: unpopulatedBlob([[0x15e, [1]]]),
     });
