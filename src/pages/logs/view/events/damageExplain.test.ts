@@ -7,15 +7,7 @@ import statusClasses from "../../../../../src-tauri/assets/status-classes.json";
 import type { ExplainHit } from "./capExplain";
 import type { CapConditions } from "./capFactors";
 import { amplifyStatusIds, explainDamageHit, type DamageExplainInput, type DamageTraitTable } from "./damageExplain";
-
-/** Builds a well-formed `instance_snapshot` blob (640 bytes, window base
- * `0xC0`) with the given game-offset byte runs written in, everything else
- * zero — mirrors `damageSnapshot.test.ts`'s own helper. */
-const blob = (entries: Array<[number, number[]]>): number[] => {
-  const out = new Array(0x340 - 0xc0).fill(0);
-  for (const [gameOffset, bytes] of entries) bytes.forEach((b, i) => (out[gameOffset - 0xc0 + i] = b));
-  return out;
-};
+import { blob } from "./damageSnapshot.test";
 
 /** A blob that PROVES the builder ran: nonzero `+0xD0` (d0). */
 const populatedBlob = (entries: Array<[number, number[]]>): number[] => blob([[0xd0, [0xe8, 0x03, 0, 0]], ...entries]); // d0 = 1000
@@ -105,8 +97,8 @@ const line = (sectionKey: string, lineKey: string, over: Partial<typeof HIT> = {
 /** Like `line`, but for the tests that need to set `modeInference` — a
  * full `DamageExplainInput` override rather than just the hit fields. */
 const lineWithInput = (sectionKey: string, lineKey: string, input: Partial<DamageExplainInput> = {}) => {
-  const sections = explainDamageHit({ hit: HIT, loadout: LOADOUT, conditions: {}, ...input }, TABLE);
-  const found = sections.find((s) => s.key === sectionKey)?.lines.find((l) => l.key === lineKey);
+  const explained = explainDamageHit({ hit: HIT, loadout: LOADOUT, conditions: {}, ...input }, TABLE);
+  const found = explained.find((s) => s.key === sectionKey)?.lines.find((l) => l.key === lineKey);
   expect(found).toBeDefined();
   return found!;
 };

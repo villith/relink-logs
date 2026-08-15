@@ -4,7 +4,7 @@ import { GATE_BYTE_OFFSET, parseInstSnapshot, type GateBytes } from "./damageSna
 
 /** Builds a well-formed snapshot blob (640 bytes, window base `0xC0`) with
  * the given game-offset byte runs written in, everything else zero. Exported
- * so `damageExplain.test.ts` can build the same fixtures. */
+ * so `damageExplain.test.ts` imports this rather than keeping its own copy. */
 export const blob = (entries: Array<[number, number[]]>): number[] => {
   const out = new Array(0x340 - 0xc0).fill(0);
   for (const [gameOffset, bytes] of entries) bytes.forEach((b, i) => (out[gameOffset - 0xc0 + i] = b));

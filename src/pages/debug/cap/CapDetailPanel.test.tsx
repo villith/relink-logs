@@ -151,6 +151,32 @@ describe("CapDetailPanel", () => {
     expect(line("open")!.querySelector('[aria-label="ui.debug.cap-marker-unknown"]')).toBeTruthy();
   });
 
+  it("marks an inferred line with its own icon, overriding the excluded-based marker", () => {
+    // `excluded: "conditional"` alone would render `cap-marker-off` (see the
+    // test above) — `inferred: true` must win that precedence, since its
+    // provenance is the more specific thing to say about the row.
+    renderSections([
+      {
+        key: "s",
+        titleKey: "t",
+        formula: null,
+        substituted: null,
+        unavailableKey: null,
+        lines: [
+          {
+            key: "inferred-off",
+            name: { kind: "literal", value: "window-inferred, ruled out" },
+            value: { kind: "percent", value: 10 },
+            excluded: "conditional",
+            inferred: true,
+          },
+        ],
+      },
+    ]);
+    expect(line("inferred-off")!.querySelector('[aria-label="ui.debug.cap-marker-inferred"]')).toBeTruthy();
+    expect(line("inferred-off")!.querySelector('[aria-label="ui.debug.cap-marker-off"]')).toBeNull();
+  });
+
   it("names the missing fact when a section cannot be derived", () => {
     renderPanel({ characterType: undefined });
     expect(screen.getByText("ui.debug.cap-no-character")).toBeTruthy();

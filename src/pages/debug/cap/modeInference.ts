@@ -20,12 +20,22 @@ import type { ChartWindow } from "@/types";
  * Actor-index reuse (the game reissuing a dead boss's id to a later spawn)
  * needs no extra disambiguation here the way `breakEnemyOf`'s DISPLAY lookup
  * does: two windows sharing one actor index can never both cover the same
- * instant, so the `[startMs, endMs)` membership check alone already picks
- * the right spawn's window.
+ * instant (see the end-bound note below for the one moment they touch), so
+ * the membership check alone already picks the right spawn's window.
  *
  * Returns `null` only when the log carries no Overdrive/Break windows AT
  * ALL (an old log, or a fight with no mode transitions) — that is the one
  * case a real "neither mode" answer must not be confused with.
+ *
+ * The end bound is exclusive EXCEPT at a window a fight-end close artificially
+ * cut off: `assemble_chart_windows` (Rust) closes a window still open at the
+ * last event at `fight_end_ms` — the LAST event's own timestamp, not one past
+ * it — so a hit that IS the last event lands exactly at `endMs`. Reading that
+ * as outside the window would misreport the killing blow landing while an
+ * enemy sits in Break as "not in Break". A real hand-off is not fooled by
+ * this: when another mode window for the SAME actor genuinely starts at that
+ * exact millisecond (a transition, not an artificial close), that later
+ * window is what actually held at that instant and wins.
  */
 export const modeInferenceForHit = (
   chartWindows: ChartWindow[],
@@ -35,14 +45,21 @@ export const modeInferenceForHit = (
   const modeWindows = chartWindows.filter((window) => window.kind === "overdrive" || window.kind === "break");
   if (modeWindows.length === 0) return null;
 
-  const covers = (kind: "overdrive" | "break"): boolean =>
+  // Whether some other window for this actor picks up exactly where `window`
+  // ends — a real transition, as opposed to an artificial fight-end close.
+  const handedOff = (window: ChartWindow): boolean =>
     modeWindows.some(
-      (window) =>
-        window.kind === kind &&
-        window.actorIndex === targetParentIndex &&
-        relTimeMs >= window.startMs &&
-        relTimeMs < window.endMs
+      (next) => next !== window && next.actorIndex === targetParentIndex && next.startMs === window.endMs
     );
+
+  const covers = (kind: "overdrive" | "break"): boolean =>
+    modeWindows.some((window) => {
+      if (window.kind !== kind || window.actorIndex !== targetParentIndex) return false;
+      if (relTimeMs < window.startMs || relTimeMs > window.endMs) return false;
+      if (relTimeMs < window.endMs) return true;
+      // relTimeMs === window.endMs.
+      return !handedOff(window);
+    });
 
   return { overdrive: covers("overdrive"), break: covers("break") };
 };

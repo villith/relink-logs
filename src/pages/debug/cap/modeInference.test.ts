@@ -32,8 +32,6 @@ describe("modeInferenceForHit", () => {
     const windows = [window("overdrive", 1_000, 2_000, 7)];
     // Outside the window's time span.
     expect(modeInferenceForHit(windows, 7, 5_000)).toEqual({ overdrive: false, break: false });
-    // Right target, but the end bound is exclusive.
-    expect(modeInferenceForHit(windows, 7, 2_000)).toEqual({ overdrive: false, break: false });
     // Right time, wrong target.
     expect(modeInferenceForHit(windows, 9, 1_500)).toEqual({ overdrive: false, break: false });
   });
@@ -57,5 +55,23 @@ describe("modeInferenceForHit", () => {
   it("the start bound is inclusive", () => {
     const windows = [window("overdrive", 1_000, 2_000, 7)];
     expect(modeInferenceForHit(windows, 7, 1_000)).toEqual({ overdrive: true, break: false });
+  });
+
+  it("a hit at the endMs of a fight-end-closed window reads as inside it", () => {
+    // `assemble_chart_windows` (Rust) closes a window still open at the last
+    // event AT that event's own timestamp, not one past it — so the killing
+    // blow (the last event) can land exactly at `endMs`. Nothing else picks
+    // up here for this actor, so this is an artificial close, not a real
+    // hand-off, and the window must still cover it.
+    const windows = [window("break", 1_000, 2_000, 7)];
+    expect(modeInferenceForHit(windows, 7, 2_000)).toEqual({ overdrive: false, break: true });
+  });
+
+  it("a hit at a real hand-off boundary reads the NEW window's state, not the old one's", () => {
+    // Overdrive ends exactly where Break begins for the same actor — a real
+    // mode transition, not an artificial fight-end close. At that exact
+    // millisecond the enemy is already in Break.
+    const windows = [window("overdrive", 0, 1_000, 7), window("break", 1_000, 2_000, 7)];
+    expect(modeInferenceForHit(windows, 7, 1_000)).toEqual({ overdrive: false, break: true });
   });
 });
