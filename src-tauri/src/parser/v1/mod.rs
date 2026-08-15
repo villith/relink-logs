@@ -24,6 +24,7 @@ mod ability_charts;
 pub mod audit;
 mod cap_detection;
 mod chart_scope;
+pub mod damage_facts;
 mod filters;
 mod groups;
 mod live_emit;
