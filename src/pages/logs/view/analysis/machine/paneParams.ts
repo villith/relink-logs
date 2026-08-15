@@ -47,8 +47,8 @@ export const paneParamName = (field: keyof PaneRaw, index: number): string =>
  * down two different drill paths is a real comparison, not the same pane
  * twice. Collapsing `2661,2661` to one pane would also orphan the second
  * pane's `src2`/`aura2`/etc. in the URL with no removal having run to clear
- * them, which is exactly the dormant-key hazard `paneParamNames` exists to
- * avoid. */
+ * them, which is exactly the dormant-key hazard `clearablePaneParamNames`
+ * exists to avoid. */
 export const decodeCompare = (raw: string | null): number[] =>
   raw === null
     ? []
