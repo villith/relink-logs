@@ -48,7 +48,14 @@ const countedHits = (tally: FactTally): number =>
 
 /** One fact's rate over its counted hits, e.g. "63%" — or a dash where
  * nothing was counted (every hit landed `unknown`, or logged before facts
- * existed at all). */
+ * existed at all).
+ *
+ * Rounded to a whole percent, deliberately: the underlying quantity is a hit
+ * COUNT (yes-hits over counted-hits), not a continuous measurement, so a
+ * decimal place would suggest a precision the tally does not carry — and
+ * these cells sit in `w-cell`-width columns, where every extra character
+ * competes with the `~` provenance marker for room. Do not "fix" this to
+ * match `share`'s one decimal place. */
 export const factRate = (tally: FactTally): string => {
   const counted = countedHits(tally);
   if (counted === 0) return NOT_RECORDED;

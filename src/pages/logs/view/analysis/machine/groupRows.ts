@@ -76,6 +76,19 @@ const columnsFor = (ctx: GroupRowsContext, measure: GroupMeasure, total: number,
   return ctx.metric === "damage" ? [...base, ...factColumns(facts)] : base;
 };
 
+/** The row's own fact tallies, gated on the METRIC rather than on whether the
+ * measure happens to carry them.
+ *
+ * `GroupMeasure.facts` is documented absent on `taken` rows, but a row/column
+ * fold that trusted that alone is one backend skew away from lighting the
+ * hover card's "Damage facts" section on a taken row the day that contract
+ * slips. Every attachment site — the three column shapes above and every
+ * `MetricRow.facts` spread below — reads through here instead of `measure`
+ * directly, so `MetricTable`'s forwarding of `row.facts` into the hover card
+ * inherits the gate for free. */
+const factsOf = (ctx: GroupRowsContext, measure: GroupMeasure): GroupFacts | undefined =>
+  ctx.metric === "damage" ? measure.facts : undefined;
+
 /** What clicking a row pins: always the dimension the table is grouped by,
  * carried in the existing `SelectorPins` wire shape (`source`/`targets[0]`/
  * `ability` ↔ the machine's three dimensions). The VALUE's universe follows
@@ -255,44 +268,49 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
     // beside it come from the same measure or they contradict each other.
     const view = reportsLandings(ctx) ? merged : measure;
     switch (key.kind) {
-      case "player":
+      case "player": {
+        const facts = factsOf(ctx, measure);
         rows.push({
           key: playerRowKey(key.index),
           label: String(key.index),
           kind: "player",
           value: view.amount,
-          columns: columnsFor(ctx, view, total, measure.facts),
+          columns: columnsFor(ctx, view, total, facts),
           pinOnClick: pinFor(ctx, key.index),
           colorSlot: ctx.partySlots.get(key.index) ?? -1,
-          ...(measure.facts !== undefined ? { facts: measure.facts } : {}),
+          ...(facts !== undefined ? { facts } : {}),
         });
         break;
+      }
 
-      case "enemySpawn":
+      case "enemySpawn": {
+        const facts = factsOf(ctx, measure);
         rows.push({
           key: spawnRowKey(key.segment),
           label: spawnRowKey(key.segment),
           kind: "target",
           value: view.amount,
-          columns: columnsFor(ctx, view, total, measure.facts),
+          columns: columnsFor(ctx, view, total, facts),
           pinOnClick: pinFor(ctx, key.segment),
           colorSlot: -1,
-          ...(measure.facts !== undefined ? { facts: measure.facts } : {}),
+          ...(facts !== undefined ? { facts } : {}),
         });
         break;
+      }
 
       case "enemyType": {
         // A type merges same-type spawns, so it cannot pick one to pin.
         const label = JSON.stringify(key.enemyType);
+        const facts = factsOf(ctx, measure);
         rows.push({
           key: enemyRowKey(key.enemyType),
           label,
           kind: "enemy",
           value: view.amount,
-          columns: columnsFor(ctx, view, total, measure.facts),
+          columns: columnsFor(ctx, view, total, facts),
           pinOnClick: null,
           colorSlot: -1,
-          ...(measure.facts !== undefined ? { facts: measure.facts } : {}),
+          ...(facts !== undefined ? { facts } : {}),
         });
         break;
       }
@@ -377,31 +395,33 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
       groupOfPin(rowKey) === null
         ? undefined
         : [...bucket.members.entries()]
-            .map(
-              ([memberKey, member]): MetricRow => ({
+            .map(([memberKey, member]): MetricRow => {
+              const facts = factsOf(ctx, member.split.raw);
+              return {
                 key: skillKey(memberKey),
                 label: memberKey,
                 kind: "ability",
                 value: reportedMeasure(ctx, member.split).amount,
                 ...subValueOf(ctx, member.split),
-                columns: columnsFor(ctx, reportedMeasure(ctx, member.split), total, member.split.raw.facts),
+                columns: columnsFor(ctx, reportedMeasure(ctx, member.split), total, facts),
                 pinOnClick: { ability: memberKey },
                 colorSlot: abilitySlot,
-                ...(member.split.raw.facts !== undefined ? { facts: member.split.raw.facts } : {}),
-              })
-            )
+                ...(facts !== undefined ? { facts } : {}),
+              };
+            })
             .sort((a, b) => b.value - a.value);
 
+    const bucketFacts = factsOf(ctx, bucket.raw);
     rows.push({
       key: skillKey(rowKey),
       label: rowKey,
       kind: "ability",
       value: reportedMeasure(ctx, bucket).amount,
       ...subValueOf(ctx, bucket),
-      columns: columnsFor(ctx, reportedMeasure(ctx, bucket), total, bucket.raw.facts),
+      columns: columnsFor(ctx, reportedMeasure(ctx, bucket), total, bucketFacts),
       pinOnClick: { ability: rowKey },
       colorSlot: abilitySlot,
-      ...(bucket.raw.facts !== undefined ? { facts: bucket.raw.facts } : {}),
+      ...(bucketFacts !== undefined ? { facts: bucketFacts } : {}),
       ...(children === undefined ? {} : { children }),
     });
   }

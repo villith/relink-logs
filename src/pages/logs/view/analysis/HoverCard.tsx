@@ -119,7 +119,13 @@ export type HoverCardBodyProps = {
    * produces. `total` is the ROW's own value, not this section's — the
    * Overdrive/Break split answers "what share of the row happened there",
    * and an Overdrive+Break sum does not equal the row (a hit can be in
-   * neither, or the row's damage can predate either state). */
+   * neither, or the row's damage can predate either state).
+   *
+   * `facts` is always the RAW measure (see `MetricRow.facts`'s own doc), so
+   * with Merge Sup DMG on, the split's numerator (direct hits only) is
+   * divided by a `total` that is the MERGED, echo-folded row value — the
+   * share reads slightly low in that state, a direct consequence of facts
+   * staying raw rather than a bug in the division itself. */
   damageFacts?: { facts: GroupFacts; total: number };
 } & CardAmount;
 

@@ -289,7 +289,7 @@ const tally = (over: Partial<FactTally>): FactTally => ({
 const FACTS = (over: Partial<GroupFacts> = {}): GroupFacts => ({
   // Fully measured: 3 of 4 counted hits crit, no inference involved.
   crit: tally({ measuredYes: 3, measuredNo: 1 }),
-  // Half inferred: the tilde/caption case.
+  // 50%~, all inferred: the tilde/caption case.
   weakPoint: tally({ inferredYes: 1, inferredNo: 1 }),
   // Nothing counted: the dash/no-data case.
   backAttack: tally({ unknown: 4 }),

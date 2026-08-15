@@ -175,6 +175,25 @@ describe("damageDone descriptor", () => {
     expect(rows[1].value).toBe(100);
   });
 
+  it("fills the exact players-level column shape: amount, DPS, share, then crit/WP/BA", () => {
+    // The header/cell parity the abilities-level test below pins, at the
+    // players level: `columnKeys("players")` promises six keys, and a row
+    // built from it must fill exactly six cells or the trailing ones render
+    // under no header at all.
+    const rows = damageDone.rows(input("players"));
+    expect(damageDone.columnKeys("players")).toEqual([
+      "ui.meter-columns.damage",
+      "ui.meter-columns.dps",
+      "ui.logs.column-share",
+      "ui.skill-columns.crit",
+      "ui.skill-columns.weak-point",
+      "ui.skill-columns.back-attack",
+    ]);
+    // SkillState carries no fact tallies, so the trailing three are honestly
+    // "no data".
+    expect(rows[0].columns).toEqual(["300", "30", "75.0%", "—", "—", "—"]);
+  });
+
   it("makes a player row pin that player as the source", () => {
     const rows = damageDone.rows(input("players"));
     expect(rows[0].pinOnClick).toEqual({ source: 0 });

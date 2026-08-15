@@ -761,6 +761,9 @@ describe("groupRowsFor — damage facts", () => {
       ctx({ metric: "taken", groupBy: "source" })
     );
     expect(rows[0].columns).toHaveLength(3);
+    // Same gate: a taken row must never carry `MetricRow.facts` either, or the
+    // hover card would light its "Damage facts" section on a taken row.
+    expect(rows[0].facts).toBeUndefined();
   });
 
   it("sums sibling members' facts field-wise into the group parent", () => {
