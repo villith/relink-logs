@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api";
 import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 
+import { useAnalysisPanesStore } from "@/stores/useAnalysisPanesStore";
 import type { EncounterStateResponse } from "@/stores/useEncounterStore";
 import type {
   AbilitySeries,
@@ -77,6 +78,9 @@ export type EncounterData = {
 export type EncounterDataInput = {
   id: string | undefined;
   filters: unknown;
+  /** Which pane's slice this data belongs to. Every response lands there, so
+   * the frame can draw one chart across panes it does not itself fetch for. */
+  paneIndex: number;
   loadFromResponse: (response: EncounterStateResponse) => void;
   encounter: EncounterState | null;
   baseFacts: SelectionFact[];
@@ -104,6 +108,7 @@ export type EncounterDataInput = {
 export const useEncounterData = ({
   id,
   filters,
+  paneIndex,
   loadFromResponse,
   encounter,
   baseFacts,
@@ -120,6 +125,12 @@ export const useEncounterData = ({
   metricKey,
   bucketMs,
 }: EncounterDataInput): EncounterData => {
+  // Writes go to THIS pane's slice. Read off the store rather than taken as a
+  // prop so the effects below keep a stable dependency — zustand actions are
+  // referentially stable for the life of the store.
+  const setPaneBase = useAnalysisPanesStore((state) => state.setPaneBase);
+  const setPaneScoped = useAnalysisPanesStore((state) => state.setPaneScoped);
+
   // Meter state, facts and group aggregates re-derived under the current
   // pins, window and grouping. Null means "the base load already says it".
   const [scoped, setScoped] = useState<{
@@ -168,14 +179,20 @@ export const useEncounterData = ({
     invoke("fetch_encounter_state", { id: Number(id), options: { filters, groupQuery } })
       .then((result) => {
         if (generation !== loadGeneration.current) return;
-        loadFromResponse(result as EncounterStateResponse);
+        const response = result as EncounterStateResponse;
+        // Two destinations, one response: the pane's own slice, which is what
+        // the frame reads to draw across panes, and — until the pane reads its
+        // slice for everything — the single-encounter store the view still
+        // renders from.
+        loadFromResponse(response);
+        setPaneBase(paneIndex, response);
         setScoped(null);
       })
       .catch((e) => {
         if (generation !== loadGeneration.current) return;
         toast.error(`Failed to fetch encounter state: ${e}`);
       });
-  }, [id, filters, loadFromResponse]);
+  }, [id, filters, paneIndex, setPaneBase, loadFromResponse]);
 
   // A pinned target is a SPAWN (an index into `targetEntries`), and the backend
   // filters by that spawn's span. Deliberately not the actor id: the game
@@ -359,6 +376,7 @@ export const useEncounterData = ({
     const needsGroups = wireQueryKey !== null && wireQueryKey !== baseQueryKeyRef.current;
     if (!needsScopedFetch({ ...earlyOutRef.current, needsGroups })) {
       setScoped(null);
+      setPaneScoped(paneIndex, null);
       return;
     }
 
@@ -392,12 +410,16 @@ export const useEncounterData = ({
           // backend degrades to ranking bands by the aggregates it was sent.
           groupReference: response.groupReference ?? [],
         });
+        // The chart is drawn by the FRAME from every pane's slice, so the
+        // scoped response has to reach the store as well as this hook's local
+        // state. Same object, two readers — not a second fetch.
+        setPaneScoped(paneIndex, response);
       })
       .catch((e) => {
         if (generation !== scopeGeneration.current) return;
         toast.error(`Failed to fetch encounter state: ${e}`);
       });
-  }, [id, scopedOptionsKey, wireQueryKey]);
+  }, [id, scopedOptionsKey, wireQueryKey, paneIndex, setPaneScoped]);
 
   // Which aggregates the groups path renders — the scoped fetch's when one is
   // in hand, else the base load's — AND which grouping they answer, which is

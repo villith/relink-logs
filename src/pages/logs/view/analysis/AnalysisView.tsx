@@ -252,6 +252,7 @@ export const AnalysisView = () => {
   } = useEncounterData({
     id,
     filters,
+    paneIndex: 0,
     loadFromResponse,
     encounter,
     baseFacts,
