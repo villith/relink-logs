@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { PANE_FIELDS, SHARED_FIELDS, paneParamName } from "./paneParams";
+import type { RawState } from "./state";
 
 describe("paneParamName", () => {
   it("leaves pane 0 on the bare keys, so today's URLs keep working", () => {
@@ -15,11 +16,19 @@ describe("paneParamName", () => {
 });
 
 describe("field split", () => {
-  it("scopes the pins, the grouping override and the aura filter to a pane", () => {
-    expect([...PANE_FIELDS]).toEqual(["src", "tgt", "abil", "by", "aura"]);
-  });
-
-  it("keeps the metric, side, zoom and window filter shared", () => {
-    expect([...SHARED_FIELDS]).toEqual(["metric", "side", "from", "to", "win"]);
+  it("partitions every RawState field into exactly one scope", () => {
+    const RAW_NONE: RawState = {
+      metric: null,
+      side: null,
+      src: null,
+      tgt: null,
+      abil: null,
+      from: null,
+      to: null,
+      by: null,
+      aura: null,
+      win: null,
+    };
+    expect([...SHARED_FIELDS, ...PANE_FIELDS].sort()).toEqual(Object.keys(RAW_NONE).sort());
   });
 });
