@@ -1251,6 +1251,7 @@ mod tests {
             source_statuses: None,
             instance_snapshot: None,
             source_snapshot: None,
+            record_snapshot: None,
         }
     }
 
@@ -1302,6 +1303,7 @@ mod tests {
             source_statuses: None,
             instance_snapshot: None,
             source_snapshot: None,
+            record_snapshot: None,
         }
     }
 
@@ -1966,6 +1968,7 @@ mod tests {
             source_statuses: None,
             instance_snapshot: None,
             source_snapshot: None,
+            record_snapshot: None,
         };
 
         // Self-parented Pl2000, matching `dragon_form_damage_attributes_to_the_id_player`.

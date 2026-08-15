@@ -59,6 +59,7 @@ describe("damageHits", () => {
       class_flags: 0x1,
       flags: 0,
       instance_snapshot: null,
+      record_snapshot: null,
     });
   });
 

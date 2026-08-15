@@ -1060,6 +1060,15 @@ export type LogEventPayload =
          * slot. `null` otherwise. Mirrors
          * `protocol::DamageEvent::source_snapshot`. */
         source_snapshot: number[] | null;
+        /** Raw player-record window `record+0x18..0x28` (16 bytes), captured
+         * pre-call alongside `source_snapshot` — same player-family gate.
+         * Known residents: `+0x1C` SBA class dmg%, `+0x24` Skill class
+         * dmg% (integer percent). `null` on old logs, on non-player
+         * attackers, and when the pointer chain or read fails. Mirrors
+         * `protocol::DamageEvent::record_snapshot`; see
+         * `src/pages/logs/view/events/recordSnapshot.ts` for the offset map
+         * — there is no Rust-side interpreter for this window yet. */
+        record_snapshot: number[] | null;
       };
     }
   | { OnDeathEvent: { actor_index: number; death_counter: number } }

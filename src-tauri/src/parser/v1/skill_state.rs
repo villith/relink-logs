@@ -288,6 +288,7 @@ mod tests {
             source_statuses: None,
             instance_snapshot: None,
             source_snapshot: None,
+            record_snapshot: None,
         };
 
         let damage_event_two = DamageEvent {
@@ -318,6 +319,7 @@ mod tests {
             source_statuses: None,
             instance_snapshot: None,
             source_snapshot: None,
+            record_snapshot: None,
         };
 
         skill_state.update_from_damage_event(&AdjustedDamageInstance::from_damage_event(
@@ -364,6 +366,7 @@ mod tests {
             source_statuses: None,
             instance_snapshot: None,
             source_snapshot: None,
+            record_snapshot: None,
         }
     }
 

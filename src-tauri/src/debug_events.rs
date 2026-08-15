@@ -110,6 +110,7 @@ pub fn damage_event(slot: u8, character_type: u32, amount: i32, skill_id: u32) -
         source_statuses: None,
         instance_snapshot: None,
         source_snapshot: None,
+        record_snapshot: None,
     }
 }
 

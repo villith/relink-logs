@@ -8,6 +8,7 @@ import type { ExplainHit } from "./capExplain";
 import type { CapConditions } from "./capFactors";
 import { amplifyStatusIds, explainDamageHit, type DamageExplainInput, type DamageTraitTable } from "./damageExplain";
 import { blob } from "./damageSnapshot.test";
+import { f32Bytes, blob as recordBlob } from "./recordSnapshot.test";
 
 /** A blob that PROVES the builder ran: nonzero `+0xD0` (d0). */
 const populatedBlob = (entries: Array<[number, number[]]>): number[] => blob([[0xd0, [0xe8, 0x03, 0, 0]], ...entries]); // d0 = 1000
@@ -77,6 +78,7 @@ const HIT: ExplainHit = {
   class_flags: 0x10000, // Skill
   flags: 0,
   instance_snapshot: null,
+  record_snapshot: null,
 };
 
 const sections = (over: Partial<typeof HIT> = {}, conditions: CapConditions = {}) =>
@@ -340,6 +342,33 @@ describe("class section", () => {
       value: "sba",
     });
     expect(line("dmg-class", "attack-class", { class_flags: null }).value).toEqual({ kind: "absent" });
+  });
+
+  it("values the record dmg% line from the record snapshot, Skill vs SBA", () => {
+    // HIT.class_flags is 0x10000 (Skill).
+    const skill = line("dmg-class", "record", { record_snapshot: recordBlob([[0x24, f32Bytes(15)]]) });
+    expect(skill.value).toEqual({ kind: "percent", value: 15 });
+    expect(skill.excluded).toBeUndefined();
+
+    const sba = line("dmg-class", "record", {
+      class_flags: 0x40000,
+      record_snapshot: recordBlob([[0x1c, f32Bytes(7.5)]]),
+    });
+    expect(sba.value).toEqual({ kind: "percent", value: 7.5 });
+    expect(sba.excluded).toBeUndefined();
+  });
+
+  it("excludes the record dmg% line as value-unrecorded when no snapshot was captured", () => {
+    expect(line("dmg-class", "record", { record_snapshot: null }).excluded).toBe("value-unrecorded");
+  });
+
+  it("excludes the record dmg% line as other-class for Normal hits, even with a snapshot", () => {
+    const normal = line("dmg-class", "record", {
+      class_flags: 0,
+      record_snapshot: recordBlob([[0x24, f32Bytes(15)]]),
+    });
+    expect(normal.excluded).toBe("other-class");
+    expect(normal.value).toEqual({ kind: "absent" });
   });
 });
 

@@ -685,6 +685,7 @@ mod tests {
             source_statuses: None,
             instance_snapshot: None,
             source_snapshot: None,
+            record_snapshot: None,
         };
 
         player_state.update_from_damage_event(&AdjustedDamageInstance::from_damage_event(
@@ -729,6 +730,7 @@ mod tests {
             source_statuses: None,
             instance_snapshot: None,
             source_snapshot: None,
+            record_snapshot: None,
         };
 
         player_state.update_from_damage_event(&AdjustedDamageInstance::from_damage_event(
@@ -781,6 +783,7 @@ mod tests {
             source_statuses: None,
             instance_snapshot: None,
             source_snapshot: None,
+            record_snapshot: None,
         };
 
         let skill_two = DamageEvent {
@@ -811,6 +814,7 @@ mod tests {
             source_statuses: None,
             instance_snapshot: None,
             source_snapshot: None,
+            record_snapshot: None,
         };
 
         player_state
@@ -858,6 +862,7 @@ mod tests {
             source_statuses: None,
             instance_snapshot: None,
             source_snapshot: None,
+            record_snapshot: None,
         };
 
         let child_skill = DamageEvent {
@@ -888,6 +893,7 @@ mod tests {
             source_statuses: None,
             instance_snapshot: None,
             source_snapshot: None,
+            record_snapshot: None,
         };
 
         player_state.update_from_damage_event(&AdjustedDamageInstance::from_damage_event(
@@ -941,6 +947,7 @@ mod tests {
             source_statuses: None,
             instance_snapshot: None,
             source_snapshot: None,
+            record_snapshot: None,
         };
 
         let player_data = PlayerData {
@@ -1015,6 +1022,7 @@ mod tests {
             source_statuses: None,
             instance_snapshot: None,
             source_snapshot: None,
+            record_snapshot: None,
         };
 
         player_state.update_from_damage_event(&AdjustedDamageInstance::from_damage_event(
@@ -1054,6 +1062,7 @@ mod tests {
             source_statuses: None,
             instance_snapshot: None,
             source_snapshot: None,
+            record_snapshot: None,
         }
     }
 
@@ -1086,6 +1095,7 @@ mod tests {
             source_statuses: None,
             instance_snapshot: None,
             source_snapshot: None,
+            record_snapshot: None,
         }
     }
 
@@ -1315,6 +1325,7 @@ mod tests {
             source_statuses: None,
             instance_snapshot: None,
             source_snapshot: None,
+            record_snapshot: None,
         }
     }
 

@@ -7,6 +7,7 @@ import type { ExplainHit, ExplainLine, ExplainSection, ExplainValue } from "./ca
 import type { CapConditions } from "./capFactors";
 import { capClassOf, type CapLoadout } from "./capSources";
 import { GATE_BYTE_OFFSET, parseInstSnapshot, type GateBytes, type ParsedSnapshot } from "./damageSnapshot";
+import { parseRecordSnapshot } from "./recordSnapshot";
 
 /**
  * The damage-calculation walk for one hit, in the game's own order — the
@@ -394,6 +395,33 @@ const critSection = (
 
 const classSection = (hit: ExplainHit): ExplainSection => {
   const cls = capClassOf(hit.class_flags);
+  const record = parseRecordSnapshot(hit.record_snapshot);
+  // Only Skill and SBA read a record dmg% term (formula tree f24); Normal
+  // does not, so a resolved "normal" class is a real "other-class" exclusion
+  // rather than a missing capture, even when the snapshot itself is present.
+  const recordLine: ExplainLine =
+    cls === "skill" || cls === "sba"
+      ? record === null
+        ? {
+            key: "record",
+            name: { kind: "key", value: "ui.debug.dmg-line-record" },
+            value: absent,
+            source: { kind: "literal", value: "record+0x24 (Skill) / +0x1C (SBA)" },
+            excluded: "value-unrecorded",
+          }
+        : {
+            key: "record",
+            name: { kind: "key", value: "ui.debug.dmg-line-record" },
+            value: { kind: "percent", value: cls === "skill" ? record.skill : record.sba },
+            source: { kind: "literal", value: cls === "skill" ? "record+0x24" : "record+0x1C" },
+          }
+      : {
+          key: "record",
+          name: { kind: "key", value: "ui.debug.dmg-line-record" },
+          value: absent,
+          source: { kind: "literal", value: "record+0x24 (Skill) / +0x1C (SBA)" },
+          excluded: "other-class",
+        };
   return {
     key: "dmg-class",
     titleKey: "ui.debug.dmg-sec-class",
@@ -407,13 +435,7 @@ const classSection = (hit: ExplainHit): ExplainSection => {
         value: cls === null ? absent : { kind: "text", value: cls },
         source: { kind: "literal", value: "class_flags 0x10000/0x40000" },
       },
-      {
-        key: "record",
-        name: { kind: "key", value: "ui.debug.dmg-line-record" },
-        value: absent,
-        source: { kind: "literal", value: "record+0x24 (Skill) / +0x1C (SBA)" },
-        excluded: "value-unrecorded",
-      },
+      recordLine,
       {
         key: "difficulty",
         name: { kind: "key", value: "ui.debug.dmg-line-difficulty" },

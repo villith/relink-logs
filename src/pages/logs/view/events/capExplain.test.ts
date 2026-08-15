@@ -41,6 +41,7 @@ const input = (over: Partial<ExplainInput> = {}): ExplainInput => ({
     class_flags: 0x1,
     flags: 0,
     instance_snapshot: null,
+    record_snapshot: null,
   },
   characterType: "Pl0300",
   ...over,
@@ -286,6 +287,7 @@ describe("a log recorded before the cap capture", () => {
       class_flags: null,
       flags: 0,
       instance_snapshot: null,
+      record_snapshot: null,
     },
   });
 

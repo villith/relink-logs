@@ -1444,6 +1444,7 @@ impl OnProcessDotHook {
             source_statuses: None,
             instance_snapshot: None,
             source_snapshot: None,
+            record_snapshot: None,
         });
 
         let _ = self.tx.send(event);
@@ -1696,6 +1697,12 @@ struct SourceState {
     /// as everything else here — including the dragon-form owner walk, which
     /// reads the HUMAN body.
     source_snapshot: Option<Vec<u8>>,
+    /// Raw player-record window (`RECORD_SNAPSHOT_START`), resolved via
+    /// [`resolve_player_record`] off the same `body` pointer as
+    /// `source_snapshot` — same player-family gate, same pre-call timing.
+    /// `None` whenever the pointer chain or the window read fails, same as
+    /// every other guarded read in this file.
+    record_snapshot: Option<Vec<u8>>,
 }
 
 impl SourceState {
@@ -1728,6 +1735,8 @@ impl SourceState {
             }
         };
         let (current_hp, max_hp) = read_actor_hp_pair(body as usize).unzip();
+        let record_snapshot = resolve_player_record(body as usize)
+            .and_then(|record| snapshot_window(record, RECORD_SNAPSHOT_START, RECORD_SNAPSHOT_LEN));
         Self {
             current_hp,
             max_hp,
@@ -1737,6 +1746,7 @@ impl SourceState {
                 SOURCE_SNAPSHOT_START,
                 SOURCE_SNAPSHOT_LEN,
             ),
+            record_snapshot,
         }
     }
 }
@@ -1771,6 +1781,7 @@ fn build_damage_event(
         max_hp: source_max_hp,
         statuses: source_statuses,
         source_snapshot,
+        record_snapshot,
     } = source_state;
     let Victim {
         specified_instance_ptr: target_specified_instance_ptr,
@@ -1855,6 +1866,7 @@ fn build_damage_event(
         source_statuses,
         instance_snapshot,
         source_snapshot,
+        record_snapshot,
     }
 }
 
@@ -1918,6 +1930,57 @@ pub(crate) const INSTANCE_SNAPSHOT_LEN: usize = 0x340 - 0xC0;
 /// at-cap overflow k +0x249C). Player-family instances only.
 pub(crate) const SOURCE_SNAPSHOT_START: usize = 0x2480;
 pub(crate) const SOURCE_SNAPSHOT_LEN: usize = 0x20;
+
+/// The attacker's per-player stats record, one dereference off the
+/// specified-instance pointer this file already resolves as `pre_call_source_ptr`
+/// (== the damage-head formula tree's "attacker"/"this"). The damage builder
+/// `FUN_1409c1cf0` computes a local `slice = attacker + 0x22F0` (pure address
+/// arithmetic — `lea r14,[rcx+0x22f0]` in its own prologue, no dereference) and
+/// then reads `holder = *(slice + 0x10)`, i.e. `*(attacker + 0x2300)`. Same
+/// constant `cap_oracle.rs`'s `BUILD_STATUS_HOLDER` and `dmg_oracle.rs`'s
+/// `SLICE_STATUS_HOLDER` (relative to `slice`) already read off this exact
+/// decompile.
+const RECORD_HOLDER_OFFSET: usize = 0x2300;
+/// The holder's `this`-only player-record getter — a virtual call, not a plain
+/// field read: `(**(code**)(*holder + 0x9f0))(holder)`. The same slot
+/// `cap_oracle.rs`'s `HOLDER_PLAYER_RECORD_SLOT` and `dmg_oracle.rs`'s constant
+/// of the same name call to read the cap-up / damage-head record fields.
+const HOLDER_PLAYER_RECORD_SLOT: usize = 0x9f0;
+/// Record window covering the two class dmg% fields the damage-head formula
+/// tree calls "the record twin of the cap's fused record": `+0x1C` SBA,
+/// `+0x24` Skill. Both `f32` (per `dmg_oracle.rs`'s `read_f32_guarded` reads
+/// of the same fields, not an integer reinterpreted), applied by the game as
+/// `1 + v * 0.01` — the float itself IS the percent number.
+pub(crate) const RECORD_SNAPSHOT_START: usize = 0x18;
+pub(crate) const RECORD_SNAPSHOT_LEN: usize = 0x10;
+
+/// Resolve the attacker's player-record pointer from its specified-instance
+/// pointer, two guarded hops: a pointer dereference (`RECORD_HOLDER_OFFSET`)
+/// then a bounds-checked `this`-only virtual call (`HOLDER_PLAYER_RECORD_SLOT`)
+/// — the same resolution `dmg_oracle.rs`'s `player_record` performs from
+/// `slice`, folded here to start from `attacker` directly (`slice` itself is
+/// never dereferenced, only offset, so the two are the same pointer chain).
+///
+/// Bounds-checks the vtable and the slot against the module image before the
+/// transmuted call, exactly as the oracle does: a garbage vtable pointer
+/// (unfamiliar actor class, shifted layout) must never be called through.
+fn resolve_player_record(attacker: usize) -> Option<usize> {
+    use crate::hooks::diag::{read_ptr_guarded, MODULE_BASE};
+
+    let module_base = MODULE_BASE.load(std::sync::atomic::Ordering::Relaxed);
+    if module_base == 0 {
+        return None;
+    }
+    let holder = read_ptr_guarded(attacker, RECORD_HOLDER_OFFSET).filter(|h| *h != 0)?;
+    let vtable = read_ptr_guarded(holder, 0).filter(|v| *v != 0)?;
+    vtable.checked_sub(module_base)?;
+    let slot = read_ptr_guarded(vtable, HOLDER_PLAYER_RECORD_SLOT).filter(|s| *s != 0)?;
+    slot.checked_sub(module_base)?;
+    let get_record: unsafe extern "system" fn(usize) -> usize =
+        unsafe { std::mem::transmute(slot) };
+    let record = unsafe { get_record(holder) };
+    (record != 0).then_some(record)
+}
 
 /// Copy `base+start .. base+start+len` as a raw blob — ONE readability probe
 /// and one memcpy, because this runs per hit on a game thread (per-call guard

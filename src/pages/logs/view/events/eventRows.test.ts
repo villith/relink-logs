@@ -25,6 +25,7 @@ const noCap = {
   source_max_hp: null,
   source_statuses: null,
   instance_snapshot: null,
+  record_snapshot: null,
   source_snapshot: null,
 };
 

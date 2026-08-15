@@ -115,6 +115,12 @@ export type ExplainHit = {
    * Read by `damageExplain.ts` via `damageSnapshot.ts`'s `parseInstSnapshot`;
    * `capExplain.ts` itself does not interpret it. */
   instance_snapshot: number[] | null;
+  /** Raw player-record window `record+0x18..0x28`, as
+   * `DamageEvent.record_snapshot` carries it — `null` on old logs, non-player
+   * attackers, and hits the hook could not resolve the record pointer for.
+   * Read by `damageExplain.ts` via `recordSnapshot.ts`'s `parseRecordSnapshot`;
+   * `capExplain.ts` itself does not interpret it. */
+  record_snapshot: number[] | null;
 };
 
 export type ExplainInput = {

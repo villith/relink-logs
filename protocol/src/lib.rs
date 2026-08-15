@@ -274,6 +274,24 @@ pub struct DamageEvent {
     /// captured for future interpretation.
     #[serde(default, with = "serde_bytes")]
     pub source_snapshot: Option<Vec<u8>>,
+    /// Raw window `record+0x18..0x28` (16 bytes) off the attacker's own
+    /// per-player stats record, captured pre-call alongside
+    /// [`DamageEvent::source_snapshot`] — same player-family gate, same
+    /// "state before the call decided the cap" reasoning.
+    ///
+    /// The record pointer is reached from the attacker's specified-instance
+    /// pointer (the same pointer [`DamageEvent::source_snapshot`] is read
+    /// from) in two RE-verified hops, both already load-bearing elsewhere in
+    /// this repo (`cap_oracle.rs` / `dmg_oracle.rs`): `holder =
+    /// *(attacker+0x2300)`, then `record = holder.vtable[0x9f0](holder)` — a
+    /// `this`-only virtual getter, the same one the game's own damage
+    /// formula calls. Known residents of the window: `+0x1C` SBA class
+    /// dmg%, `+0x24` Skill class dmg% (damage-head formula tree, "record
+    /// twin of the cap's fused record"); the rest is captured for future
+    /// interpretation. `None` on old logs, DoT ticks, the damage-TAKEN
+    /// stream, and when the pointer chain or window read fails.
+    #[serde(default, with = "serde_bytes")]
+    pub record_snapshot: Option<Vec<u8>>,
 }
 
 /// One status held by the attacker at the moment of a hit, as
@@ -1127,6 +1145,7 @@ mod source_state_tests {
         assert_eq!(new.source_statuses, None);
         assert_eq!(new.instance_snapshot, None);
         assert_eq!(new.source_snapshot, None);
+        assert_eq!(new.record_snapshot, None);
     }
 
     /// "Captured, and the attacker held nothing" must survive a round trip as
@@ -1152,6 +1171,7 @@ mod source_state_tests {
             source_statuses: Some(Vec::new()),
             instance_snapshot: None,
             source_snapshot: None,
+            record_snapshot: None,
         };
 
         let round_trip = |e: &DamageEvent| -> DamageEvent {
@@ -1225,6 +1245,7 @@ mod source_state_tests {
             }]),
             instance_snapshot: Some((0u8..64).collect()),
             source_snapshot: Some(vec![0xAA; 32]),
+            record_snapshot: Some(vec![0x55; 16]),
         };
 
         let cbor_back: DamageEvent = {
@@ -1233,6 +1254,7 @@ mod source_state_tests {
         };
         assert_eq!(cbor_back.instance_snapshot, event.instance_snapshot);
         assert_eq!(cbor_back.source_snapshot, event.source_snapshot);
+        assert_eq!(cbor_back.record_snapshot, event.record_snapshot);
         assert_eq!(cbor_back.source_statuses, event.source_statuses);
 
         let bincode_back: DamageEvent = {
@@ -1241,6 +1263,7 @@ mod source_state_tests {
         };
         assert_eq!(bincode_back.instance_snapshot, event.instance_snapshot);
         assert_eq!(bincode_back.source_snapshot, event.source_snapshot);
+        assert_eq!(bincode_back.record_snapshot, event.record_snapshot);
         assert_eq!(bincode_back.source_statuses, event.source_statuses);
     }
 }

@@ -681,6 +681,7 @@ mod tests {
                         source_statuses: None,
                         instance_snapshot: None,
                         source_snapshot: None,
+                        record_snapshot: None,
                     }),
                 ),
                 (
@@ -883,6 +884,7 @@ mod tests {
                         source_statuses: None,
                         instance_snapshot: None,
                         source_snapshot: None,
+                        record_snapshot: None,
                     }),
                 )
             })
