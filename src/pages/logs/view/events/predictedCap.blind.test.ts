@@ -79,7 +79,9 @@ describe.skipIf(fixture === undefined)("blind local prediction sweep", () => {
         {
           source_current_hp: line.sourceCurrentHp,
           source_max_hp: line.sourceMaxHp,
-          source_statuses: line.sourceStatuses,
+          // The dump predates the raw term-bits probe and `conditionsForHit`
+          // never reads it — null is the honest stand-in, not a claim.
+          source_statuses: line.sourceStatuses?.map((status) => ({ ...status, term_bits: null })) ?? null,
         },
         null,
         line.action
