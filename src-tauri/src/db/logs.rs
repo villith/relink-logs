@@ -545,7 +545,15 @@ pub struct LogSummary {
 }
 
 /// Every log, newest first, as picker rows. Unpaginated on purpose — the picker
-/// searches client-side, which needs the whole library in hand.
+/// searches client-side, which needs the whole library in hand. That is cheap:
+/// measured against the real 71 MB `logs.db` (`SUM(LENGTH(json_object(...)))`
+/// over its 1,881 rows), a summary row averages ~179 bytes — ~465 KB at 2,600
+/// logs, ~8.9 MB at 50,000.
+///
+/// `logs.time` has no index; this does a full scan plus a temp-btree sort
+/// (`EXPLAIN QUERY PLAN`), and the whole call measures ~40ms including process
+/// startup. One call per session does not justify one, and schema changes here
+/// are permanent — left unindexed on purpose, not an oversight.
 pub fn fetch_log_summaries(conn: &Connection) -> Result<Vec<LogSummary>> {
     let mut stmt = conn.prepare(
         "SELECT id, time, duration, quest_id, quest_elapsed_time,
@@ -920,11 +928,23 @@ mod tests {
     /// The picker needs exactly enough to tell two runs of one quest apart: when,
     /// how long, and who was in the party. Anything more is bytes the dropdown
     /// never draws, multiplied by a library that can hold thousands of rows.
+    ///
+    /// Every one of the ten selected columns gets a distinct value and its own
+    /// assertion — the query maps them positionally (`row.get(0)` … `row.get(9)`),
+    /// and several are type-compatible with a neighbor (`time`/`duration` are
+    /// both `i64`; the four `p*_type` are all `Option<String>`), so a swap
+    /// within one of those groups would still compile. Distinct values are what
+    /// makes such a swap fail here instead of passing by coincidence.
     #[test]
     fn summary_carries_what_the_picker_draws() {
         let conn = db_with(&[(1, false)]);
         conn.execute(
-            "UPDATE logs SET quest_id = 2657, quest_elapsed_time = 180, p1_type = 'Pl1400' WHERE id = 1",
+            "UPDATE logs SET
+                time = 111, duration = 222,
+                quest_id = 2657, quest_elapsed_time = 180,
+                p1_type = 'Pl1400', p2_type = 'Pl1300',
+                p3_type = 'Pl1200', p4_type = 'Pl1100'
+             WHERE id = 1",
             [],
         )
         .expect("stamp log");
@@ -933,24 +953,40 @@ mod tests {
 
         assert_eq!(summaries.len(), 1);
         let summary = &summaries[0];
+        assert_eq!(summary.id, 1);
+        assert_eq!(summary.time, 111);
+        assert_eq!(summary.duration, 222);
         assert_eq!(summary.quest_id, Some(2657));
         assert_eq!(summary.quest_elapsed_time, Some(180));
         assert_eq!(summary.p1_type.as_deref(), Some("Pl1400"));
+        assert_eq!(summary.p2_type.as_deref(), Some("Pl1300"));
+        assert_eq!(summary.p3_type.as_deref(), Some("Pl1200"));
+        assert_eq!(summary.p4_type.as_deref(), Some("Pl1100"));
         assert_eq!(summary.repeat_group, None);
     }
 
     /// Newest first — the picker's most likely target is the run just finished.
+    ///
+    /// The fixture's ids and times run in OPPOSITE directions, so this only
+    /// passes under `ORDER BY time DESC`; an id-keyed order (ascending or
+    /// descending) comes back wrong. That distinction is not academic: an
+    /// imported log gets a fresh local rowid but keeps its original timestamp,
+    /// so id order and time order routinely disagree on the real database.
     #[test]
     fn summaries_come_back_newest_first() {
-        // `db_with` stamps `time` from the id passed in, so the ids double as
-        // the times: 100, 300, 200.
-        let conn = db_with(&[(100, false), (300, false), (200, false)]);
+        let conn = db_with(&[(1, false), (2, false), (3, false)]);
+        conn.execute("UPDATE logs SET time = 300 WHERE id = 1", [])
+            .expect("set time");
+        conn.execute("UPDATE logs SET time = 200 WHERE id = 2", [])
+            .expect("set time");
+        conn.execute("UPDATE logs SET time = 100 WHERE id = 3", [])
+            .expect("set time");
 
         let summaries = fetch_log_summaries(&conn).expect("query");
 
         assert_eq!(
             summaries.iter().map(|s| s.id).collect::<Vec<_>>(),
-            vec![300, 200, 100]
+            vec![1, 2, 3]
         );
     }
 }

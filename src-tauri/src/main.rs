@@ -1077,6 +1077,12 @@ struct SearchResult {
 /// Kept separate from [`fetch_logs`] rather than an "unpaginated" flag on it —
 /// the two return different shapes ([`db::logs::LogSummary`] is deliberately
 /// narrower than [`db::logs::LogEntry`]) and want different callers.
+///
+/// Plain `fn`, so Tauri runs this synchronously on the IPC thread — the same
+/// as every other DB reader here. If a large library ever makes that a visible
+/// hitch, the fix is `#[tauri::command(async)]` (used 11 times in this file
+/// already), not a `LIMIT`: a limit would silently truncate the library the
+/// picker searches, breaking client-side search in a way the user can't see.
 #[tauri::command]
 fn fetch_log_summaries() -> Result<Vec<db::logs::LogSummary>, String> {
     let conn = db::connect_to_db().map_err(|e| e.to_string())?;
