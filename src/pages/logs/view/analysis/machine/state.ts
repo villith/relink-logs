@@ -62,19 +62,27 @@ export const DEFAULT_STATE: AnalysisState = {
 export const isPinned = (state: AnalysisState, dim: Dimension): boolean =>
   dim === "source" ? state.source !== null : dim === "ability" ? state.ability !== null : state.target !== null;
 
-/** The raw query-string fields, one per URL param. */
-export type RawState = {
+/** The raw query-string fields every pane shares. */
+export type SharedRaw = {
   metric: string | null;
   side: string | null;
+  from: string | null;
+  to: string | null;
+  win: string | null;
+};
+
+/** The raw query-string fields scoped to ONE pane. */
+export type PaneRaw = {
   src: string | null;
   tgt: string | null;
   abil: string | null;
-  from: string | null;
-  to: string | null;
   by: string | null;
   aura: string | null;
-  win: string | null;
 };
+
+/** One pane's whole raw state. Unchanged in shape — `decodeState` and
+ * `encodeState` still take and return exactly this. */
+export type RawState = SharedRaw & PaneRaw;
 
 export const encodeState = (state: AnalysisState): RawState => ({
   metric: state.metric === DEFAULT_STATE.metric ? null : state.metric,
