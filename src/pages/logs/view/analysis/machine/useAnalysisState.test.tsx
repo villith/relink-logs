@@ -20,8 +20,8 @@ const FULL_STATE: AnalysisState = {
 
 /** The real state, the real adapter, the real jsdom URL — the point of this
  * test is the wiring between them, so nothing here is stubbed. */
-const Harness = () => {
-  const [state, setState] = useAnalysisState();
+const Harness = ({ paneIndex = 0 }: { paneIndex?: number }) => {
+  const [state, setState] = useAnalysisState(paneIndex);
 
   return (
     <>
@@ -35,12 +35,12 @@ const Harness = () => {
 // The react-router v6 adapter reads the initial search params from the REAL
 // `location.search`, not from MemoryRouter's in-memory history — so a
 // pre-seeded URL has to land on `window.location` too, or nuqs never sees it.
-const renderHarness = (initialEntries?: string[]) => {
+const renderHarness = (initialEntries?: string[], paneIndex?: number) => {
   if (initialEntries !== undefined) window.history.replaceState(null, "", initialEntries[0]);
   return render(
     <MemoryRouter initialEntries={initialEntries}>
       <NuqsAdapter>
-        <Harness />
+        <Harness paneIndex={paneIndex} />
       </NuqsAdapter>
     </MemoryRouter>
   );
@@ -135,5 +135,52 @@ describe("useAnalysisState", () => {
       expect(decoded.aura).toEqual(["src:status:4:1:unknown", "tgt:status:9:1:1"]);
       expect(decoded.win).toEqual(["sba", "break:1"]);
     });
+  });
+});
+
+describe("pane scoping", () => {
+  it("reads pane 0 off the bare keys, so a link written before compare still opens", () => {
+    renderHarness(["/?metric=taken&src=1"]);
+
+    const state = JSON.parse(screen.getByTestId("state").textContent ?? "");
+    expect(state.metric).toBe("taken");
+    expect(state.source).toBe(1);
+  });
+
+  it("reads pane 1 off the suffixed keys while sharing the metric", () => {
+    renderHarness(["/?metric=taken&src=1&src1=3"], 1);
+
+    const state = JSON.parse(screen.getByTestId("state").textContent ?? "");
+    expect(state.metric).toBe("taken");
+    expect(state.source).toBe(3);
+  });
+
+  it("does not let one pane read another pane's pins", () => {
+    renderHarness(["/?src=1"], 1);
+
+    expect(JSON.parse(screen.getByTestId("state").textContent ?? "").source).toBeNull();
+  });
+
+  it("writes pane 1's pins to the suffixed keys, leaving pane 0's alone", async () => {
+    renderHarness(["/?src=1"], 1);
+
+    fireEvent.click(screen.getByText("set"));
+
+    await waitFor(() => expect(window.location.search).toContain("src1=3"));
+    // Pane 0's own pin is untouched by a pane 1 write — the whole point of
+    // suffixing. FULL_STATE sets source 3, so an unscoped write would have
+    // clobbered `src=1`.
+    expect(window.location.search).toContain("src=1");
+  });
+
+  it("keeps the shared fields unsuffixed whichever pane writes them", async () => {
+    renderHarness(undefined, 1);
+
+    fireEvent.click(screen.getByText("set"));
+
+    await waitFor(() => expect(window.location.search).toContain("metric=taken"));
+    expect(window.location.search).not.toContain("metric1=");
+    expect(window.location.search).toContain("side=enemy");
+    expect(window.location.search).not.toContain("side1=");
   });
 });

@@ -182,7 +182,7 @@ export const AnalysisView = () => {
 
   // The machine: the URL holds the WHOLE state (metric, side, pins, window,
   // grouping override), the resolver turns it into everything the view shows.
-  const [state, setState] = useAnalysisState();
+  const [state, setState] = useAnalysisState(0);
   // Which BODY the frame shows — the top-level view switch. Its own nuqs key
   // rather than a machine field: neither Events nor Timeline is a metric, so
   // putting either in `AnalysisState` would mean a `MetricKey` the resolver has

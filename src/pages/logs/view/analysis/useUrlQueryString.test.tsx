@@ -10,7 +10,7 @@ import { useUrlQueryString } from "./useUrlQueryString";
 /** The real machine state, the real adapter, the real jsdom URL — the point of
  * this test is the wiring between them, so nothing here is stubbed. */
 const Harness = () => {
-  const [, setState] = useAnalysisState();
+  const [, setState] = useAnalysisState(0);
   const query = useUrlQueryString();
 
   return (
