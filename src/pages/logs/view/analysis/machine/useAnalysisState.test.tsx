@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { NuqsAdapter } from "nuqs/adapters/react-router/v6";
+import { useState } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -19,15 +20,25 @@ const FULL_STATE: AnalysisState = {
 };
 
 /** The real state, the real adapter, the real jsdom URL — the point of this
- * test is the wiring between them, so nothing here is stubbed. */
-const Harness = ({ paneIndex = 0 }: { paneIndex?: number }) => {
+ * test is the wiring between them, so nothing here is stubbed.
+ *
+ * `testId` suffixes the testids (`state-0`, `set-0`, ...) so two of these can
+ * mount side by side without colliding; left undefined it falls back to the
+ * bare `state`/`set`/`reset` the six pre-existing tests already query by, so
+ * they keep passing unchanged. */
+const Harness = ({ paneIndex = 0, testId }: { paneIndex?: number; testId?: string }) => {
   const [state, setState] = useAnalysisState(paneIndex);
+  const suffix = testId === undefined ? "" : `-${testId}`;
 
   return (
     <>
-      <output data-testid="state">{JSON.stringify(state)}</output>
-      <button onClick={() => setState(FULL_STATE)}>set</button>
-      <button onClick={() => setState(DEFAULT_STATE)}>reset</button>
+      <output data-testid={`state${suffix}`}>{JSON.stringify(state)}</output>
+      <button data-testid={`set${suffix}`} onClick={() => setState(FULL_STATE)}>
+        set
+      </button>
+      <button data-testid={`reset${suffix}`} onClick={() => setState(DEFAULT_STATE)}>
+        reset
+      </button>
     </>
   );
 };
@@ -45,6 +56,25 @@ const renderHarness = (initialEntries?: string[], paneIndex?: number) => {
     </MemoryRouter>
   );
 };
+
+// Two panes in one adapter — what Task 10 actually renders. Testids carry the
+// pane index so each pane's output/buttons are queryable on their own.
+const renderTwoPanes = (initialEntries?: string[]) => {
+  if (initialEntries !== undefined) window.history.replaceState(null, "", initialEntries[0]);
+  return render(
+    <MemoryRouter initialEntries={initialEntries}>
+      <NuqsAdapter>
+        <Harness paneIndex={0} testId="0" />
+        <Harness paneIndex={1} testId="1" />
+      </NuqsAdapter>
+    </MemoryRouter>
+  );
+};
+
+// Exact param reads rather than substring matches on the raw query string —
+// `toContain("src=1")` would also pass a write that clobbered it into
+// `src=13`.
+const params = () => new URLSearchParams(window.location.search);
 
 // nuqs writes the REAL window URL, which outlives a render.
 afterEach(() => window.history.replaceState(null, "", "/"));
@@ -166,11 +196,12 @@ describe("pane scoping", () => {
 
     fireEvent.click(screen.getByText("set"));
 
-    await waitFor(() => expect(window.location.search).toContain("src1=3"));
+    await waitFor(() => expect(params().get("src1")).toBe("3"));
     // Pane 0's own pin is untouched by a pane 1 write — the whole point of
     // suffixing. FULL_STATE sets source 3, so an unscoped write would have
-    // clobbered `src=1`.
-    expect(window.location.search).toContain("src=1");
+    // clobbered `src=1`. An exact read, not a substring match: `toContain`
+    // would also pass if the write had clobbered it into `src=13`.
+    expect(params().get("src")).toBe("1");
   });
 
   it("keeps the shared fields unsuffixed whichever pane writes them", async () => {
@@ -178,9 +209,75 @@ describe("pane scoping", () => {
 
     fireEvent.click(screen.getByText("set"));
 
-    await waitFor(() => expect(window.location.search).toContain("metric=taken"));
-    expect(window.location.search).not.toContain("metric1=");
-    expect(window.location.search).toContain("side=enemy");
-    expect(window.location.search).not.toContain("side1=");
+    await waitFor(() => expect(params().get("metric")).toBe("taken"));
+    expect(params().get("metric1")).toBeNull();
+    expect(params().get("side")).toBe("enemy");
+    expect(params().get("side1")).toBeNull();
+  });
+});
+
+describe("two panes mounted together", () => {
+  it("keeps each pane's pins separate when both are mounted", () => {
+    renderTwoPanes(["/?src=1&src1=9"]);
+
+    expect(JSON.parse(screen.getByTestId("state-0").textContent ?? "").source).toBe(1);
+    expect(JSON.parse(screen.getByTestId("state-1").textContent ?? "").source).toBe(9);
+  });
+
+  it("lets one pane's write change the shared metric without touching the other's pins", async () => {
+    renderTwoPanes(["/?src=1&src1=9"]);
+
+    fireEvent.click(screen.getByTestId("set-1"));
+
+    await waitFor(() => expect(params().get("src1")).toBe("3"));
+    expect(params().get("src")).toBe("1");
+    expect(params().get("metric")).toBe("taken");
+
+    await waitFor(() => expect(JSON.parse(screen.getByTestId("state-0").textContent ?? "").metric).toBe("taken"));
+    expect(JSON.parse(screen.getByTestId("state-0").textContent ?? "").source).toBe(1);
+  });
+});
+
+describe("a live pane's index changing", () => {
+  // Reproduces the reviewer's finding directly, rather than only asserting
+  // the defence: a mounted pane whose `paneIndex` prop changes (what a naive
+  // reindex-on-removal would do, before Task 11 remounts instead) hits the
+  // render where nuqs still has the OLD key's value cached and the NEW key
+  // reads back `undefined`. Without the `?? null` coalescing in
+  // `useAnalysisState`, `decodeState` throws inside that render and this test
+  // fails with an uncaught TypeError instead of reaching the final assertion.
+  it("does not throw when a mounted pane's index moves, and settles on the new pane's value", async () => {
+    const ReindexHarness = () => {
+      const [index, setIndex] = useState(2);
+      return (
+        <>
+          <Harness paneIndex={index} testId="live" />
+          <button data-testid="reindex" onClick={() => setIndex(1)}>
+            reindex
+          </button>
+        </>
+      );
+    };
+
+    // As in `renderHarness`: the react-router v6 adapter reads the initial
+    // params off the REAL `window.location.search`, not off MemoryRouter's
+    // in-memory history.
+    window.history.replaceState(null, "", "/?src1=7&src2=42");
+    render(
+      <MemoryRouter initialEntries={["/?src1=7&src2=42"]}>
+        <NuqsAdapter>
+          <ReindexHarness />
+        </NuqsAdapter>
+      </MemoryRouter>
+    );
+
+    expect(JSON.parse(screen.getByTestId("state-live").textContent ?? "").source).toBe(42);
+
+    // The crash, if `decodeState` isn't defended, happens inside this click —
+    // React re-renders synchronously under `act()`, and the render that reads
+    // the new key's stale-`undefined` value is part of that same flush.
+    fireEvent.click(screen.getByTestId("reindex"));
+
+    await waitFor(() => expect(JSON.parse(screen.getByTestId("state-live").textContent ?? "").source).toBe(7));
   });
 });
