@@ -203,9 +203,17 @@ impl FactTally {
 }
 
 /// The per-group damage-fact block. Lives only on [`GroupMeasure`], and only
-/// for [`GroupMetric::Damage`] rows — the taken stream shares this walk's
-/// loop but the tally is never touched for it, so `facts` stays `None` on a
-/// taken row regardless of what the events carried.
+/// for the FRIENDLY-side dealt-stream damage row this round — `(metric:
+/// Damage, hostility: Friendly)`, `aggregate_groups`'s own `dealt_stream`
+/// true and `query.metric == GroupMetric::Damage` both. Every other
+/// (metric, hostility) combination shares this walk's loop but the tally is
+/// never touched for it, so `facts` stays `None` there regardless of what
+/// the events carried — in particular `(Damage, Enemy)` walks the TAKEN
+/// stream (enemy→player hits): overdrive/break would describe the victim
+/// (a player, who has no modes), crit/WP/BA describe an enemy attack the
+/// analysis columns don't model, and mode inference keyed on a player
+/// `parent_index` would rarely resolve — semantically wrong-side facts, not
+/// a smaller version of the right ones.
 ///
 /// `None` on the measure itself (rather than an all-`Unknown` `GroupFacts`
 /// always being present) so old frontends and the mirror read absence, not
@@ -892,15 +900,21 @@ pub fn aggregate_groups(
         entry.measure.max = Some(entry.measure.max.map_or(damage, |max| max.max(damage)));
         entry.series[bucket] += damage;
 
-        // Fact tallies: Damage-metric rows only, direct hits only. An echo's
-        // instance belongs to the hit that triggered it — tallying it too
-        // would double-count the trigger's own facts, and letting its
-        // damage into the OD/Break sums below would double-count there too
-        // (the split covers direct hits, matching the provenance tallies it
-        // sits beside). `facts_index` is `None` at a position that wasn't a
-        // `DamageEvent` at all; every survivor of the gates above IS one, so
-        // this is defensive completeness, not a real gap.
-        if query.metric == GroupMetric::Damage && !is_echo {
+        // Fact tallies: the FRIENDLY-side dealt-stream damage row only —
+        // `query.metric == GroupMetric::Damage` narrows the metric,
+        // `dealt_stream` (this function's own stream discriminator, set
+        // above from `(query.metric, query.hostility)`) narrows out
+        // `(Damage, Enemy)`, which walks the TAKEN stream and would tally
+        // wrong-side facts (see `GroupFacts`'s doc comment) — and direct
+        // hits only. An echo's instance belongs to the hit that triggered
+        // it — tallying it too would double-count the trigger's own facts,
+        // and letting its damage into the OD/Break sums below would
+        // double-count there too (the split covers direct hits, matching
+        // the provenance tallies it sits beside). `facts_index` is `None`
+        // at a position that wasn't a `DamageEvent` at all; every survivor
+        // of the gates above IS one, so this is defensive completeness, not
+        // a real gap.
+        if query.metric == GroupMetric::Damage && dealt_stream && !is_echo {
             if let Some(hit_facts) = facts_index.get(position).copied().flatten() {
                 let facts = entry.measure.facts.get_or_insert_with(Default::default);
                 facts.crit.add(hit_facts.crit);
@@ -1558,6 +1572,38 @@ mod tests {
         assert_eq!(
             b_facts.overdrive_damage, 1_000,
             "both of B's hits landed while the target was inferred Overdrive"
+        );
+    }
+
+    /// `(Damage, Enemy)` walks the TAKEN stream (enemy→player hits) — see
+    /// `GroupFacts`'s doc comment for why those facts would describe the
+    /// wrong side. Rows from this combination must carry `facts: None`, the
+    /// same "no data" the frontend already renders for a taken row.
+    #[test]
+    fn enemy_hostility_damage_rows_never_tally_facts() {
+        let events = vec![(
+            1_000,
+            Message::DamageEvent(enemy_hit(0xDEAD_BEEF, 0, 100, 500)),
+        )];
+        let query = damage_enemy_query(Dimension::Source);
+
+        let aggregates = aggregate_groups(
+            &events,
+            &Default::default(),
+            &[],
+            &[],
+            &query,
+            1_000,
+            1_000,
+            1,
+            MeterFilters::default(),
+        )
+        .expect("damage grouped by enemy source is supported");
+
+        assert_eq!(aggregates.len(), 1);
+        assert!(
+            aggregates[0].measure.facts.is_none(),
+            "the taken stream must never tally facts, even under a Damage-metric query"
         );
     }
 
