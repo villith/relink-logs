@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { abilityLabelFor } from "@/pages/logs/view/analysis/abilityLabel";
+import { capPredictableKey } from "@/pages/logs/view/events/capBreakdown";
 import { explainCapHit } from "@/pages/logs/view/events/capExplain";
 import { conditionsForHit } from "@/pages/logs/view/events/capFactors/conditions";
 import { buildGridStates } from "@/pages/logs/view/events/capGridStates";
@@ -161,6 +162,10 @@ export const CapTab = () => {
         loadout: player,
         characterType: player?.characterType,
         gridStates: gridStates.get(selected.sourceIndex),
+        // The same gate the events-view card uses: a capless hit of a kind
+        // the builder locally always stamps (a remote hit) derives a
+        // predicted cap instead of stopping at "no cap".
+        predictable: capPredictableKey(selected.abilityKey),
         conditions,
       }),
       damageSections: explainDamageHit({

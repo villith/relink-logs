@@ -335,3 +335,52 @@ describe("a log recorded before the cap capture", () => {
     expect(line(explainCapHit(old), "clamp", "damage").value).toEqual({ kind: "count", value: 152_737 });
   });
 });
+
+describe("the predicted cap section (remote hits)", () => {
+  /** A remote-shaped hit: a cap-builder hit kind with no logged cap/precap,
+   * whose player has a captured store and loadout — the card's own gate. */
+  const capless = (over: Partial<ExplainInput> = {}): ExplainInput =>
+    input({
+      hit: { ...input().hit, damage_cap: null, base_damage: null },
+      capUp: { normal: 0.1618, skill: 0.1826, sba: 0.1534 },
+      loadout: loadout(),
+      predictable: true,
+      ...over,
+    });
+
+  it("pivots a capless predictable hit to the predicted derivation", () => {
+    const sections = explainCapHit(capless());
+    expect(sections.map((entry) => entry.key)).toEqual(["class", "base", "predicted", "clamp", "postcap"]);
+    const predicted = line(sections, "predicted", "predicted");
+    // The card's own arithmetic: trunc(5399 x (1 + 0.1618)) — no DMG Cap
+    // trait, no channel terms on an empty loadout.
+    expect(predicted.value).toEqual({ kind: "count", value: 6272 });
+    expect(predicted.inferred).toBe(true);
+    expect(predicted.emphasis).toBe("total");
+    expect(line(sections, "predicted", "record").value).toEqual({ kind: "percent", value: 16.18 });
+  });
+
+  it("keeps the bare no-cap bail for a hit kind that never carries a cap", () => {
+    const sections = explainCapHit(capless({ predictable: undefined }));
+    expect(section(sections, "capup").unavailableKey).toBe("ui.debug.cap-no-cap");
+  });
+
+  it("predicts the bare ladder base for a summon-class hit", () => {
+    const sections = explainCapHit(capless({ hit: { ...capless().hit, class_flags: 0x80 } }));
+    const base = line(sections, "base", "result").value;
+    expect(base.kind).toBe("count");
+    expect(line(sections, "predicted", "predicted").value).toEqual(base);
+    // None of the player's terms apply on the summon path — not even as rows.
+    expect(section(sections, "predicted").lines.some((entry) => entry.key === "record")).toBe(false);
+  });
+
+  it("declines to predict for a denylisted character", () => {
+    const sections = explainCapHit(capless({ characterType: "Pl0600" }));
+    expect(section(sections, "predicted").unavailableKey).toBe("ui.debug.cap-pred-denylist");
+  });
+
+  it("names the missing store rather than predicting from nothing", () => {
+    const sections = explainCapHit(capless({ capUp: undefined }));
+    expect(section(sections, "predicted").unavailableKey).toBe("ui.debug.cap-pred-no-record");
+  });
+});
