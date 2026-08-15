@@ -1073,6 +1073,16 @@ struct SearchResult {
     legality: HashMap<i64, Vec<db::legality::StoredFinding>>,
 }
 
+/// The whole log library, unpaginated, for the picker's client-side search.
+/// Kept separate from [`fetch_logs`] rather than an "unpaginated" flag on it —
+/// the two return different shapes ([`db::logs::LogSummary`] is deliberately
+/// narrower than [`db::logs::LogEntry`]) and want different callers.
+#[tauri::command]
+fn fetch_log_summaries() -> Result<Vec<db::logs::LogSummary>, String> {
+    let conn = db::connect_to_db().map_err(|e| e.to_string())?;
+    db::logs::fetch_log_summaries(&conn).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn fetch_logs(
     page: Option<u32>,
@@ -3048,6 +3058,7 @@ fn main() {
             fetch_encounter_state,
             fetch_encounter_events,
             fetch_logs,
+            fetch_log_summaries,
             fetch_conflux_runs,
             fetch_legality_players,
             delete_logs,

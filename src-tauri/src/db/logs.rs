@@ -524,6 +524,55 @@ pub fn get_counts(conn: &Connection, filters: &LogFilters) -> Result<LogCounts> 
     Ok(counts)
 }
 
+/// One row of the log picker's list. Deliberately narrower than [`LogEntry`]:
+/// the picker loads the WHOLE library at once so its search can be instant,
+/// and the fields it does not draw are what would make that payload big.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LogSummary {
+    pub id: u64,
+    pub time: i64,
+    pub duration: i64,
+    pub quest_id: Option<u32>,
+    pub quest_elapsed_time: Option<u32>,
+    pub p1_type: Option<String>,
+    pub p2_type: Option<String>,
+    pub p3_type: Option<String>,
+    pub p4_type: Option<String>,
+    /// Id of the first run of this log's Repeat Quest chain, null when it is
+    /// the first run or is unchained. The picker groups on it.
+    pub repeat_group: Option<i64>,
+}
+
+/// Every log, newest first, as picker rows. Unpaginated on purpose — the picker
+/// searches client-side, which needs the whole library in hand.
+pub fn fetch_log_summaries(conn: &Connection) -> Result<Vec<LogSummary>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, time, duration, quest_id, quest_elapsed_time,
+                p1_type, p2_type, p3_type, p4_type, repeat_group
+         FROM logs
+         ORDER BY time DESC",
+    )?;
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(LogSummary {
+                id: row.get(0)?,
+                time: row.get(1)?,
+                duration: row.get(2)?,
+                quest_id: row.get(3)?,
+                quest_elapsed_time: row.get(4)?,
+                p1_type: row.get(5)?,
+                p2_type: row.get(6)?,
+                p3_type: row.get(7)?,
+                p4_type: row.get(8)?,
+                repeat_group: row.get(9)?,
+            })
+        })?
+        .collect::<rusqlite::Result<Vec<LogSummary>>>()?;
+
+    Ok(rows)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -865,6 +914,43 @@ mod tests {
         assert_eq!(
             sorted(&conn, &SortType::Duration, &SortDirection::Ascending),
             vec![3, 1, 2]
+        );
+    }
+
+    /// The picker needs exactly enough to tell two runs of one quest apart: when,
+    /// how long, and who was in the party. Anything more is bytes the dropdown
+    /// never draws, multiplied by a library that can hold thousands of rows.
+    #[test]
+    fn summary_carries_what_the_picker_draws() {
+        let conn = db_with(&[(1, false)]);
+        conn.execute(
+            "UPDATE logs SET quest_id = 2657, quest_elapsed_time = 180, p1_type = 'Pl1400' WHERE id = 1",
+            [],
+        )
+        .expect("stamp log");
+
+        let summaries = fetch_log_summaries(&conn).expect("query");
+
+        assert_eq!(summaries.len(), 1);
+        let summary = &summaries[0];
+        assert_eq!(summary.quest_id, Some(2657));
+        assert_eq!(summary.quest_elapsed_time, Some(180));
+        assert_eq!(summary.p1_type.as_deref(), Some("Pl1400"));
+        assert_eq!(summary.repeat_group, None);
+    }
+
+    /// Newest first — the picker's most likely target is the run just finished.
+    #[test]
+    fn summaries_come_back_newest_first() {
+        // `db_with` stamps `time` from the id passed in, so the ids double as
+        // the times: 100, 300, 200.
+        let conn = db_with(&[(100, false), (300, false), (200, false)]);
+
+        let summaries = fetch_log_summaries(&conn).expect("query");
+
+        assert_eq!(
+            summaries.iter().map(|s| s.id).collect::<Vec<_>>(),
+            vec![300, 200, 100]
         );
     }
 }
