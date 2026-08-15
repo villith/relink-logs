@@ -336,9 +336,12 @@ pub struct GroupReference {
 ///
 /// It reads only `amount`, so the [`MergedMeasure`] the inner call folds is paid
 /// for and thrown away — a second [`SuppPairing`] over the whole log on every
-/// scrub. Left alone deliberately: the fixes are a tenth parameter on an already
-/// nine-argument function or a restructuring of this path, and that call wants a
-/// measurement rather than a guess. Start here if profiling points at scrubbing.
+/// scrub, and (for a friendly damage query) a second [`damage_facts::assemble_hit_facts`]
+/// (including its crit-cluster sorts) plus the full [`GroupFacts`] tally it
+/// feeds, discarded the same way. Left alone deliberately: the fixes are a
+/// tenth parameter on an already nine-argument function or a restructuring of
+/// this path, and that call wants a measurement rather than a guess. Start
+/// here if profiling points at scrubbing.
 pub fn aggregate_group_reference(
     events: &[(i64, Message)],
     player_data: &[Option<PlayerData>; 4],
@@ -1604,6 +1607,103 @@ mod tests {
         assert!(
             aggregates[0].measure.facts.is_none(),
             "the taken stream must never tally facts, even under a Damage-metric query"
+        );
+    }
+
+    /// `(Taken, Enemy)` also walks the DEALT stream (see `aggregate_groups`'s
+    /// own table: it is `dealt_stream` true too, just with `source_is_player`
+    /// flipped) — so the gate's `dealt_stream` check alone would let it
+    /// through. Only the `query.metric == GroupMetric::Damage` half of the
+    /// gate excludes it; this pins that half.
+    #[test]
+    fn taken_enemy_dimension_rows_never_tally_facts() {
+        let events = vec![(1_000, Message::DamageEvent(player_hit(0, 9, 100, 500)))];
+        let query = taken_enemy_query(Dimension::Ability);
+
+        let aggregates = aggregate_groups(
+            &events,
+            &Default::default(),
+            &[],
+            &[],
+            &query,
+            1_000,
+            1_000,
+            1,
+            MeterFilters::default(),
+        )
+        .expect("taken+enemy grouped by ability is supported");
+
+        assert_eq!(aggregates.len(), 1);
+        assert!(
+            aggregates[0].measure.facts.is_none(),
+            "(Taken, Enemy) walks the dealt stream but must still never tally facts"
+        );
+    }
+
+    /// The must-fix regression: an echo must tally NOTHING, even when its own
+    /// facts would resolve non-`Unknown`. Both the trigger and its echo land
+    /// on a target inferred Overdrive (a mode event, so no snapshot-building
+    /// needed), so if `!is_echo` were ever dropped from the gate the echo's
+    /// `InferredYes` would double the overdrive count and add its own damage
+    /// to `overdrive_damage` — this pins both halves of that double-count.
+    #[test]
+    fn an_echo_tallies_nothing_even_though_its_own_facts_resolve() {
+        let events = vec![
+            (
+                0,
+                Message::EnemyMode(protocol::EnemyModeEvent {
+                    actor_index: 9,
+                    mode: protocol::EnemyModeEvent::MODE_OVERDRIVE,
+                }),
+            ),
+            // Trigger: a Normal hit under action 9001.
+            (100, Message::DamageEvent(player_hit(0, 9, 9001, 1_000))),
+            // Its echo — same source/target/action id, well inside the
+            // pairing window — `SuppPairing` claims it (mirrors the existing
+            // `a_claimed_echo_whose_trigger_the_window_excluded_lands_on_its_own`
+            // fixture's shape).
+            (150, Message::DamageEvent(player_echo(0, 9, 9001, 600))),
+        ];
+        assert_eq!(
+            SuppPairing::learned_from(&events).trigger_of(2),
+            Some(1),
+            "the echo must really be claimed for this test to pin the right gate"
+        );
+        let query = friendly_damage_query(Dimension::Source);
+
+        let aggregates = aggregate_groups(
+            &events,
+            &Default::default(),
+            &[],
+            &[],
+            &query,
+            0,
+            1_000,
+            1,
+            MeterFilters::default(),
+        )
+        .expect("friendly damage grouped by source is supported");
+
+        let row = aggregates
+            .iter()
+            .find(|aggregate| aggregate.key == GroupKey::Player { index: 0 })
+            .expect("the player has a row");
+        let facts = row
+            .measure
+            .facts
+            .as_deref()
+            .expect("the trigger tallied facts");
+        assert_eq!(
+            facts.overdrive,
+            FactTally {
+                inferred_yes: 1,
+                ..Default::default()
+            },
+            "only the trigger's Overdrive fact counts — the echo's must not"
+        );
+        assert_eq!(
+            facts.overdrive_damage, 1_000,
+            "the OD damage split must be the trigger's damage alone, not trigger + echo"
         );
     }
 
