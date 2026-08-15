@@ -6,7 +6,7 @@ import statusClasses from "../../../../../src-tauri/assets/status-classes.json";
 
 import type { ExplainHit } from "./capExplain";
 import type { CapConditions } from "./capFactors";
-import { amplifyStatusIds, explainDamageHit, type DamageTraitTable } from "./damageExplain";
+import { amplifyStatusIds, explainDamageHit, type DamageExplainInput, type DamageTraitTable } from "./damageExplain";
 
 /** Builds a well-formed `instance_snapshot` blob (640 bytes, window base
  * `0xC0`) with the given game-offset byte runs written in, everything else
@@ -45,6 +45,10 @@ const TABLE: DamageTraitTable = {
     c35b111b: { key: "SKILL_030_00", name: "Lucky Charge", values: { value: [5] } },
     // SKILL_099_00 (crit section, gate-byte trait — back attack byte+0x15F).
     "4b400b01": { key: "SKILL_099_00", name: "SKILL_099_00", values: { value: [7] } },
+    // Overdrive Assassin (gate-byte trait, window-inferable when unmeasured).
+    a9d17f55: { key: "SKILL_331_00", name: "Overdrive Assassin", values: { value: [12] } },
+    // Break Assassin (gate-byte trait, window-inferable when unmeasured).
+    ac9674c1: { key: "SKILL_332_00", name: "Break Assassin", values: { value: [9] } },
   },
 };
 
@@ -65,6 +69,7 @@ const LOADOUT = {
     { sigilId: 4, firstTraitId: 0xb360801d, firstTraitLevel: 1, secondTraitId: 0xa7726190, secondTraitLevel: 1 },
     { sigilId: 5, firstTraitId: 0x0de887a0, firstTraitLevel: 1, secondTraitId: 0, secondTraitLevel: 0 },
     { sigilId: 6, firstTraitId: 0xc35b111b, firstTraitLevel: 1, secondTraitId: 0x4b400b01, secondTraitLevel: 1 },
+    { sigilId: 7, firstTraitId: 0xa9d17f55, firstTraitLevel: 1, secondTraitId: 0xac9674c1, secondTraitLevel: 1 },
   ],
   summons: [],
   weaponState: null,
@@ -93,6 +98,15 @@ const section = (key: string, over: Partial<typeof HIT> = {}, conditions: CapCon
 
 const line = (sectionKey: string, lineKey: string, over: Partial<typeof HIT> = {}, conditions: CapConditions = {}) => {
   const found = section(sectionKey, over, conditions).lines.find((l) => l.key === lineKey);
+  expect(found).toBeDefined();
+  return found!;
+};
+
+/** Like `line`, but for the tests that need to set `modeInference` — a
+ * full `DamageExplainInput` override rather than just the hit fields. */
+const lineWithInput = (sectionKey: string, lineKey: string, input: Partial<DamageExplainInput> = {}) => {
+  const sections = explainDamageHit({ hit: HIT, loadout: LOADOUT, conditions: {}, ...input }, TABLE);
+  const found = sections.find((s) => s.key === sectionKey)?.lines.find((l) => l.key === lineKey);
   expect(found).toBeDefined();
   return found!;
 };
@@ -168,6 +182,61 @@ describe("gate-byte trait: measured verdict from a recorded snapshot", () => {
     const weak = line("dmg-chain", "trait-6b694d6d-weakpoint", { instance_snapshot: null });
     expect(weak.excluded).toBe("gate-unrecorded");
     expect(weak.value).toEqual({ kind: "percent", value: 15 });
+  });
+});
+
+describe("gate-byte trait: window-inferred verdict for the two mode traits", () => {
+  it("infers a yes verdict from the mode windows when unmeasured, marked as inferred", () => {
+    const od = lineWithInput("dmg-chain", "trait-a9d17f55-value", {
+      hit: HIT,
+      modeInference: { overdrive: true, break: false },
+    });
+    expect(od.excluded).toBeUndefined();
+    expect(od.inferred).toBe(true);
+    expect(od.value).toEqual({ kind: "percent", value: 12 });
+    expect(od.source).toEqual({ kind: "literal", value: "SKILL_331_00 L1, mode windows" });
+  });
+
+  it("infers a no verdict as conditional when unmeasured, marked as inferred", () => {
+    const brk = lineWithInput("dmg-chain", "trait-ac9674c1-value", {
+      hit: HIT,
+      modeInference: { overdrive: true, break: false },
+    });
+    expect(brk.excluded).toBe("conditional");
+    expect(brk.inferred).toBe(true);
+    expect(brk.value).toEqual({ kind: "percent", value: 9 });
+    expect(brk.source).toEqual({ kind: "literal", value: "SKILL_332_00 L1, mode windows" });
+  });
+
+  it("a measured verdict always wins over window inference", () => {
+    const od = lineWithInput("dmg-chain", "trait-a9d17f55-value", {
+      hit: { ...HIT, instance_snapshot: populatedBlob([[0x162, [0]]]) }, // measured: overdrive NO
+      modeInference: { overdrive: true, break: false }, // inference says YES
+    });
+    expect(od.inferred).toBeUndefined();
+    expect(od.excluded).toBe("conditional");
+    expect(od.source).toEqual({ kind: "literal", value: "SKILL_331_00 L1, inst+0x162" });
+  });
+
+  it("falls back to gate-unrecorded, not inferred, when no mode windows exist at all", () => {
+    const od = lineWithInput("dmg-chain", "trait-a9d17f55-value", { hit: HIT, modeInference: null });
+    expect(od.excluded).toBe("gate-unrecorded");
+    expect(od.inferred).toBeUndefined();
+  });
+
+  it("falls back to gate-unrecorded when modeInference is not supplied at all", () => {
+    const od = lineWithInput("dmg-chain", "trait-a9d17f55-value", { hit: HIT });
+    expect(od.excluded).toBe("gate-unrecorded");
+    expect(od.inferred).toBeUndefined();
+  });
+
+  it("leaves an unrelated gate-byte trait (weak point) untouched by mode inference", () => {
+    const weak = lineWithInput("dmg-chain", "trait-6b694d6d-weakpoint", {
+      hit: HIT,
+      modeInference: { overdrive: true, break: true },
+    });
+    expect(weak.excluded).toBe("gate-unrecorded");
+    expect(weak.inferred).toBeUndefined();
   });
 });
 

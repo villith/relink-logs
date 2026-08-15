@@ -11,6 +11,7 @@ import { getSkillName, millisecondsToPreciseElapsedFormat, translateCharacterTyp
 import { CapDetailPanel } from "./CapDetailPanel";
 import { HitPipeline } from "./HitPipeline";
 import { hitLabel, type CapDebugHit } from "./capHits";
+import { modeInferenceForHit } from "./modeInference";
 import { useCapDebugLog, usePlayersByActor, useRecentLogs } from "./useCapDebugLog";
 
 /** The hit list's width. Sized so a timestamp, a full ability key and a
@@ -83,7 +84,8 @@ export const CapTab = () => {
   const [actorIndex, setActorIndex] = useState<number | null>(null);
   const [eventIndex, setEventIndex] = useState<number | null>(null);
 
-  const { hits, players, skillsByActor, capUp, amplifyStatusIds, truncated, loading, error } = useCapDebugLog(logId);
+  const { hits, players, skillsByActor, capUp, amplifyStatusIds, chartWindows, truncated, loading, error } =
+    useCapDebugLog(logId);
   const playersByActor = usePlayersByActor(players);
 
   // Named through the ANALYSIS view's own resolver, not a second spelling here:
@@ -135,6 +137,11 @@ export const CapTab = () => {
     // supplies neither, and the factors that need them say so rather than
     // reading as inactive.
     const conditions = conditionsForHit(selected.attacker, player?.playerStats ?? null, selected.actionId);
+    // The fallback for a hit whose own snapshot cannot say: this target,
+    // joined against the fight's Overdrive/Break windows at this hit's own
+    // moment. `targetParentIndex`, not `targetIndex` — chart windows name an
+    // enemy by its own actor index, not the folded instance pointer.
+    const modeInference = modeInferenceForHit(chartWindows, selected.targetParentIndex, selected.timeMs);
     return {
       sections: explainCapHit({
         hit: selected.hit,
@@ -148,9 +155,10 @@ export const CapTab = () => {
         loadout: player,
         conditions,
         amplifyStatusIds,
+        modeInference,
       }),
     };
-  }, [selected, playersByActor, capUp, amplifyStatusIds]);
+  }, [selected, playersByActor, capUp, amplifyStatusIds, chartWindows]);
 
   const logOptions = recent.map((log) => ({
     value: String(log.id),

@@ -129,12 +129,23 @@ const hex8 = (id: number) => id.toString(16).padStart(8, "0");
 const count = (value: number): ExplainValue => ({ kind: "count", value });
 const absent: ExplainValue = { kind: "absent" };
 
+/** The two mode gate bytes' verdicts, reconstructed from the fight's
+ * Overdrive/Break chart windows rather than read off this hit's own
+ * snapshot — the fallback for a hit whose snapshot is unpopulated (a remote
+ * player) or absent (an old log). */
+export type ModeInference = { overdrive: boolean; break: boolean };
+
 export type DamageExplainInput = {
   hit: ExplainHit;
   loadout?: CapLoadout;
   conditions?: CapConditions;
   /** Status ids this log has seen applied with an Amplify status class. */
   amplifyStatusIds?: ReadonlySet<number>;
+  /** This hit's target joined against the fight's mode windows, at the hit's
+   * own moment. `null` when the log carries no mode windows at all (an old
+   * log) — as opposed to `{ overdrive: false, break: false }`, which is a
+   * real answer: windows exist, and neither covers this hit. */
+  modeInference?: ModeInference | null;
 };
 
 /** min(base, cap) — what the post-cap chain starts from. Null when
@@ -203,6 +214,15 @@ const hitSection = (hit: ExplainHit): ExplainSection => {
   };
 };
 
+/** For the two mode gate bytes only, `modeInference`'s matching field —
+ * `undefined` for every other byte, which is what keeps this fallback out of
+ * their reach. */
+const modeInferenceField = (byte: keyof GateBytes): "overdrive" | "break" | undefined => {
+  if (byte === "overdrive") return "overdrive";
+  if (byte === "breakMode") return "break";
+  return undefined;
+};
+
 /** One trait slot as a line: value from the table at the combined level, gate
  * verdict from the hit. */
 const traitLine = (
@@ -213,7 +233,8 @@ const traitLine = (
   level: number,
   hit: ExplainHit,
   conditions: CapConditions,
-  snapshot: ParsedSnapshot | null
+  snapshot: ParsedSnapshot | null,
+  modeInference: ModeInference | null
 ): ExplainLine => {
   const perLevel = entry.values[slot] ?? [];
   const value = perLevel[Math.min(level, perLevel.length) - 1];
@@ -233,17 +254,26 @@ const traitLine = (
       break;
     case "gate-byte": {
       const offsetHex = GATE_BYTE_OFFSET[gate.byte].toString(16).toUpperCase();
+      const labelSuffix = slot === "value" ? "" : ` [${slot}]`;
       if (snapshot !== null && snapshot.builderPopulated) {
         // A measured verdict: say so and name the byte it came from, styled
         // like the hp-gate case's threshold source below.
-        line.source = {
-          kind: "literal",
-          value: `${entry.key} L${level}${slot === "value" ? "" : ` [${slot}]`}, inst+0x${offsetHex}`,
-        };
+        line.source = { kind: "literal", value: `${entry.key} L${level}${labelSuffix}, inst+0x${offsetHex}` };
         if (!snapshot.gates[gate.byte]) line.excluded = "conditional";
-      } else {
-        line.excluded = "gate-unrecorded";
+        break;
       }
+      // Only for the two mode-gated traits (Overdrive/Break Assassin):
+      // measured always wins above, but when the snapshot cannot say, the
+      // fight's own Overdrive/Break windows can — a DERIVED verdict, marked
+      // as such rather than presented like a measured one.
+      const field = modeInferenceField(gate.byte);
+      if (field !== undefined && modeInference != null) {
+        line.source = { kind: "literal", value: `${entry.key} L${level}${labelSuffix}, mode windows` };
+        line.inferred = true;
+        if (!modeInference[field]) line.excluded = "conditional";
+        break;
+      }
+      line.excluded = "gate-unrecorded";
       break;
     }
     case "conditional":
@@ -289,7 +319,8 @@ const traitLines = (
   loadout: CapLoadout | undefined,
   conditions: CapConditions,
   table: DamageTraitTable,
-  snapshot: ParsedSnapshot | null
+  snapshot: ParsedSnapshot | null,
+  modeInference: ModeInference | null
 ): ExplainLine[] => {
   if (loadout === undefined) return [];
   const combined = new Map(computeCombinedTraits(loadout).map((trait) => [trait.id, trait.level]));
@@ -302,7 +333,7 @@ const traitLines = (
     if (entry === undefined) continue;
     for (const [slot, gate] of Object.entries(spec.gates)) {
       if (CONTEXT_SLOTS.has(slot)) continue;
-      lines.push(traitLine(spec, slot, gate, entry, level, hit, conditions, snapshot));
+      lines.push(traitLine(spec, slot, gate, entry, level, hit, conditions, snapshot, modeInference));
     }
   }
   return lines;
@@ -313,7 +344,8 @@ const chainSection = (
   loadout: CapLoadout | undefined,
   conditions: CapConditions,
   table: DamageTraitTable,
-  snapshot: ParsedSnapshot | null
+  snapshot: ParsedSnapshot | null,
+  modeInference: ModeInference | null
 ): ExplainSection => ({
   key: "dmg-chain",
   titleKey: "ui.debug.dmg-sec-chain",
@@ -322,7 +354,7 @@ const chainSection = (
   unavailableKey: loadout === undefined ? "ui.debug.cap-no-loadout" : null,
   noteKey: "ui.debug.dmg-note-chain",
   lines: [
-    ...traitLines("chain", hit, loadout, conditions, table, snapshot),
+    ...traitLines("chain", hit, loadout, conditions, table, snapshot, modeInference),
     {
       key: "status-atk",
       name: { kind: "key", value: "ui.debug.dmg-line-status-atk" },
@@ -354,7 +386,9 @@ const critSection = (
     formula: "critMult = 1 + (crit dmg base + Critical Hit DMG + record + agg)",
     substituted: null,
     unavailableKey: loadout === undefined ? "ui.debug.cap-no-loadout" : null,
-    lines: [...traitLines("crit", hit, loadout, conditions, table, snapshot), critRollLine],
+    // No mode-gated trait lives in this section, so there is nothing for
+    // window inference to resolve here.
+    lines: [...traitLines("crit", hit, loadout, conditions, table, snapshot, null), critRollLine],
   };
 };
 
@@ -482,7 +516,7 @@ const postcapSection = (
         depth: 1,
       })
     ),
-    ...traitLines("postcap", hit, loadout, conditions, table, snapshot),
+    ...traitLines("postcap", hit, loadout, conditions, table, snapshot, null),
   ];
   if (capped) {
     lines.push({
@@ -514,9 +548,10 @@ export const explainDamageHit = (
   // Parsed ONCE per hit — every gate-byte trait row and the crit-roll line
   // read the same parse rather than each re-decoding the blob.
   const snapshot = parseInstSnapshot(input.hit.instance_snapshot);
+  const modeInference = input.modeInference ?? null;
   return [
     hitSection(input.hit),
-    chainSection(input.hit, input.loadout, conditions, table, snapshot),
+    chainSection(input.hit, input.loadout, conditions, table, snapshot, modeInference),
     critSection(input.hit, input.loadout, conditions, table, snapshot),
     classSection(input.hit),
     takenSection(input.hit),

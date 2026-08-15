@@ -78,6 +78,11 @@ export type ExplainLine = {
   excluded?: ExplainReason;
   /** A term that is a total rather than an addend. */
   emphasis?: "total";
+  /** The verdict was DERIVED — a window/state reconstruction — rather than
+   * read off this hit's own recorded snapshot. Weaker provenance than a
+   * measured line, even when it is not `excluded`: it says what the game
+   * probably did, not what the hit itself proved. */
+  inferred?: true;
 };
 
 export type ExplainSection = {

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { AbilityLabelPlayer } from "@/pages/logs/view/analysis/abilityLabel";
 import { amplifyStatusIds } from "@/pages/logs/view/events/damageExplain";
 import type { EncounterStateResponse } from "@/stores/useEncounterStore";
-import type { EventPage, Log, PlayerCapUp, PlayerData } from "@/types";
+import type { ChartWindow, EventPage, Log, PlayerCapUp, PlayerData } from "@/types";
 
 import { browsableHits, type CapDebugHit } from "./capHits";
 
@@ -31,6 +31,11 @@ export type CapDebugLog = {
   /** Status ids this log applied with an Amplify status class — feeds the
    * damage panel's post-cap held-status rows. */
   amplifyStatusIds: Set<number>;
+  /** This fight's Overdrive/Break/SBA/Link spans — what the damage panel
+   * joins a hit's target and moment against for the window-inferred
+   * Overdrive/Break verdicts. Empty on an old log, same as `[]` everywhere
+   * else this response ships them. */
+  chartWindows: ChartWindow[];
   /** True when the fetch hit `EVENT_FETCH_CAP` — said out loud rather than
    * letting a long fight look like it simply ended early. */
   truncated: boolean;
@@ -44,6 +49,7 @@ const EMPTY: CapDebugLog = {
   skillsByActor: new Map(),
   capUp: {},
   amplifyStatusIds: new Set(),
+  chartWindows: [],
   truncated: false,
   loading: false,
   error: null,
@@ -110,6 +116,7 @@ export const useCapDebugLog = (id: number | null): CapDebugLog => {
           ),
           capUp: page.capUp ?? {},
           amplifyStatusIds: amplifyStatusIds(page.events),
+          chartWindows: encounter.chartWindows ?? [],
           truncated: page.total > page.events.length,
           loading: false,
           error: null,

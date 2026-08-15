@@ -221,14 +221,21 @@ const LineRow = ({ line }: { line: ExplainLine }) => {
       </Text>
 
       {/* The status gutter: ? for "the log could not say", ○ for "weighed and
-          ruled out". The full reason is in the row's hover card. */}
+          ruled out", ⓘ for "derived from window state, not measured on this
+          hit" — an inferred line overrides the excluded-based icon, because
+          its provenance is the more specific thing to say. The full reason is
+          in the row's hover card. */}
       <Box w={MARKER_WIDTH} style={{ flexShrink: 0, lineHeight: 0, display: "flex", alignItems: "center" }}>
-        {excluded !== undefined &&
+        {line.inferred === true ? (
+          <Info size={13} color="var(--mantine-color-blue-4)" aria-label={t("ui.debug.cap-marker-inferred")} />
+        ) : (
+          excluded !== undefined &&
           (unknown ? (
             <Question size={13} color="var(--mantine-color-orange-4)" aria-label={t("ui.debug.cap-marker-unknown")} />
           ) : (
             <MinusCircle size={13} color="var(--mantine-color-dark-3)" aria-label={t("ui.debug.cap-marker-off")} />
-          ))}
+          ))
+        )}
       </Box>
     </Group>
   );
@@ -250,6 +257,11 @@ const LineRow = ({ line }: { line: ExplainLine }) => {
           {source !== null && (
             <Text size="xs" c="dimmed" style={sourceIsCode ? MONO : undefined}>
               {source}
+            </Text>
+          )}
+          {line.inferred === true && (
+            <Text size="xs" c="blue.4" fs="italic">
+              {t("ui.debug.cap-tt-inferred")}
             </Text>
           )}
           {excluded !== undefined && (
