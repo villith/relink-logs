@@ -23,6 +23,7 @@ const capped: ExplainHit = {
   attack_rate: 0.54,
   class_flags: 0x1,
   flags: 0,
+  instance_snapshot: null,
 };
 
 const renderIt = (hit: ExplainHit) =>

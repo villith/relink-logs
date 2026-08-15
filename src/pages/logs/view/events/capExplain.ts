@@ -105,6 +105,11 @@ export type ExplainHit = {
   attack_rate: number | null;
   class_flags: number | null;
   flags: number;
+  /** Raw DamageInstance window `0xC0..0x340`, as `DamageEvent.instance_snapshot`
+   * carries it — `null` on old logs and on hits the hook could not capture.
+   * Read by `damageExplain.ts` via `damageSnapshot.ts`'s `parseInstSnapshot`;
+   * `capExplain.ts` itself does not interpret it. */
+  instance_snapshot: number[] | null;
 };
 
 export type ExplainInput = {

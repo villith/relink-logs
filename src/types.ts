@@ -980,6 +980,11 @@ export type DeathEvent = [number, { OnDeathEvent: { actor_index: number; death_c
 export type SourceStatus = {
   status_id: number;
   stacks: number;
+  /** Candidate cached per-status term, as raw f32 bits (`status+0x8`). Proven
+   * live for cap buffs; a PROBE for every other status class. `null` when the
+   * read is unavailable or the bits are not a finite f32. Mirrors
+   * `protocol::SourceStatus::term_bits`. */
+  term_bits: number | null;
 };
 
 /** One actor as a damage event reports it. `parent_index` is what an attribution
@@ -1042,6 +1047,19 @@ export type LogEventPayload =
          * nothing". A conditional cap source may only be reported as inactive
          * on the second — on the first it is unresolved. */
         source_statuses: SourceStatus[] | null;
+        /** Raw DamageInstance window `0xC0..0x340` (640 bytes), captured
+         * post-build — carries the seven gate bytes (crit, weak point, back
+         * attack, vuln action, debuffed, Overdrive, Break) at `+0x15D..
+         * +0x163`. `null` on old logs and on hits the hook could not
+         * capture. Mirrors `protocol::DamageEvent::instance_snapshot`; see
+         * `src/pages/logs/view/events/damageSnapshot.ts` for the offset map
+         * and the builder-populated (measured vs. unpopulated) distinction. */
+        instance_snapshot: number[] | null;
+        /** Raw SOURCE-actor-instance window `0x2480..0x24A0` (32 bytes),
+         * captured pre-call, for attackers whose own record carries a party
+         * slot. `null` otherwise. Mirrors
+         * `protocol::DamageEvent::source_snapshot`. */
+        source_snapshot: number[] | null;
       };
     }
   | { OnDeathEvent: { actor_index: number; death_counter: number } }

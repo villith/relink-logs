@@ -58,6 +58,7 @@ describe("damageHits", () => {
       attack_rate: 0.25,
       class_flags: 0x1,
       flags: 0,
+      instance_snapshot: null,
     });
   });
 

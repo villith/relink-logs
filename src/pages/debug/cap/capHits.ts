@@ -47,6 +47,9 @@ export const damageHits = (events: LogEvent[]): CapDebugHit[] => {
         attack_rate: event.attack_rate,
         class_flags: event.class_flags,
         flags: event.flags,
+        // `?? null`-tolerant: an old stored log can deserialize with this key
+        // absent rather than null (see eventRows.ts's own note on this).
+        instance_snapshot: event.instance_snapshot ?? null,
       },
       attacker: {
         source_current_hp: event.source_current_hp,

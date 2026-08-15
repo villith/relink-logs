@@ -40,6 +40,7 @@ const input = (over: Partial<ExplainInput> = {}): ExplainInput => ({
     attack_rate: 0.54,
     class_flags: 0x1,
     flags: 0,
+    instance_snapshot: null,
   },
   characterType: "Pl0300",
   ...over,
@@ -277,7 +278,15 @@ describe("the post-cap section", () => {
 
 describe("a log recorded before the cap capture", () => {
   const old = input({
-    hit: { damage: 152_737, damage_cap: null, base_damage: null, attack_rate: null, class_flags: null, flags: 0 },
+    hit: {
+      damage: 152_737,
+      damage_cap: null,
+      base_damage: null,
+      attack_rate: null,
+      class_flags: null,
+      flags: 0,
+      instance_snapshot: null,
+    },
   });
 
   it("marks every derived section unavailable instead of rendering zeroes", () => {

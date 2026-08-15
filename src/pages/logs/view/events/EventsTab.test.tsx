@@ -388,6 +388,8 @@ const NO_CAPTURE = {
   source_current_hp: null,
   source_max_hp: null,
   source_statuses: null,
+  instance_snapshot: null,
+  source_snapshot: null,
 };
 
 /** The same hit, from a nominated player — for the cases that need more than

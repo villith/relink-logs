@@ -25,6 +25,7 @@ const input: ExplainInput = {
     attack_rate: 0.54,
     class_flags: 0x1,
     flags: 0,
+    instance_snapshot: null,
   },
   characterType: "Pl0300",
 };

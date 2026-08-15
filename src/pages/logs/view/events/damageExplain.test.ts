@@ -8,6 +8,22 @@ import type { ExplainHit } from "./capExplain";
 import type { CapConditions } from "./capFactors";
 import { amplifyStatusIds, explainDamageHit, type DamageTraitTable } from "./damageExplain";
 
+/** Builds a well-formed `instance_snapshot` blob (640 bytes, window base
+ * `0xC0`) with the given game-offset byte runs written in, everything else
+ * zero — mirrors `damageSnapshot.test.ts`'s own helper. */
+const blob = (entries: Array<[number, number[]]>): number[] => {
+  const out = new Array(0x340 - 0xc0).fill(0);
+  for (const [gameOffset, bytes] of entries) bytes.forEach((b, i) => (out[gameOffset - 0xc0 + i] = b));
+  return out;
+};
+
+/** A blob that PROVES the builder ran: nonzero `+0xD0` (d0). */
+const populatedBlob = (entries: Array<[number, number[]]>): number[] => blob([[0xd0, [0xe8, 0x03, 0, 0]], ...entries]); // d0 = 1000
+
+/** A blob shaped like a remote player's hit: gate bytes present but `+0xD0`
+ * and `+0x2D4` both zero, so it must read as unpopulated. */
+const unpopulatedBlob = (entries: Array<[number, number[]]>): number[] => blob(entries);
+
 /** A tiny fake value table so tests never depend on the generated asset. */
 const TABLE: DamageTraitTable = {
   version: "test",
@@ -27,6 +43,8 @@ const TABLE: DamageTraitTable = {
     "0de887a0": { key: "SKILL_320_00", name: "Celestial Nyx", values: { value: [16] } },
     // Lucky Charge (crit section, class-flag bit 0x2 — charged attack).
     c35b111b: { key: "SKILL_030_00", name: "Lucky Charge", values: { value: [5] } },
+    // SKILL_099_00 (crit section, gate-byte trait — back attack byte+0x15F).
+    "4b400b01": { key: "SKILL_099_00", name: "SKILL_099_00", values: { value: [7] } },
   },
 };
 
@@ -46,7 +64,7 @@ const LOADOUT = {
     { sigilId: 3, firstTraitId: 0x1c360c63, firstTraitLevel: 1, secondTraitId: 0x6b694d6d, secondTraitLevel: 1 },
     { sigilId: 4, firstTraitId: 0xb360801d, firstTraitLevel: 1, secondTraitId: 0xa7726190, secondTraitLevel: 1 },
     { sigilId: 5, firstTraitId: 0x0de887a0, firstTraitLevel: 1, secondTraitId: 0, secondTraitLevel: 0 },
-    { sigilId: 6, firstTraitId: 0xc35b111b, firstTraitLevel: 1, secondTraitId: 0, secondTraitLevel: 0 },
+    { sigilId: 6, firstTraitId: 0xc35b111b, firstTraitLevel: 1, secondTraitId: 0x4b400b01, secondTraitLevel: 1 },
   ],
   summons: [],
   weaponState: null,
@@ -61,6 +79,7 @@ const HIT: ExplainHit = {
   attack_rate: 3.2,
   class_flags: 0x10000, // Skill
   flags: 0,
+  instance_snapshot: null,
 };
 
 const sections = (over: Partial<typeof HIT> = {}, conditions: CapConditions = {}) =>
@@ -111,6 +130,44 @@ describe("attack chain", () => {
 
   it("marks class gates unresolvable when class_flags is null", () => {
     expect(line("dmg-chain", "trait-eae321eb-value", { class_flags: null }).excluded).toBe("gate-unrecorded");
+  });
+});
+
+describe("gate-byte trait: measured verdict from a recorded snapshot", () => {
+  // 6b694d6d's weakpoint slot gates on inst+0x15E (GateBytes.weakPoint).
+  it("reads a real yes verdict from a builder-populated snapshot", () => {
+    const weak = line("dmg-chain", "trait-6b694d6d-weakpoint", {
+      instance_snapshot: populatedBlob([[0x15e, [1]]]),
+    });
+    expect(weak.excluded).toBeUndefined();
+    expect(weak.value).toEqual({ kind: "percent", value: 15 });
+    expect(weak.source).toEqual({ kind: "literal", value: "SKILL_020_00 L1 [weakpoint], inst+0x15E" });
+  });
+
+  it("reads a real no verdict as conditional, value still shown", () => {
+    const weak = line("dmg-chain", "trait-6b694d6d-weakpoint", {
+      instance_snapshot: populatedBlob([[0x15e, [0]]]),
+    });
+    expect(weak.excluded).toBe("conditional");
+    expect(weak.value).toEqual({ kind: "percent", value: 15 });
+    expect(weak.source).toEqual({ kind: "literal", value: "SKILL_020_00 L1 [weakpoint], inst+0x15E" });
+  });
+
+  it("falls back to gate-unrecorded for an unpopulated (remote-style) snapshot", () => {
+    // Gate byte set, but +0xD0/+0x2D4 both zero — the log-405 remote
+    // signature. Its bytes may mean "not computed here", not "no".
+    const weak = line("dmg-chain", "trait-6b694d6d-weakpoint", {
+      instance_snapshot: unpopulatedBlob([[0x15e, [1]]]),
+    });
+    expect(weak.excluded).toBe("gate-unrecorded");
+    expect(weak.value).toEqual({ kind: "percent", value: 15 });
+    expect(weak.source).toEqual({ kind: "literal", value: "SKILL_020_00 L1 [weakpoint]" });
+  });
+
+  it("falls back to gate-unrecorded when no snapshot was captured at all", () => {
+    const weak = line("dmg-chain", "trait-6b694d6d-weakpoint", { instance_snapshot: null });
+    expect(weak.excluded).toBe("gate-unrecorded");
+    expect(weak.value).toEqual({ kind: "percent", value: 15 });
   });
 });
 
@@ -165,10 +222,40 @@ describe("hp-gate gate", () => {
 });
 
 describe("crit section", () => {
-  it("always shows the roll as unrecorded", () => {
+  it("shows the roll as unrecorded when no snapshot was captured", () => {
     const roll = line("dmg-crit", "crit-roll");
     expect(roll.excluded).toBe("gate-unrecorded");
     expect(roll.value).toEqual({ kind: "absent" });
+  });
+
+  it("reads a real crit-yes verdict from a builder-populated snapshot", () => {
+    const roll = line("dmg-crit", "crit-roll", { instance_snapshot: populatedBlob([[0x15d, [1]]]) });
+    expect(roll.excluded).toBeUndefined();
+    expect(roll.value).toEqual({ kind: "verdict", value: true });
+  });
+
+  it("reads a real crit-no verdict from a builder-populated snapshot, not excluded", () => {
+    const roll = line("dmg-crit", "crit-roll", { instance_snapshot: populatedBlob([[0x15d, [0]]]) });
+    expect(roll.excluded).toBeUndefined();
+    expect(roll.value).toEqual({ kind: "verdict", value: false });
+  });
+
+  it("falls back to unrecorded for an unpopulated (remote-style) snapshot", () => {
+    const roll = line("dmg-crit", "crit-roll", { instance_snapshot: unpopulatedBlob([[0x15d, [1]]]) });
+    expect(roll.excluded).toBe("gate-unrecorded");
+    expect(roll.value).toEqual({ kind: "absent" });
+  });
+
+  // SKILL_099_00 (4b400b01) is a crit-section trait but gates on the SAME
+  // byte as weak-point's back-attack slot (+0x15F), not on the crit byte.
+  it("reads the crit-section back-attack trait from byte+0x15F, not the crit byte", () => {
+    const backAttack = line("dmg-crit", "trait-4b400b01-value", {
+      instance_snapshot: populatedBlob([
+        [0x15d, [0]], // crit: no
+        [0x15f, [1]], // back attack: yes
+      ]),
+    });
+    expect(backAttack.excluded).toBeUndefined();
   });
 
   it("includes a crit trait when its class gate fires", () => {

@@ -45,8 +45,8 @@ describe("conditionsForHit", () => {
     const conditions = conditionsForHit(
       attacker({
         source_statuses: [
-          { status_id: 1000, stacks: 1 },
-          { status_id: 56, stacks: 3 },
+          { status_id: 1000, stacks: 1, term_bits: null },
+          { status_id: 56, stacks: 3, term_bits: null },
         ],
       }),
       null

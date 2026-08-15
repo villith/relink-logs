@@ -6,6 +6,7 @@ import statusClasses from "../../../../../src-tauri/assets/status-classes.json";
 import type { ExplainHit, ExplainLine, ExplainSection, ExplainValue } from "./capExplain";
 import type { CapConditions } from "./capFactors";
 import { capClassOf, type CapLoadout } from "./capSources";
+import { GATE_BYTE_OFFSET, parseInstSnapshot, type GateBytes, type ParsedSnapshot } from "./damageSnapshot";
 
 /**
  * The damage-calculation walk for one hit, in the game's own order — the
@@ -32,7 +33,10 @@ const DEFAULT_TABLE = damageTraitValues as DamageTraitTable;
 type Gate =
   | { kind: "class-flag"; bit: number } // resolvable from class_flags
   | { kind: "flags-bit"; bit: number } // resolvable from flags (low 32 bits only are used)
-  | { kind: "gate-byte" } // exists in the game, not captured per hit
+  // The named byte in DamageEvent.instance_snapshot (+0x15D..+0x163) that
+  // gates this slot — a real verdict on a builder-populated snapshot,
+  // gate-unrecorded otherwise (an old log, or a remote player's hit).
+  | { kind: "gate-byte"; byte: keyof GateBytes }
   | { kind: "hp-curve" } // Stamina/Enmity: value is curve-scaled by attacker HP
   | { kind: "hp-gate"; cmp: "gte" | "lte" } // Celestial Lumen/Nyx: threshold in `hpGate` slot
   | { kind: "conditional" }; // runtime state beyond any capture (Less Is More, Roll of the Die…)
@@ -63,9 +67,14 @@ const DAMAGE_TRAITS: DamageTraitSpec[] = [
   {
     id: 0x6b694d6d,
     section: "chain",
-    gates: { weakpoint: { kind: "gate-byte" }, backattack: { kind: "gate-byte" } },
+    gates: {
+      weakpoint: { kind: "gate-byte", byte: "weakPoint" },
+      backattack: { kind: "gate-byte", byte: "backAttack" },
+    },
   },
-  { id: 0x54401e12, section: "chain", gates: { value: { kind: "gate-byte" } } },
+  // SKILL_015_00 (internal, no text) — ×(1.2 + t%) gated on +0x160, the
+  // authored vulnerable-action window (INFERRED downed/system state).
+  { id: 0x54401e12, section: "chain", gates: { value: { kind: "gate-byte", byte: "vulnAction" } } },
   { id: 0x8f502f0d, section: "chain", gates: { value: { kind: "conditional" } } },
   { id: 0x84078cb0, section: "chain", gates: { value: { kind: "conditional" } } },
   { id: 0xdc225c96, section: "chain", gates: { value: { kind: "conditional" } } },
@@ -83,14 +92,20 @@ const DAMAGE_TRAITS: DamageTraitSpec[] = [
   { id: 0xaefeb1bc, section: "chain", gates: { atkLow: { kind: "conditional" }, atkHigh: { kind: "conditional" } } },
   { id: 0x2fc8fbff, section: "chain", gates: { value: { kind: "hp-curve" } } },
   { id: 0x3f488339, section: "chain", gates: { value: { kind: "hp-curve" } } },
-  { id: 0x4f1a3683, section: "chain", gates: { value: { kind: "gate-byte" } } },
-  { id: 0xa9d17f55, section: "chain", gates: { value: { kind: "gate-byte" } } },
-  { id: 0xac9674c1, section: "chain", gates: { value: { kind: "gate-byte" } } },
+  // Injury to Insult — byte+0x161: target debuffed.
+  { id: 0x4f1a3683, section: "chain", gates: { value: { kind: "gate-byte", byte: "debuffed" } } },
+  // Overdrive Assassin — byte+0x162: target in Overdrive.
+  { id: 0xa9d17f55, section: "chain", gates: { value: { kind: "gate-byte", byte: "overdrive" } } },
+  // Break Assassin — byte+0x163: target in Break.
+  { id: 0xac9674c1, section: "chain", gates: { value: { kind: "gate-byte", byte: "breakMode" } } },
   { id: 0xa7726190, section: "chain", gates: { value: { kind: "hp-gate", cmp: "gte" } } },
   { id: 0x0de887a0, section: "chain", gates: { value: { kind: "hp-gate", cmp: "lte" } } },
   { id: 0xc0979a17, section: "crit", gates: { value: { kind: "conditional" } } },
   { id: 0xc35b111b, section: "crit", gates: { value: { kind: "class-flag", bit: 0x2 } } },
-  { id: 0x4b400b01, section: "crit", gates: { value: { kind: "gate-byte" } } },
+  // SKILL_099_00 (internal, no text) — crit rate on back attack, gated on
+  // the SAME byte+0x15F as 0x6b694d6d's back-attack slot, not on the crit
+  // byte itself.
+  { id: 0x4b400b01, section: "crit", gates: { value: { kind: "gate-byte", byte: "backAttack" } } },
   {
     id: 0x333e5862,
     section: "chain",
@@ -197,7 +212,8 @@ const traitLine = (
   entry: DamageTraitEntry,
   level: number,
   hit: ExplainHit,
-  conditions: CapConditions
+  conditions: CapConditions,
+  snapshot: ParsedSnapshot | null
 ): ExplainLine => {
   const perLevel = entry.values[slot] ?? [];
   const value = perLevel[Math.min(level, perLevel.length) - 1];
@@ -215,9 +231,21 @@ const traitLine = (
     case "flags-bit":
       if ((hit.flags & gate.bit) === 0) line.excluded = "conditional";
       break;
-    case "gate-byte":
-      line.excluded = "gate-unrecorded";
+    case "gate-byte": {
+      const offsetHex = GATE_BYTE_OFFSET[gate.byte].toString(16).toUpperCase();
+      if (snapshot !== null && snapshot.builderPopulated) {
+        // A measured verdict: say so and name the byte it came from, styled
+        // like the hp-gate case's threshold source below.
+        line.source = {
+          kind: "literal",
+          value: `${entry.key} L${level}${slot === "value" ? "" : ` [${slot}]`}, inst+0x${offsetHex}`,
+        };
+        if (!snapshot.gates[gate.byte]) line.excluded = "conditional";
+      } else {
+        line.excluded = "gate-unrecorded";
+      }
       break;
+    }
     case "conditional":
       line.excluded = "conditional";
       break;
@@ -260,7 +288,8 @@ const traitLines = (
   hit: ExplainHit,
   loadout: CapLoadout | undefined,
   conditions: CapConditions,
-  table: DamageTraitTable
+  table: DamageTraitTable,
+  snapshot: ParsedSnapshot | null
 ): ExplainLine[] => {
   if (loadout === undefined) return [];
   const combined = new Map(computeCombinedTraits(loadout).map((trait) => [trait.id, trait.level]));
@@ -273,7 +302,7 @@ const traitLines = (
     if (entry === undefined) continue;
     for (const [slot, gate] of Object.entries(spec.gates)) {
       if (CONTEXT_SLOTS.has(slot)) continue;
-      lines.push(traitLine(spec, slot, gate, entry, level, hit, conditions));
+      lines.push(traitLine(spec, slot, gate, entry, level, hit, conditions, snapshot));
     }
   }
   return lines;
@@ -283,7 +312,8 @@ const chainSection = (
   hit: ExplainHit,
   loadout: CapLoadout | undefined,
   conditions: CapConditions,
-  table: DamageTraitTable
+  table: DamageTraitTable,
+  snapshot: ParsedSnapshot | null
 ): ExplainSection => ({
   key: "dmg-chain",
   titleKey: "ui.debug.dmg-sec-chain",
@@ -292,7 +322,7 @@ const chainSection = (
   unavailableKey: loadout === undefined ? "ui.debug.cap-no-loadout" : null,
   noteKey: "ui.debug.dmg-note-chain",
   lines: [
-    ...traitLines("chain", hit, loadout, conditions, table),
+    ...traitLines("chain", hit, loadout, conditions, table, snapshot),
     {
       key: "status-atk",
       name: { kind: "key", value: "ui.debug.dmg-line-status-atk" },
@@ -307,24 +337,26 @@ const critSection = (
   hit: ExplainHit,
   loadout: CapLoadout | undefined,
   conditions: CapConditions,
-  table: DamageTraitTable
-): ExplainSection => ({
-  key: "dmg-crit",
-  titleKey: "ui.debug.dmg-sec-crit",
-  formula: "critMult = 1 + (crit dmg base + Critical Hit DMG + record + agg)",
-  substituted: null,
-  unavailableKey: loadout === undefined ? "ui.debug.cap-no-loadout" : null,
-  lines: [
-    ...traitLines("crit", hit, loadout, conditions, table),
-    {
-      key: "crit-roll",
-      name: { kind: "key", value: "ui.debug.dmg-line-crit-roll" },
-      value: absent,
-      source: { kind: "literal", value: "inst+0x15D (roll vs FUN_141f42d40 rate)" },
-      excluded: "gate-unrecorded",
-    },
-  ],
-});
+  table: DamageTraitTable,
+  snapshot: ParsedSnapshot | null
+): ExplainSection => {
+  const measured = snapshot !== null && snapshot.builderPopulated;
+  const critRollLine: ExplainLine = {
+    key: "crit-roll",
+    name: { kind: "key", value: "ui.debug.dmg-line-crit-roll" },
+    value: measured ? { kind: "verdict", value: snapshot!.gates.crit } : absent,
+    source: { kind: "literal", value: "inst+0x15D (roll vs FUN_141f42d40 rate)" },
+    ...(measured ? {} : { excluded: "gate-unrecorded" as const }),
+  };
+  return {
+    key: "dmg-crit",
+    titleKey: "ui.debug.dmg-sec-crit",
+    formula: "critMult = 1 + (crit dmg base + Critical Hit DMG + record + agg)",
+    substituted: null,
+    unavailableKey: loadout === undefined ? "ui.debug.cap-no-loadout" : null,
+    lines: [...traitLines("crit", hit, loadout, conditions, table, snapshot), critRollLine],
+  };
+};
 
 const classSection = (hit: ExplainHit): ExplainSection => {
   const cls = capClassOf(hit.class_flags);
@@ -419,7 +451,8 @@ const postcapSection = (
   loadout: CapLoadout | undefined,
   conditions: CapConditions,
   amplifyIds: ReadonlySet<number>,
-  table: DamageTraitTable
+  table: DamageTraitTable,
+  snapshot: ParsedSnapshot | null
 ): ExplainSection => {
   const clamped = clampedPrecap(hit);
   const capped = hit.base_damage !== null && hit.damage_cap !== null && hit.base_damage >= hit.damage_cap;
@@ -449,7 +482,7 @@ const postcapSection = (
         depth: 1,
       })
     ),
-    ...traitLines("postcap", hit, loadout, conditions, table),
+    ...traitLines("postcap", hit, loadout, conditions, table, snapshot),
   ];
   if (capped) {
     lines.push({
@@ -478,12 +511,15 @@ export const explainDamageHit = (
 ): ExplainSection[] => {
   const conditions = input.conditions ?? {};
   const amplifyIds = input.amplifyStatusIds ?? new Set<number>();
+  // Parsed ONCE per hit — every gate-byte trait row and the crit-roll line
+  // read the same parse rather than each re-decoding the blob.
+  const snapshot = parseInstSnapshot(input.hit.instance_snapshot);
   return [
     hitSection(input.hit),
-    chainSection(input.hit, input.loadout, conditions, table),
-    critSection(input.hit, input.loadout, conditions, table),
+    chainSection(input.hit, input.loadout, conditions, table, snapshot),
+    critSection(input.hit, input.loadout, conditions, table, snapshot),
     classSection(input.hit),
     takenSection(input.hit),
-    postcapSection(input.hit, input.loadout, conditions, amplifyIds, table),
+    postcapSection(input.hit, input.loadout, conditions, amplifyIds, table, snapshot),
   ];
 };
