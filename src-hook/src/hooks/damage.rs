@@ -1865,6 +1865,34 @@ fn read_actor_hp_pair(instance: usize) -> Option<(u64, u64)> {
     sanitize_hp_pair(Some(current), Some(max))
 }
 
+/// DamageInstance snapshot window: `0xC0..0x340`. Covers d0/d4, both rate
+/// floats, flags, class_flags, the seven gate bytes (0x15D..0x163), action
+/// id, part id, floor/cap/precap — and every not-yet-RE'd neighbour, which
+/// is the point: a blob captures what a named field cannot.
+pub(crate) const INSTANCE_SNAPSHOT_START: usize = 0xC0;
+pub(crate) const INSTANCE_SNAPSHOT_LEN: usize = 0x340 - 0xC0;
+/// Attacker extras window: `0x2480..0x24A0` (elemental base +0x2488,
+/// at-cap overflow k +0x249C). Player-family instances only.
+pub(crate) const SOURCE_SNAPSHOT_START: usize = 0x2480;
+pub(crate) const SOURCE_SNAPSHOT_LEN: usize = 0x20;
+
+/// Copy `base+start .. base+start+len` as a raw blob — ONE readability probe
+/// and one memcpy, because this runs per hit on a game thread (per-call guard
+/// cost is what caused the v1.9.2 in-combat slowdown). `None` (never a
+/// partial copy) when the span is unreadable.
+fn snapshot_window(base: usize, start: usize, len: usize) -> Option<Vec<u8>> {
+    if base == 0 {
+        return None;
+    }
+    let addr = base.checked_add(start)?;
+    if !readable(addr, len) {
+        return None;
+    }
+    let mut out = vec![0u8; len];
+    unsafe { std::ptr::copy_nonoverlapping(addr as *const u8, out.as_mut_ptr(), len) };
+    Some(out)
+}
+
 /// Validate a raw (current, max) HP pair read from the target's ExHp component.
 /// Accepts the pair only when it plausibly IS one: both reads succeeded, the pool
 /// is initialized (max > 0), current fits inside it, the magnitude is sane, and
@@ -2063,5 +2091,25 @@ mod tests {
             sanitize_hp_pair(Some(0x7FF6_0000_0000), Some(0x7FF6_0000_0008)),
             None
         );
+    }
+
+    /// The snapshot is raw insurance for future RE: it must be exactly the
+    /// window's bytes, and any unreadable/degenerate input must yield None —
+    /// never a partial or zero-filled blob that could be mistaken for data.
+    #[test]
+    fn snapshot_window_copies_exactly_the_requested_span() {
+        let buf: Vec<u8> = (0u8..=255).cycle().take(0x400).collect();
+        let base = buf.as_ptr() as usize;
+        let snap = snapshot_window(base, 0x40, 0x20).expect("readable heap span");
+        assert_eq!(snap.len(), 0x20);
+        assert_eq!(&snap[..], &buf[0x40..0x60]);
+    }
+
+    #[test]
+    fn snapshot_window_refuses_null_and_unmapped_bases() {
+        assert_eq!(snapshot_window(0, 0x40, 0x20), None);
+        // Unmapped low address: the readability probe must fail closed.
+        assert_eq!(snapshot_window(0x10, 0x40, 0x20), None);
+        assert_eq!(snapshot_window(usize::MAX - 0x100, 0x40, 0x20), None);
     }
 }
