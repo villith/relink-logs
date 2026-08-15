@@ -44,17 +44,24 @@
 //!   *look* like a cluster boundary; the ratio band is what keeps that from
 //!   being misread as a crit split — live gate (b) is the validation this
 //!   heuristic still needs. A rejected or ambiguous split resolves every hit
-//!   in the group to `Unknown` — never a guess.
+//!   in the group to `Unknown` — never a guess. Two other surfaces can still
+//!   mis-accept in-band: (a) a multi-part action with two authored damage
+//!   tiers (e.g. a hit-then-finisher skill) landing at an in-band ratio
+//!   (1.3–3.5, ≥2 hits on each tier) reads as a crit split when it is really
+//!   two non-crit tiers; (b) the group key deliberately omits the TARGET, so
+//!   cross-target defense differences or a buff window that opens mid-group
+//!   can manufacture in-band bimodality inside one `(source, action)` group
+//!   that has nothing to do with crit.
+
+use std::collections::HashMap;
+
+use protocol::{ActionType, DamageEvent, Message};
 
 /// Game offset of the snapshot window's first byte, and its exact length.
 /// MUST match the hook's `INSTANCE_SNAPSHOT_START`/`INSTANCE_SNAPSHOT_LEN`
 /// (src-hook/src/hooks/damage.rs) and the frontend's
 /// `src/pages/logs/view/events/damageSnapshot.ts` — three copies of one
 /// fact, each documented with this cross-reference.
-use std::collections::HashMap;
-
-use protocol::{ActionType, DamageEvent, Message};
-
 pub const SNAPSHOT_BASE: usize = 0xC0;
 pub const SNAPSHOT_LEN: usize = 0x340 - 0xC0;
 
@@ -188,7 +195,9 @@ pub const MIN_CLUSTER_HITS: usize = 2;
 
 /// Lower bound on `mean(high) / mean(low)` for an accepted split. Crit
 /// multipliers in this game are never below 1.35x, so a gap smaller than this
-/// is ordinary damage variance, not a crit boundary.
+/// is ordinary damage variance, not a crit boundary; the 0.05 of headroom
+/// below 1.35 absorbs ordinary variance pulling the two cluster means
+/// slightly together.
 pub const CRIT_RATIO_MIN: f64 = 1.3;
 
 /// Upper bound on `mean(high) / mean(low)` for an accepted split. The
@@ -223,6 +232,13 @@ pub fn assemble_hit_facts(raw_event_log: &[(i64, Message)]) -> Vec<Option<HitFac
                 let index = facts.len();
                 facts.push(Some(hit_facts));
                 if hit_facts.crit == Fact::Unknown
+                    // A non-positive damage value (a miss recorded as 0, a
+                    // heal, a data glitch) is not a real roll and must never
+                    // enter a cluster: left in, it drags a cluster's mean
+                    // down without dragging its ratio search away from it,
+                    // which can pull an otherwise-flat group's mean ratio
+                    // into the accept band.
+                    && event.damage > 0
                     && !matches!(
                         event.action_id,
                         ActionType::SupplementaryDamage(_) | ActionType::DamageOverTime(_)
@@ -439,9 +455,10 @@ mod tests {
         (ts, Message::EnemyMode(EnemyModeEvent { actor_index, mode }))
     }
 
-    /// A group of `n` hits under one `(source, action)` key, evenly spaced in
-    /// time starting at `start_ts`, so the crit second pass sees them as one
-    /// candidate group.
+    /// A group of `n` hits under one `(source, action)` key — the second
+    /// pass's grouping key, so these always land in one crit candidate group
+    /// regardless of timestamp. `start_ts` and the 100ms spacing only keep
+    /// the fixture's timestamps distinct and readable.
     fn hits_at(start_ts: i64, action: ActionType, damages: &[i32]) -> Vec<(i64, Message)> {
         damages
             .iter()
@@ -527,6 +544,22 @@ mod tests {
     }
 
     #[test]
+    fn an_unrecognized_mode_infers_neither_overdrive_nor_break() {
+        // Mode 3 is reachable (the hook forwards raw modes < 6) and is
+        // neither Overdrive nor Break — matches the windows fold's own
+        // "any other mode closes both" semantics.
+        let log = vec![
+            mode(1_000, 7, 3),
+            damage(2_000, hit(1, 7, ActionType::Normal(1), 100)),
+        ];
+        let facts = assemble_hit_facts(&log);
+
+        let hit_facts = facts[1].expect("damage event");
+        assert_eq!(hit_facts.overdrive, Fact::InferredNo);
+        assert_eq!(hit_facts.break_mode, Fact::InferredNo);
+    }
+
+    #[test]
     fn crit_clean_split_infers_low_as_no_and_high_as_yes() {
         // Six hits ~1000 (±3%), four hits ~2550 (±3%): a clean ~2.5x gap
         // between clusters, well inside the accepted band.
@@ -555,9 +588,10 @@ mod tests {
 
     #[test]
     fn crit_split_rejected_when_damages_are_uniform() {
-        // No gap at all: every adjacent ratio is 1.0, so any split's
-        // high/low mean ratio is 1.0 — outside the accepted band regardless
-        // of where the (arbitrary) largest-gap search lands.
+        // No gap at all: every adjacent ratio is 1.0, so the largest-gap
+        // search leaves `split_at` at its initial 0 — a singleton low
+        // cluster, which MIN_CLUSTER_HITS rejects before the ratio band is
+        // ever consulted.
         let uniform = [1_000; 8];
         let log = hits_at(0, ActionType::Normal(500), &uniform);
 
@@ -576,6 +610,26 @@ mod tests {
 
         let facts = assemble_hit_facts(&log);
         assert!(facts.iter().all(|f| f.unwrap().crit == Fact::Unknown));
+    }
+
+    #[test]
+    fn a_non_positive_damage_is_excluded_and_cannot_drag_a_cluster_mean() {
+        // Regression: a zero-damage hit alongside seven identical 1000s used
+        // to slip into the low cluster (only the GAP SEARCH skipped
+        // non-positive pairs, not candidate collection), dragging
+        // mean(low) down until seven identical hits split into 1 InferredNo
+        // + 6 InferredYes. The zero must never enter a cluster at all, and
+        // with it gone the seven 1000s have no gap to split on — every hit
+        // here stays Unknown.
+        let mut log = hits_at(0, ActionType::Normal(500), &[0]);
+        log.extend(hits_at(100, ActionType::Normal(500), &[1_000; 7]));
+
+        let facts = assemble_hit_facts(&log);
+        assert_eq!(facts.len(), 8);
+        assert!(
+            facts.iter().all(|f| f.unwrap().crit == Fact::Unknown),
+            "the zero-damage hit and all seven 1000s must stay Unknown: {facts:?}"
+        );
     }
 
     #[test]
