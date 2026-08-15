@@ -81,7 +81,6 @@ export type EncounterDataInput = {
   /** Which pane's slice this data belongs to. Every response lands there, so
    * the frame can draw one chart across panes it does not itself fetch for. */
   paneIndex: number;
-  loadFromResponse: (response: EncounterStateResponse) => void;
   encounter: EncounterState | null;
   baseFacts: SelectionFact[];
   baseGroups: GroupAggregate[];
@@ -109,7 +108,6 @@ export const useEncounterData = ({
   id,
   filters,
   paneIndex,
-  loadFromResponse,
   encounter,
   baseFacts,
   baseGroups,
@@ -179,20 +177,17 @@ export const useEncounterData = ({
     invoke("fetch_encounter_state", { id: Number(id), options: { filters, groupQuery } })
       .then((result) => {
         if (generation !== loadGeneration.current) return;
-        const response = result as EncounterStateResponse;
-        // Two destinations, one response: the pane's own slice, which is what
-        // the frame reads to draw across panes, and — until the pane reads its
-        // slice for everything — the single-encounter store the view still
-        // renders from.
-        loadFromResponse(response);
-        setPaneBase(paneIndex, response);
+        // Into THIS pane's slice — the only holder of a compared log's fight.
+        // The single encounter store is left to the live meter and the Classic
+        // view, which have one fight between them.
+        setPaneBase(paneIndex, result as EncounterStateResponse);
         setScoped(null);
       })
       .catch((e) => {
         if (generation !== loadGeneration.current) return;
         toast.error(`Failed to fetch encounter state: ${e}`);
       });
-  }, [id, filters, paneIndex, setPaneBase, loadFromResponse]);
+  }, [id, filters, paneIndex, setPaneBase]);
 
   // A pinned target is a SPAWN (an index into `targetEntries`), and the backend
   // filters by that spawn's span. Deliberately not the actor id: the game

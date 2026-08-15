@@ -3,7 +3,8 @@ import { useQueryState } from "nuqs";
 import { useCallback, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 
-import { useEncounterStore } from "@/stores/useEncounterStore";
+import { useAnalysisPanesStore } from "@/stores/useAnalysisPanesStore";
+import { EMPTY_ENCOUNTER_FACTS, encounterFromResponse } from "@/stores/useEncounterStore";
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import type { MeterFilters } from "@/types";
 import { formatInPartyOrder, millisecondsToElapsedFormat } from "@/utils";
@@ -117,8 +118,15 @@ export const AnalysisPane = ({ paneIndex, logId, filters }: AnalysisPaneProps) =
   // state — read here only for the dev-only readout below the plot.
   const search = useUrlQueryString();
 
+  // THIS pane's loaded log. A slice per pane rather than the single encounter
+  // store the view used to read: two panes hold two different fights, and one
+  // store can hold one. Normalised through the same function that store uses,
+  // so an optional field absent from an older backend — and the party-slot
+  // alignment findings ride on — cannot mean two things in two places.
+  const base = useAnalysisPanesStore((panes) => panes.panes[paneIndex]?.base ?? null);
+  const loaded = useMemo(() => (base === null ? EMPTY_ENCOUNTER_FACTS : encounterFromResponse(base)), [base]);
   const {
-    encounter,
+    encounterState: encounter,
     dpsChart,
     stunChart,
     takenChart,
@@ -133,39 +141,13 @@ export const AnalysisPane = ({ paneIndex, logId, filters }: AnalysisPaneProps) =
     groups: baseGroups,
     groupReference: baseGroupReference,
     statusIntervals,
-    playerData,
+    players: playerData,
     questId,
     questTimer,
     questCompleted,
     roomIndex,
     imported,
-    loadFromResponse,
-  } = useEncounterStore(
-    useShallow((state) => ({
-      encounter: state.encounterState,
-      dpsChart: state.dpsChart,
-      stunChart: state.stunChart,
-      takenChart: state.takenChart,
-      chartLen: state.chartLen,
-      sbaChart: state.sbaChart,
-      sbaChartLen: state.sbaChartLen,
-      sbaEvents: state.sbaEvents,
-      deathEvents: state.deathEvents,
-      chartWindows: state.chartWindows,
-      targetEntries: state.targetEntries,
-      selectionFacts: state.selectionFacts,
-      groups: state.groups,
-      groupReference: state.groupReference,
-      statusIntervals: state.statusIntervals,
-      playerData: state.players,
-      questId: state.questId,
-      questTimer: state.questTimer,
-      questCompleted: state.questCompleted,
-      roomIndex: state.roomIndex,
-      imported: state.imported,
-      loadFromResponse: state.loadFromResponse,
-    }))
-  );
+  } = loaded;
 
   const {
     show_display_names,
@@ -267,7 +249,6 @@ export const AnalysisPane = ({ paneIndex, logId, filters }: AnalysisPaneProps) =
     id,
     filters,
     paneIndex,
-    loadFromResponse,
     encounter,
     baseFacts,
     baseGroups,
