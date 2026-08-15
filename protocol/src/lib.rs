@@ -259,26 +259,31 @@ pub struct DamageEvent {
     /// interpret: the offset map lives in `parser::v1::damage_facts`, so a
     /// wrong interpretation is a parser fix and the logs stay good. `None` on
     /// old logs, DoT ticks, and when the window fails its readability probe.
-    #[serde(default)]
-    pub inst_snapshot: Option<Vec<u8>>,
-    /// Raw ATTACKER-instance window `0x2480..0x24A0` (32 bytes), captured
+    ///
+    /// Encoded with `serde_bytes`: a plain `Vec<u8>` would serialize to CBOR
+    /// as an integer array (~1.7x the size of these windows at rest), while
+    /// this emits a compact byte string and its visitor still accepts the
+    /// array form on read.
+    #[serde(default, with = "serde_bytes")]
+    pub instance_snapshot: Option<Vec<u8>>,
+    /// Raw SOURCE-actor-instance window `0x2480..0x24A0` (32 bytes), captured
     /// pre-call (the builder computed this hit from pre-call state), and only
     /// for attackers whose own record carries a party slot — the offsets are
     /// verified against the `Pl####` layout alone. Known residents: elemental
     /// base `+0x2488`, at-cap overflow k `+0x249C`; the rest of the window is
     /// captured for future interpretation.
-    #[serde(default)]
-    pub attacker_snapshot: Option<Vec<u8>>,
+    #[serde(default, with = "serde_bytes")]
+    pub source_snapshot: Option<Vec<u8>>,
 }
 
 /// One status held by the attacker at the moment of a hit, as
 /// [`DamageEvent::source_statuses`] reports it.
 ///
-/// Deliberately just the effect and its count: this is a per-hit snapshot on a
-/// stream that carries thousands of events per fight, and everything else about
-/// a status (its caster, its cause, its class, its window) is already on the
-/// [`StatusApplyEvent`] / [`StatusRemoveEvent`] pair, keyed by the same
-/// `status_id`.
+/// Deliberately small — the effect, its count, and one probed cached term:
+/// this is a per-hit snapshot on a stream that carries thousands of events
+/// per fight, and everything else about a status (its caster, its cause, its
+/// class, its window) is already on the [`StatusApplyEvent`] /
+/// [`StatusRemoveEvent`] pair, keyed by the same `status_id`.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct SourceStatus {
     /// `status.tbl` StatusId — the same id [`StatusApplyEvent::status_id`] carries.
@@ -1120,6 +1125,8 @@ mod source_state_tests {
         assert_eq!(new.source_current_hp, None);
         assert_eq!(new.source_max_hp, None);
         assert_eq!(new.source_statuses, None);
+        assert_eq!(new.instance_snapshot, None);
+        assert_eq!(new.source_snapshot, None);
     }
 
     /// "Captured, and the attacker held nothing" must survive a round trip as
@@ -1143,8 +1150,8 @@ mod source_state_tests {
             source_current_hp: Some(4_200),
             source_max_hp: Some(10_000),
             source_statuses: Some(Vec::new()),
-            inst_snapshot: None,
-            attacker_snapshot: None,
+            instance_snapshot: None,
+            source_snapshot: None,
         };
 
         let round_trip = |e: &DamageEvent| -> DamageEvent {
@@ -1188,6 +1195,53 @@ mod source_state_tests {
 
         event.source_statuses = None;
         assert_eq!(round_trip(&event).source_statuses, None);
+    }
+
+    /// The raw snapshot windows and a status's cached term survive a round
+    /// trip byte-for-byte and bit-for-bit, through both wire formats: bincode
+    /// (hook -> app) and the `serde_bytes`-encoded CBOR the app writes to
+    /// disk.
+    #[test]
+    fn snapshot_windows_and_a_term_round_trip_through_both_formats() {
+        let event = DamageEvent {
+            source: super::Actor::default(),
+            target: super::Actor::default(),
+            damage: 999,
+            flags: 0,
+            action_id: super::ActionType::Normal(2),
+            attack_rate: None,
+            stun_value: None,
+            damage_cap: None,
+            base_damage: None,
+            target_current_hp: None,
+            target_max_hp: None,
+            class_flags: None,
+            source_current_hp: None,
+            source_max_hp: None,
+            source_statuses: Some(vec![SourceStatus {
+                status_id: 7,
+                stacks: 2,
+                term_bits: Some(0x3F800000), // 1.0f32
+            }]),
+            instance_snapshot: Some((0u8..64).collect()),
+            source_snapshot: Some(vec![0xAA; 32]),
+        };
+
+        let cbor_back: DamageEvent = {
+            let blob = cbor4ii::serde::to_vec(Vec::new(), &event).expect("cbor encode");
+            cbor4ii::serde::from_slice(&blob).expect("cbor decode")
+        };
+        assert_eq!(cbor_back.instance_snapshot, event.instance_snapshot);
+        assert_eq!(cbor_back.source_snapshot, event.source_snapshot);
+        assert_eq!(cbor_back.source_statuses, event.source_statuses);
+
+        let bincode_back: DamageEvent = {
+            let blob = super::bincode::serialize(&event).expect("bincode encode");
+            super::bincode::deserialize(&blob).expect("bincode decode")
+        };
+        assert_eq!(bincode_back.instance_snapshot, event.instance_snapshot);
+        assert_eq!(bincode_back.source_snapshot, event.source_snapshot);
+        assert_eq!(bincode_back.source_statuses, event.source_statuses);
     }
 }
 

@@ -291,8 +291,8 @@ mod tests {
                 source_current_hp: None,
                 source_max_hp: None,
                 source_statuses: None,
-                inst_snapshot: None,
-                attacker_snapshot: None,
+                instance_snapshot: None,
+                source_snapshot: None,
             }),
         )
     }

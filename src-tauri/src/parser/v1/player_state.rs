@@ -683,8 +683,8 @@ mod tests {
             source_current_hp: None,
             source_max_hp: None,
             source_statuses: None,
-            inst_snapshot: None,
-            attacker_snapshot: None,
+            instance_snapshot: None,
+            source_snapshot: None,
         };
 
         player_state.update_from_damage_event(&AdjustedDamageInstance::from_damage_event(
@@ -727,8 +727,8 @@ mod tests {
             source_current_hp: None,
             source_max_hp: None,
             source_statuses: None,
-            inst_snapshot: None,
-            attacker_snapshot: None,
+            instance_snapshot: None,
+            source_snapshot: None,
         };
 
         player_state.update_from_damage_event(&AdjustedDamageInstance::from_damage_event(
@@ -779,8 +779,8 @@ mod tests {
             source_current_hp: None,
             source_max_hp: None,
             source_statuses: None,
-            inst_snapshot: None,
-            attacker_snapshot: None,
+            instance_snapshot: None,
+            source_snapshot: None,
         };
 
         let skill_two = DamageEvent {
@@ -809,8 +809,8 @@ mod tests {
             source_current_hp: None,
             source_max_hp: None,
             source_statuses: None,
-            inst_snapshot: None,
-            attacker_snapshot: None,
+            instance_snapshot: None,
+            source_snapshot: None,
         };
 
         player_state
@@ -856,8 +856,8 @@ mod tests {
             source_current_hp: None,
             source_max_hp: None,
             source_statuses: None,
-            inst_snapshot: None,
-            attacker_snapshot: None,
+            instance_snapshot: None,
+            source_snapshot: None,
         };
 
         let child_skill = DamageEvent {
@@ -886,8 +886,8 @@ mod tests {
             source_current_hp: None,
             source_max_hp: None,
             source_statuses: None,
-            inst_snapshot: None,
-            attacker_snapshot: None,
+            instance_snapshot: None,
+            source_snapshot: None,
         };
 
         player_state.update_from_damage_event(&AdjustedDamageInstance::from_damage_event(
@@ -939,8 +939,8 @@ mod tests {
             source_current_hp: None,
             source_max_hp: None,
             source_statuses: None,
-            inst_snapshot: None,
-            attacker_snapshot: None,
+            instance_snapshot: None,
+            source_snapshot: None,
         };
 
         let player_data = PlayerData {
@@ -1013,8 +1013,8 @@ mod tests {
             source_current_hp: None,
             source_max_hp: None,
             source_statuses: None,
-            inst_snapshot: None,
-            attacker_snapshot: None,
+            instance_snapshot: None,
+            source_snapshot: None,
         };
 
         player_state.update_from_damage_event(&AdjustedDamageInstance::from_damage_event(
@@ -1052,8 +1052,8 @@ mod tests {
             source_current_hp: None,
             source_max_hp: None,
             source_statuses: None,
-            inst_snapshot: None,
-            attacker_snapshot: None,
+            instance_snapshot: None,
+            source_snapshot: None,
         }
     }
 
@@ -1084,8 +1084,8 @@ mod tests {
             source_current_hp: None,
             source_max_hp: None,
             source_statuses: None,
-            inst_snapshot: None,
-            attacker_snapshot: None,
+            instance_snapshot: None,
+            source_snapshot: None,
         }
     }
 
@@ -1313,8 +1313,8 @@ mod tests {
             source_current_hp: None,
             source_max_hp: None,
             source_statuses: None,
-            inst_snapshot: None,
-            attacker_snapshot: None,
+            instance_snapshot: None,
+            source_snapshot: None,
         }
     }
 
