@@ -1992,23 +1992,65 @@ fn within_module_image(addr: usize, module_base: usize) -> bool {
 fn resolve_player_record(attacker: usize) -> Option<usize> {
     use crate::hooks::diag::{read_ptr_guarded, MODULE_BASE};
 
+    // Which hop fails, said out loud a few times per session: rec was None on
+    // every hit of nine fresh-hook logs (2026-08-15) while the oracles'
+    // identical chain (dmg_oracle::player_record off the builder's own
+    // pointer) resolved fine in the same fights — the discriminating evidence
+    // is WHICH branch returns here, and it is invisible without a line.
+    macro_rules! recdiag {
+        ($($arg:tt)+) => {{
+            #[cfg(feature = "hookdiag")]
+            {
+                use std::sync::atomic::{AtomicUsize, Ordering};
+                static BUDGET: AtomicUsize = AtomicUsize::new(0);
+                if BUDGET.fetch_add(1, Ordering::Relaxed) < 32 {
+                    log::info!($($arg)+);
+                }
+            }
+        }};
+    }
+
     let module_base = MODULE_BASE.load(std::sync::atomic::Ordering::Relaxed);
     if module_base == 0 {
+        recdiag!("RECDIAG no-module-base");
         return None;
     }
-    let holder = read_ptr_guarded(attacker, RECORD_HOLDER_OFFSET).filter(|h| *h != 0)?;
-    let vtable = read_ptr_guarded(holder, 0).filter(|v| *v != 0)?;
+    let Some(holder) = read_ptr_guarded(attacker, RECORD_HOLDER_OFFSET).filter(|h| *h != 0) else {
+        recdiag!("RECDIAG holder-read-failed attacker={attacker:#x}");
+        return None;
+    };
+    let Some(vtable) = read_ptr_guarded(holder, 0).filter(|v| *v != 0) else {
+        recdiag!("RECDIAG vtable-read-failed attacker={attacker:#x} holder={holder:#x}");
+        return None;
+    };
     if !within_module_image(vtable, module_base) {
+        recdiag!(
+            "RECDIAG vtable-out-of-image attacker={attacker:#x} holder={holder:#x} \
+             vtable={vtable:#x} delta={:#x}",
+            vtable.wrapping_sub(module_base)
+        );
         return None;
     }
-    let slot = read_ptr_guarded(vtable, HOLDER_PLAYER_RECORD_SLOT).filter(|s| *s != 0)?;
+    let Some(slot) = read_ptr_guarded(vtable, HOLDER_PLAYER_RECORD_SLOT).filter(|s| *s != 0) else {
+        recdiag!("RECDIAG slot-read-failed vtable={vtable:#x}");
+        return None;
+    };
     if !within_module_image(slot, module_base) {
+        recdiag!(
+            "RECDIAG slot-out-of-image vtable={vtable:#x} slot={slot:#x} delta={:#x}",
+            slot.wrapping_sub(module_base)
+        );
         return None;
     }
     let get_record: unsafe extern "system" fn(usize) -> usize =
         unsafe { std::mem::transmute(slot) };
     let record = unsafe { get_record(holder) };
-    (record != 0).then_some(record)
+    if record == 0 {
+        recdiag!("RECDIAG getter-returned-null holder={holder:#x} slot={slot:#x}");
+        return None;
+    }
+    recdiag!("RECDIAG ok attacker={attacker:#x} record={record:#x}");
+    Some(record)
 }
 
 /// Copy `base+start .. base+start+len` as a raw blob — ONE readability probe
