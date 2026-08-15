@@ -876,6 +876,25 @@ export type Log = {
   repeatGroup?: number | null;
 };
 
+/** One row of the log picker's list — the narrow shape `fetch_log_summaries`
+ * returns. Mirrors `db::logs::LogSummary` (camelCase via serde).
+ *
+ * Narrower than [`Log`] on purpose: the picker holds the WHOLE library at once
+ * so its search can be instant, and the fields it never draws are the ones that
+ * would make that payload big. */
+export type LogSummary = {
+  id: number;
+  time: number;
+  duration: number;
+  questId: number | null;
+  questElapsedTime: number | null;
+  p1Type: string | null;
+  p2Type: string | null;
+  p3Type: string | null;
+  p4Type: string | null;
+  repeatGroup: number | null;
+};
+
 /** Result of merging another installation's logs.db into ours
  * (`import_logs_from_file`). */
 export type ImportSummary = {
