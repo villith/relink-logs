@@ -695,8 +695,17 @@ pub fn aggregate_groups(
     let pairing = SuppPairing::learned_from(events);
     // Assembled ONCE per query, aligned by POSITION with `events` — never
     // rebuilt inside the walk below. See `damage_facts`'s module doc for the
-    // measured/inferred resolution order this indexes into.
-    let facts_index = damage_facts::assemble_hit_facts(events);
+    // measured/inferred resolution order this indexes into. A full-log walk
+    // plus crit-cluster sorts, so it's gated to the one metric that ever
+    // reads it below (`GroupMetric::Damage`) — stun/SBA/taken queries get an
+    // empty `Vec` instead of paying for an index they never touch; the tally
+    // site's `.get(position)` treats a missing entry exactly like a
+    // not-yet-measured one, so an empty vec is safe, not just cheap.
+    let facts_index = if query.metric == GroupMetric::Damage {
+        damage_facts::assemble_hit_facts(events)
+    } else {
+        Vec::new()
+    };
     let mut walked: Vec<Walked> = Vec::new();
     let mut aggregates: Vec<GroupAggregate> = Vec::new();
     // One `BreakdownKeying` per (remapped) source index, fed that source's
