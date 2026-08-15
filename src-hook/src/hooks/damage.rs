@@ -1637,7 +1637,12 @@ impl OnPlayerHitApplyHook {
         // Late — after every early-return gate above — so a rejected call
         // never pays for the copy. `snapshot_window` does its own readability
         // probe for the full `INSTANCE_SNAPSHOT_LEN` span (0x340, wider than
-        // the 0x2D8 already proven above), same as the dealt paths.
+        // the 0x2D8 already proven above), same as the dealt paths. Only the
+        // first 0x2D8 is proven on THIS path though: the stack-built
+        // 0xa7fc80 apply never established the tail, so the probe can pass on
+        // a mapped stack while 0x2D8..0x340 is neighbouring-frame garbage —
+        // no fault risk, but offline consumers must not treat taken-stream
+        // snapshot tail bytes as real DamageInstance fields.
         let instance_snapshot = snapshot_window(
             damage_instance_ptr as usize,
             INSTANCE_SNAPSHOT_START,

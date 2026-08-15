@@ -1009,7 +1009,7 @@ pub(crate) fn snapshot_player_statuses(actor: *const usize) -> Option<Vec<protoc
         if status == 0 {
             continue;
         }
-        // ONE probe of the object, then two direct field reads — both fields sit
+        // ONE probe of the object, then three direct field reads — all three sit
         // inside the span it covers. Going through `status_id_of` /
         // `raw_stacks_of` would probe twice per status, and this walk runs
         // inside the game's own damage call rather than once a frame. A slot
