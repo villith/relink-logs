@@ -155,15 +155,6 @@ impl OnReceptionFlowDispatchHook {
         // guarded so a not-yet-populated state can never fault.
         let quest_id = crate::hooks::diag::read_u32_guarded(a1 as usize, 0x1D8);
 
-        log::warn!(
-            "CONFLUX hook: reception_dispatch manager={:#x} type_before={:#x} type_after={:#x} room_enter={} quest_id={:#x}",
-            a1 as usize,
-            flow_type_before,
-            flow_type_after,
-            is_room_enter,
-            quest_id
-        );
-
         if is_room_enter {
             let _ = self.tx.send(protocol::Message::ConfluxRoomEnter(
                 protocol::ConfluxRoomEnterEvent {
@@ -176,9 +167,15 @@ impl OnReceptionFlowDispatchHook {
         #[cfg(feature = "hookdiag")]
         {
             let quest_type = (a2 >> 0x14) & 0xf;
+            // `room_enter` and `quest_id` are the two fields the removed
+            // release-build CONFLUX line carried that no other probe does —
+            // the verdict this hook exists to reach, and the id it reports.
             crate::hooks::diag::ev!(
                 "endless_reception_after",
-                "quest_type={quest_type} flow_after={flow_after:#x} flow_type_after={flow_type_after:#x} changed={}",
+                "manager={:#x} quest_type={quest_type} flow_after={flow_after:#x} \
+                 flow_type_after={flow_type_after:#x} changed={} room_enter={is_room_enter} \
+                 quest_id={quest_id:#x}",
+                a1 as usize,
                 flow_after != flow_before
             );
         }
@@ -219,12 +216,6 @@ impl OnEndlessBuffInstallHook {
         // populated). onInstall may fire repeatedly during RNG init, so the parser dedups;
         // we simply skip a 0 id. THIS is the buff-id offset tuning point (see const doc).
         let buff_id = crate::hooks::diag::read_u32_guarded(a1 as usize, ENDLESS_BUFF_FIRST_SLOT);
-        // [CONFLUX-DIAG] proves buff_install fired + shows the id we read at +0xc0.
-        log::info!(
-            "CONFLUX hook: buff_install this={:#x} buff_id={:#x}",
-            a1 as usize,
-            buff_id
-        );
         if buff_id != 0 {
             let _ = self.tx.send(protocol::Message::ConfluxBuffAcquired(
                 protocol::ConfluxBuffAcquiredEvent { buff_id },
@@ -274,10 +265,6 @@ impl OnEndlessMgrDtorHook {
     }
 
     fn run(&self, a1: *const usize) -> usize {
-        log::warn!(
-            "CONFLUX hook: mgr_dtor (run-end) manager={:#x}",
-            a1 as usize
-        );
         let _ = self.tx.send(protocol::Message::ConfluxRunEnd(
             protocol::ConfluxRunEndEvent {
                 manager_ptr: a1 as u64,

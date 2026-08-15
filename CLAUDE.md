@@ -74,7 +74,7 @@ Data flows **game → hook → pipe → parser → frontend**:
 - **Adding a tracked event end-to-end** touches all four projects: add a hook in `src-hook/src/hooks/`, a `Message` variant in `protocol/`, a handler in `connect_and_run_parser` (`main.rs`) + parser logic in `parser/v1/`, and frontend display in `src/`.
 - The app keeps running in the system tray after windows close; closing a window hides it rather than exiting (`on_window_event` in `main.rs`).
 - **Dev hook hot-reload:** with the game and a debug app running, rebuild the
-  hook (`cargo build --release -p hook --features hook/console,hook/hookdiag,hook/dmgdiag,hook/fullassist,hook/eject`)
+  hook (`cargo build --release -p hook --features hook/console,hook/hookdiag,hook/dmgdiag,hook/capresearch,hook/fullassist,hook/eject`)
   and click tray → "Reload hook (dev)". The app tells the hook to tear itself
   down over a dedicated dev control channel (`protocol::control`, separate from
   the toolbox RPC), ejects the old DLL, refreshes `hook-dbg.dll` from

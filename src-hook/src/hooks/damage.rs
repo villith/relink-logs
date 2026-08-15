@@ -1735,21 +1735,51 @@ impl SourceState {
             }
         };
         let (current_hp, max_hp) = read_actor_hp_pair(body as usize).unzip();
-        let record_snapshot = resolve_player_record(body as usize)
-            .and_then(|record| snapshot_window(record, RECORD_SNAPSHOT_START, RECORD_SNAPSHOT_LEN));
         Self {
             current_hp,
             max_hp,
+            ..Self::research(body)
+        }
+    }
+
+    /// The three fields the unfinished cap / damage-head models want, and
+    /// nothing else reads: `source_statuses`, `source_snapshot`,
+    /// `record_snapshot`. Off (the default), this is [`Default`] and none of
+    /// the work below runs — no `ExStatus` list walk, no heap `Vec`, no
+    /// holder->vtable->virtual chain.
+    ///
+    /// The gate is a `const` rather than `#[cfg]` on the body so the capture
+    /// stays type-checked by a plain `cargo test`, the same reason
+    /// `hooks/assist.rs` carries a dev-dependency to stay compiled. What that
+    /// buys is the guarantee users need — [`RESEARCH_CAPTURE`] is `false`, so
+    /// this returns [`Default`] and does no work — NOT a claim about the
+    /// shipped bytes: two release builds of this file differ by 7,680 bytes
+    /// with the capture-off one the LARGER, so whether the unreachable tail
+    /// survives is unmeasured. If a release DLL ever needs to provably not
+    /// CONTAIN this code, `#[cfg]` is the tool; it costs the type-checking.
+    fn research(body: *const usize) -> Self {
+        if !RESEARCH_CAPTURE {
+            return Self::default();
+        }
+        Self {
             statuses: super::status::snapshot_player_statuses(body),
             source_snapshot: snapshot_window(
                 body as usize,
                 SOURCE_SNAPSHOT_START,
                 SOURCE_SNAPSHOT_LEN,
             ),
-            record_snapshot,
+            record_snapshot: resolve_player_record(body as usize).and_then(|record| {
+                snapshot_window(record, RECORD_SNAPSHOT_START, RECORD_SNAPSHOT_LEN)
+            }),
+            ..Self::default()
         }
     }
 }
+
+/// Whether the unfinished cap / damage-head research capture is compiled in
+/// (cargo feature `capresearch`, off by default — see its comment in
+/// `src-hook/Cargo.toml` for what it costs a user and why nothing reads it).
+const RESEARCH_CAPTURE: bool = cfg!(feature = "capresearch");
 
 /// The hit's victim, as the calling detour already resolved it. Every caller
 /// has to walk the actor before it can decide whether to emit at all, so the
@@ -2103,6 +2133,20 @@ fn sanitize_hp_pair(current: Option<u64>, max: Option<u64>) -> Option<(u64, u64)
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The research capture must be OFF unless someone asks for it.
+    ///
+    /// `source_statuses`, `source_snapshot` and `record_snapshot` exist for the
+    /// unfinished cap / damage-head models, which live offline — nothing in
+    /// `src-tauri` reads any of them. Until one of them graduates the way
+    /// `instance_snapshot` did (into `parser::v1::damage_facts`), a user's
+    /// logs.db must not carry them and a user's game thread must not pay for
+    /// them. This test is what stops the feature from quietly becoming a
+    /// default.
+    #[test]
+    fn research_capture_is_off_in_a_default_build() {
+        assert!(!RESEARCH_CAPTURE);
+    }
 
     /// Live log 2026-07-21: EVERY perfect guard fires TWO player-sourced
     /// action-id -1 zero-damage events ~150ms apart — the real counter

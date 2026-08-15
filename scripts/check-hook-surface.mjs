@@ -37,6 +37,62 @@ export const PROTON_MARKERS = [
 export const PROXY_EXPORT = "DirectInput8Create";
 
 /**
+ * Log-line prefixes that must appear in NO release build, either platform.
+ *
+ * Every diagnostic in `src-hook` is supposed to sit behind `hookdiag` (or
+ * `dmgdiag`), which compiles its format string out entirely — so a marker
+ * found here means a `log::` call escaped its gate. Three `CONFLUX` lines did
+ * exactly that and shipped in every release until a byte scan found them: they
+ * were ordinary `warn!`/`info!` calls that source review kept walking past.
+ *
+ * Only prefixes unique to a diagnostic belong here. `HOOKDIAG` covers the
+ * `ev!`/probe family wholesale; the rest are the per-subsystem prefixes the
+ * `src-hook/src/hooks/*.rs` probes print. Adding a new diagnostic means adding
+ * its prefix.
+ */
+export const DIAG_MARKERS = [
+  "HOOKDIAG",
+  "CONFLUX",
+  "CAPORACLE",
+  "CAPEXTRAS",
+  "DMGHEAD",
+  "DMGREC",
+  "DMGEXTRAS",
+  "DMGDIAG",
+  "DISPDIAG",
+  "ALTDMG",
+  "TAKENAPPLY",
+  "PGDIAG",
+  "PGCOUNTER",
+  "PGDMG",
+  "PGWATCH",
+  "UNATTRB90",
+  "UNSRC",
+  "SBAGATE",
+  "SBAPOLL",
+  "SBASITE",
+  "SBANET",
+  "SBAUPD",
+  "SBAGAIN",
+  "SBAUNK",
+  "SBAGRANT",
+  "SBAWEIGHT",
+  "STUNNET",
+  "SMNBODY",
+  "IDDIAG",
+  "ARDIAG",
+  "PRDIAG",
+  "STDIAG",
+  "WSDIAG",
+  "WPDIAG",
+  "MLDIAG",
+  "APDIAG",
+  "SBDIAG",
+  "LODIAG",
+  "RECDIAG",
+];
+
+/**
  * Occurrences of `needle` in `buf`, counted as both ASCII and UTF-16LE —
  * Rust's `w!()` wide literals are stored UTF-16, narrow ones ASCII, and the
  * marker matters either way.
@@ -102,6 +158,7 @@ export function exportedNames(buf) {
 export function scanBuffer(buf) {
   return {
     markers: Object.fromEntries(PROTON_MARKERS.map((m) => [m, countMarker(buf, m)])),
+    diag: Object.fromEntries(DIAG_MARKERS.map((m) => [m, countMarker(buf, m)])),
     exports: exportedNames(buf),
   };
 }
@@ -121,6 +178,22 @@ export function checkSurface({ windows, proton }) {
       );
     }
   }
+  // Diagnostics are gated by cargo feature, not by platform, so BOTH release
+  // artifacts must be clean.
+  for (const [label, scan] of [
+    ["Windows", windows],
+    ["Proton", proton],
+  ]) {
+    for (const marker of DIAG_MARKERS) {
+      if (scan.diag[marker] > 0) {
+        errors.push(
+          `the ${label} hook.dll contains the diagnostic marker "${marker}" ` +
+            `(${scan.diag[marker]}x) — every diagnostic must sit behind hookdiag/dmgdiag`
+        );
+      }
+    }
+  }
+
   if (windows.exports.length > 0) {
     errors.push(
       `the Windows hook.dll exports ${windows.exports.length} symbol(s) ` +
@@ -158,6 +231,11 @@ if (invokedDirectly) {
       `${label}: ${scan.exports.length} export(s)${scan.exports.length ? ` [${scan.exports.join(", ")}]` : ""}`
     );
     for (const m of PROTON_MARKERS) console.log(`    ${scan.markers[m] ? "HIT " : "ok  "} ${m} x${scan.markers[m]}`);
+    // Only the hits, and a one-line all-clear otherwise: 39 diagnostic markers
+    // printed per DLL would bury the Proton lines above them.
+    const diagHits = DIAG_MARKERS.filter((m) => scan.diag[m] > 0);
+    if (diagHits.length === 0) console.log(`    ok   no diagnostic markers (${DIAG_MARKERS.length} checked)`);
+    else for (const m of diagHits) console.log(`    HIT  diag ${m} x${scan.diag[m]}`);
   };
   report(`windows (${windowsPath})`, windows);
   report(`proton  (${protonPath})`, proton);
