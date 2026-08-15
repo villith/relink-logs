@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   PANE_FIELDS,
   SHARED_FIELDS,
+  clearablePaneParamNames,
   decodeCompare,
   encodeCompare,
   paneParamName,
@@ -57,12 +58,20 @@ describe("decodeCompare", () => {
     expect(decodeCompare("2661,banana,2664")).toEqual([2661, 2664]);
   });
 
-  it("keeps an id equal to the path log — one run against itself is a real comparison", () => {
+  it("reads a lone id", () => {
     expect(decodeCompare("2657")).toEqual([2657]);
   });
 
-  it("drops a repeated id, because two panes on one log with one pin set is not two panes", () => {
-    expect(decodeCompare("2661,2661")).toEqual([2661]);
+  it("keeps a repeated id — panes are positional, and each pins independently", () => {
+    expect(decodeCompare("2661,2661")).toEqual([2661, 2661]);
+  });
+
+  it("is empty when the param is present but blank", () => {
+    expect(decodeCompare("")).toEqual([]);
+  });
+
+  it("rejects an id past the safe integer range", () => {
+    expect(decodeCompare("99999999999999999999")).toEqual([]);
   });
 });
 
@@ -73,6 +82,10 @@ describe("encodeCompare", () => {
 
   it("writes the ids in pane order", () => {
     expect(encodeCompare([2661, 2664])).toBe("2661,2664");
+  });
+
+  it("round-trips through encodeCompare, normalising exotic spellings", () => {
+    expect(encodeCompare(decodeCompare("1e3,2661"))).toBe("1000,2661");
   });
 });
 
@@ -98,8 +111,18 @@ describe("paneParamNames", () => {
   it("names pane 0's bare keys", () => {
     expect(paneParamNames(0)).toEqual(["src", "tgt", "abil", "by", "aura"]);
   });
+});
 
-  it("covers every pane field, so adding one cannot be forgotten here", () => {
-    expect(paneParamNames(1)).toHaveLength(PANE_FIELDS.length);
+describe("clearablePaneParamNames", () => {
+  it("clears a compared pane's keys", () => {
+    expect(clearablePaneParamNames(1)).toEqual(["src1", "tgt1", "abil1", "by1", "aura1"]);
+  });
+
+  it("clears nothing for pane 0, whose keys are the path log's own pins", () => {
+    expect(clearablePaneParamNames(0)).toEqual([]);
+  });
+
+  it("clears nothing for a negative index, so a bad computation is a no-op", () => {
+    expect(clearablePaneParamNames(-1)).toEqual([]);
   });
 });

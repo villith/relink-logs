@@ -42,17 +42,20 @@ export const paneParamName = (field: keyof PaneRaw, index: number): string =>
  * `decodeList` follows one level down: a hand-edited id that cannot name a log
  * discards itself and leaves the rest standing.
  *
- * An id equal to the log in the path is KEPT — one run against itself down two
- * different drill paths is a real comparison. A REPEATED id is dropped, because
- * two panes carrying one log and one set of pins are the same pane twice. */
-export const decodeCompare = (raw: string | null): number[] => {
-  if (raw === null) return [];
-  const ids = raw
-    .split(",")
-    .map((value) => Number(value))
-    .filter((value) => Number.isInteger(value) && value > 0);
-  return [...new Set(ids)];
-};
+ * A REPEATED id is KEPT. Panes are positional, not deduped by log id, and each
+ * pins independently (`PANE_FIELDS` above) — one log compared against itself
+ * down two different drill paths is a real comparison, not the same pane
+ * twice. Collapsing `2661,2661` to one pane would also orphan the second
+ * pane's `src2`/`aura2`/etc. in the URL with no removal having run to clear
+ * them, which is exactly the dormant-key hazard `paneParamNames` exists to
+ * avoid. */
+export const decodeCompare = (raw: string | null): number[] =>
+  raw === null
+    ? []
+    : raw
+        .split(",")
+        .map((value) => Number(value))
+        .filter((value) => Number.isSafeInteger(value) && value > 0);
 
 /** Empty encodes as null so the param drops out of the URL — a closed
  * comparison leaves the same address a never-opened one does. */
@@ -63,11 +66,24 @@ export const encodeCompare = (ids: number[]): string | null => (ids.length === 0
 export const removeCompareAt = (ids: number[], index: number): number[] =>
   index <= 0 ? ids : ids.filter((_, position) => position !== index - 1);
 
-/** Every URL key belonging to one pane.
+/** Every URL key belonging to one pane, including pane 0's bare keys.
  *
  * Derived from `PANE_FIELDS` rather than spelled out, so a field added to
- * `PaneRaw` cannot be left behind here — which matters because this is what a
- * pane REMOVAL clears. nuqs keeps a param it no longer reads, so a suffixed key
- * left standing after a removal is dormant rather than gone, and reopening a
- * pane at that index would revive someone else's old filter. */
+ * `PaneRaw` cannot be left behind here. Includes pane 0 on purpose — this is
+ * also what a frame-level bulk read/write over every pane's keys uses to
+ * build its key set, and pane 0 is a pane for that purpose. It is NOT what a
+ * pane removal should clear; see `clearablePaneParamNames` for that. */
 export const paneParamNames = (index: number): string[] => PANE_FIELDS.map((field) => paneParamName(field, index));
+
+/** The keys a pane REMOVAL may clear — empty for pane 0.
+ *
+ * Pane 0 is the log in the path, and its keys are the BARE ones, so clearing
+ * them wipes the pins of the log still on screen rather than tidying up after a
+ * closed pane. The vacated index a removal clears is `idsBefore.length`, and
+ * the natural slip is to compute it from `idsAfter.length` — which is 0 exactly
+ * when the last comparison closes. Returning nothing there makes that slip a
+ * no-op instead of silent data loss. nuqs keeps a param it no longer reads, so
+ * a suffixed key left standing after a removal is dormant rather than gone,
+ * and reopening a pane at that index would revive someone else's old filter —
+ * which is the failure this function exists to prevent. */
+export const clearablePaneParamNames = (index: number): string[] => (index <= 0 ? [] : paneParamNames(index));
