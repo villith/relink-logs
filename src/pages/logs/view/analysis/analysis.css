@@ -31,3 +31,9 @@
     animation: none;
   }
 }
+
+.analysis-panes {
+  display: grid;
+  gap: 12px;
+  align-items: start;
+}

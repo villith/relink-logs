@@ -22,24 +22,21 @@ import { AuraStrip } from "./AuraStrip";
 import { CollapseSupplementaryToggle } from "./CollapseSupplementaryToggle";
 import { DebugBar } from "./DebugBar";
 import { DpsChart } from "./DpsChart";
-import { HostilityToggle } from "./HostilityToggle";
 import { MetricTable } from "./MetricTable";
-import { MetricTabs, type MetricTab } from "./MetricTabs";
 import { PinBar } from "./PinBar";
 import { QuestSummary } from "./QuestSummary";
 import { RegroupStrip } from "./RegroupStrip";
 import { WindowStrip } from "./WindowStrip";
+import { EVENTS_TAB, TABLE_TAB, TIMELINE_TAB, bodyFor } from "./analysisTabs";
 import { selectedChartWindows, windowFilterScrubRange } from "./chartWindowFilter";
 import { buildDebugReadout } from "./debugReadout";
 import { CAPABILITIES, levelFor } from "./machine/capabilities";
 import { resolveViewSpec } from "./machine/resolve";
-import type { AnalysisState, MetricKey } from "./machine/state";
+import type { AnalysisState } from "./machine/state";
 import {
   toggleAura as auraTransition,
   clearPin,
   clearWindowFilters,
-  setHostility as hostilityTransition,
-  setMetric as metricTransition,
   pinRow,
   pinValueOf,
   regroup,
@@ -56,40 +53,10 @@ import { useChartModel } from "./model/useChartModel";
 import { useEncounterData } from "./model/useEncounterData";
 import { useEntityCells } from "./model/useEntityCells";
 import { useChartWindow, useFilterChips } from "./model/useFilterWindows";
-import { METRICS, useRowModel } from "./model/useRowModel";
+import { useRowModel } from "./model/useRowModel";
 import { useSelectorModel } from "./model/useSelectorModel";
 import { useStatusNaming } from "./model/useStatusNaming";
 import { useUrlQueryString } from "./useUrlQueryString";
-
-/** The switcher's contents, derived from `METRICS` — each descriptor already
- * carries the label the tab shows, and two lists that must agree is one list
- * too many. Insertion order above is the display order. */
-const METRIC_TABS: MetricTab[] = Object.entries(METRICS).map(([value, descriptor]) => ({
-  value,
-  labelKey: descriptor.labelKey,
-}));
-
-/** The raw-event-stream view's value in the top-level switch, and in the `tab`
- * URL param. Its absence means the default view, the table. */
-const EVENTS_TAB = "events";
-/** The positional view: the metric's own rows drawn against fight time. */
-const TIMELINE_TAB = "timeline";
-/** The default view: the chart-and-table body, everything the metric tabs
- * switch between. Never written to the URL — a default in the URL is noise. */
-const TABLE_TAB = "table";
-
-/** The top-level switch, which changes the WHOLE body below the selector bar.
- *
- * Neither Events nor Timeline is a metric — they have no chart of their own, no
- * groupings and no numeric columns, so there is nothing for
- * `CAPABILITIES`/`resolveViewSpec` to answer for them. Both ride the `tab`
- * param instead of `state.metric`, so the pins survive switching between the
- * three bodies — which is the point of sharing the selector bar. */
-const VIEW_TABS: MetricTab[] = [
-  { value: TABLE_TAB, labelKey: "ui.logs.view-table-tab" },
-  { value: TIMELINE_TAB, labelKey: "ui.logs.timeline-tab" },
-  { value: EVENTS_TAB, labelKey: "ui.logs.events-tab" },
-];
 
 /** Bucket index → "M:SS", for the window readout. */
 const bucketLabel = (bucket: number) => millisecondsToElapsedFormat(bucket * DPS_BUCKET_MS);
@@ -179,19 +146,16 @@ export const AnalysisPane = ({ paneIndex, logId, filters }: AnalysisPaneProps) =
   // The machine: the URL holds the WHOLE state (metric, side, pins, window,
   // grouping override), the resolver turns it into everything the view shows.
   const [state, setState] = useAnalysisState(paneIndex);
-  // Which BODY the frame shows — the top-level view switch. Its own nuqs key
+  // Which BODY this pane draws — the top-level view switch, which the FRAME
+  // operates because there is one of it for the whole view. Its own nuqs key
   // rather than a machine field: neither Events nor Timeline is a metric, so
   // putting either in `AnalysisState` would mean a `MetricKey` the resolver has
   // no spec for. nuqs writes per key, so this and `useAnalysisState` share the
   // URL without either clobbering the other — and the pins therefore survive
   // switching between the three bodies, which is the whole point of sharing the
   // selector bar.
-  const [tab, setTab] = useQueryState("tab", { history: "replace" });
-  // That param resolved to one of the three bodies, with anything unrecognised
-  // falling back to the default. One selector rather than a boolean per body:
-  // two booleans can both be true, and which one won would then depend on the
-  // order the JSX happened to test them in.
-  const body = tab === EVENTS_TAB ? EVENTS_TAB : tab === TIMELINE_TAB ? TIMELINE_TAB : TABLE_TAB;
+  const [tab] = useQueryState("tab", { history: "replace" });
+  const body = bodyFor(tab);
   const caps = CAPABILITIES[state.metric];
   const spec = useMemo(() => resolveViewSpec(state, caps), [state, caps]);
 
@@ -604,52 +568,14 @@ export const AnalysisPane = ({ paneIndex, logId, filters }: AnalysisPaneProps) =
         logId={Number.isFinite(logId) ? logId : null}
       />
 
-      {/* WHO the page is about. It outranks everything below: the actor pin is
+      {/* WHO this pane is about. It outranks everything below: the actor pin is
           the one selection the Events view and the table view read the same
-          way, so it sits above the metric tabs rather than beside them. */}
+          way, so it sits above the pin bar rather than beside it. Per PANE,
+          because comparing two logs is comparing two selections. */}
       <ActorBar
         options={labelledOptions.sources}
         value={pins.source}
         onChange={(source) => handlePinsChange({ ...pins, source })}
-        trailing={
-          <MetricTabs
-            variant="inline"
-            ariaLabelKey="ui.logs.view-tablist-label"
-            tabs={VIEW_TABS}
-            value={body}
-            onChange={(value) =>
-              // Selecting the DEFAULT body clears the param rather than storing
-              // "table": the table is the default, and a default in the URL is
-              // noise. Anything else is written as-is. The metric the table was
-              // last on is untouched either way — it lives in the machine, not
-              // here.
-              setTab(value === TABLE_TAB ? null : value)
-            }
-          />
-        }
-      />
-
-      {/* Above the metric tabs, where Warcraft Logs puts it: rendering it below
-          the switcher shifted every control under it each time the metric
-          changed. Only metrics that declare `supportsHostility` can operate it
-          — see HostilityToggle's `disabled`. */}
-      <Box style={{ padding: "8px 16px 0", display: "flex", alignItems: "center", gap: 16 }}>
-        <HostilityToggle
-          value={hostility}
-          onChange={(side) => setState(hostilityTransition(state, side))}
-          disabled={!caps.supportsHostility}
-        />
-      </Box>
-
-      {/* Live in BOTH views, because Events is a display MODE and not a view of
-          its own: the metric tab is what says which events the stream lists —
-          Buffs → applies and removes, Damage Taken → incoming hits (see
-          `eventScope`). Warcraft Logs' model, and the reason this frame is
-          shared rather than swapped. */}
-      <MetricTabs
-        tabs={METRIC_TABS}
-        value={metricKey}
-        onChange={(value) => setState(metricTransition(state, value as MetricKey))}
       />
 
       {/* The other two pins narrow whatever is below them. Below the metric tabs
