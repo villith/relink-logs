@@ -14,11 +14,18 @@ vi.mock("react-i18next", () => ({
 // to decide WHICH panes exist, what they are given, and what the controls they
 // share write, so stub the pane and assert the decisions.
 vi.mock("./AnalysisPane", () => ({
-  AnalysisPane: ({ paneIndex, logId }: { paneIndex: number; logId: number }) => (
-    <div data-testid="pane" data-pane-index={paneIndex} data-log-id={logId} />
+  AnalysisPane: ({ paneIndex, logId, drawsChart }: { paneIndex: number; logId: number; drawsChart: boolean }) => (
+    <div data-testid="pane" data-pane-index={paneIndex} data-log-id={logId} data-draws-chart={String(drawsChart)} />
   ),
 }));
 vi.mock("./AnalysisTopBar", () => ({ AnalysisTopBar: () => <div data-testid="top-bar" /> }));
+vi.mock("./CompareChart", () => ({
+  CompareChart: ({ perPaneTotals }: { perPaneTotals: number[][] }) => (
+    <div data-testid="compare-chart" data-panes={perPaneTotals.length} />
+  ),
+}));
+
+import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 
 import { AnalysisView } from "./AnalysisView";
 
@@ -133,6 +140,33 @@ describe("AnalysisView", () => {
 
     await waitFor(() => expect(search().get("metric")).toBe("stun"));
     expect(search().has("metric1")).toBe(false);
+  });
+
+  it("leaves the single-log view its own full chart, and offers no compare layout", () => {
+    useMeterSettingsStore.setState({ compare_chart_mode: "overlay" });
+    renderView();
+
+    expect(screen.getAllByTestId("pane")[0].dataset.drawsChart).toBe("true");
+    expect(screen.queryByTestId("compare-chart")).toBeNull();
+    expect(screen.queryByText("ui.logs.compare-chart-overlay")).toBeNull();
+  });
+
+  // One plot for the comparison, and the panes stand down: the same data drawn
+  // once above and once per pane is two answers to one question.
+  it("overlays the comparison on one plot, and the panes then draw none", () => {
+    useMeterSettingsStore.setState({ compare_chart_mode: "overlay" });
+    renderView("/logs/2657?compare=2661");
+
+    expect(screen.getByTestId("compare-chart").dataset.panes).toBe("2");
+    expect(screen.getAllByTestId("pane").map((pane) => pane.dataset.drawsChart)).toEqual(["false", "false"]);
+  });
+
+  it("leaves every pane its own chart when the comparison is split", () => {
+    useMeterSettingsStore.setState({ compare_chart_mode: "split" });
+    renderView("/logs/2657?compare=2661");
+
+    expect(screen.queryByTestId("compare-chart")).toBeNull();
+    expect(screen.getAllByTestId("pane").map((pane) => pane.dataset.drawsChart)).toEqual(["true", "true"]);
   });
 
   // The side toggle clears both actor pins, in every pane — they name the

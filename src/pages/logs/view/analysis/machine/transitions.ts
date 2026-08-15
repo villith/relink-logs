@@ -82,6 +82,20 @@ export const setHostility = (state: AnalysisState, hostility: Hostility): Analys
   by: null,
 });
 
+/** A drag on the plot, committed as a zoom.
+ *
+ * Indexes arrive relative to the DATA the chart was given, so a drag while
+ * already scoped is relative to the current window — offset back into
+ * whole-fight indexes before committing. Shared by every chart in the view: a
+ * pane's own plot and the frame's compare overlay both hand their drag here, so
+ * a scrub cannot mean two different spans depending on which chart was dragged.
+ */
+export const scrubWindow = (state: AnalysisState, dragged: [number, number] | null): AnalysisState => {
+  if (dragged === null) return setWindow(state, null);
+  const offset = state.window === null ? 0 : state.window[0];
+  return setWindow(state, [dragged[0] + offset, dragged[1] + offset]);
+};
+
 export const setWindow = (state: AnalysisState, window: [number, number] | null): AnalysisState => ({
   ...state,
   window,

@@ -50,6 +50,24 @@ describe("useAnalysisPanesStore", () => {
     expect(useAnalysisPanesStore.getState().panes[0].scoped).toBeNull();
   });
 
+  // The frame overlays one line per pane from these, so a pane still carrying
+  // the previous log's plot would draw that log's line under the new one's name.
+  it("drops a pane's published plot when its log changed", () => {
+    const { setPaneLogs, setPaneChart } = useAnalysisPanesStore.getState();
+    setPaneLogs([2657]);
+    setPaneChart(0, { totals: [1, 2, 3], format: "amount" });
+    useAnalysisPanesStore.getState().setPaneLogs([2661]);
+    expect(useAnalysisPanesStore.getState().panes[0].chart.totals).toEqual([]);
+  });
+
+  it("keeps a pane's published plot when an unrelated pane changes log", () => {
+    const { setPaneLogs, setPaneChart } = useAnalysisPanesStore.getState();
+    setPaneLogs([2657, 2661]);
+    setPaneChart(0, { totals: [1, 2, 3], format: "amount" });
+    useAnalysisPanesStore.getState().setPaneLogs([2657, 2664]);
+    expect(useAnalysisPanesStore.getState().panes[0].chart.totals).toEqual([1, 2, 3]);
+  });
+
   it("ignores a write aimed at a pane that no longer exists", () => {
     const { setPaneLogs, setPaneBase } = useAnalysisPanesStore.getState();
     setPaneLogs([2657]);

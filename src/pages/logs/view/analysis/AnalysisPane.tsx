@@ -1,6 +1,6 @@
 import { Box } from "@mantine/core";
 import { useQueryState } from "nuqs";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import { useAnalysisPanesStore } from "@/stores/useAnalysisPanesStore";
@@ -29,6 +29,7 @@ import { RegroupStrip } from "./RegroupStrip";
 import { WindowStrip } from "./WindowStrip";
 import { EVENTS_TAB, TABLE_TAB, TIMELINE_TAB, bodyFor } from "./analysisTabs";
 import { selectedChartWindows, windowFilterScrubRange } from "./chartWindowFilter";
+import { paneTotals } from "./compareSeries";
 import { buildDebugReadout } from "./debugReadout";
 import { CAPABILITIES, levelFor } from "./machine/capabilities";
 import { resolveViewSpec } from "./machine/resolve";
@@ -40,6 +41,7 @@ import {
   pinRow,
   pinValueOf,
   regroup,
+  scrubWindow,
   toggleWindowFilter as windowFilterTransition,
   toggleWindowKind as windowKindTransition,
   setWindow as windowTransition,
@@ -69,6 +71,9 @@ export type AnalysisPaneProps = {
   paneIndex: number;
   logId: number;
   filters: MeterFilters;
+  /** Whether this pane draws its OWN plot. False while the frame overlays every
+   * pane on one, where a per-pane chart would be the same data drawn twice. */
+  drawsChart: boolean;
 };
 
 /** ONE log, end to end: its own fetches, its own pins, its own body.
@@ -76,7 +81,7 @@ export type AnalysisPaneProps = {
  * Extracted from `AnalysisView` as a move, not a rewrite — every comment here
  * carries reasoning that was paid for once already. The frame above it holds
  * only what is shared between panes. */
-export const AnalysisPane = ({ paneIndex, logId, filters }: AnalysisPaneProps) => {
+export const AnalysisPane = ({ paneIndex, logId, filters, drawsChart }: AnalysisPaneProps) => {
   // The id the fetches and the debug surfaces use. A string because that is what
   // `useParams` handed the view before panes existed, and both consumers parse
   // it back with `Number(...)`.
@@ -452,6 +457,19 @@ export const AnalysisPane = ({ paneIndex, logId, filters }: AnalysisPaneProps) =
     playerLabelTemplate: player_label_template,
   });
 
+  // What this pane's plot comes to per bucket, published for the frame's
+  // compare overlay. Resolved HERE because deciding what a plot totals is the
+  // chart model's job, and there is one of those per pane; the frame only draws
+  // the lines side by side.
+  const setPaneChart = useAnalysisPanesStore((panes) => panes.setPaneChart);
+  const paneChart = useMemo(
+    () => ({ totals: paneTotals(shownChartData, labels), format }),
+    [shownChartData, labels, format]
+  );
+  useEffect(() => {
+    setPaneChart(paneIndex, paneChart);
+  }, [paneIndex, paneChart, setPaneChart]);
+
   // The dev-only readout: the state, what the machine resolved it INTO, and the
   // stored settings that colour the reading. Built even in a release build —
   // it is a handful of string joins, and gating it would mean gating the memo
@@ -513,18 +531,10 @@ export const AnalysisPane = ({ paneIndex, logId, filters }: AnalysisPaneProps) =
     [chartWindows]
   );
 
-  // Indexes arrive relative to the data the chart was given, so a drag while
-  // already scoped is relative to the current window — offset it back into
-  // whole-fight indexes before committing.
+  // A drag on this pane's plot, committed through the same rule the frame's
+  // compare overlay commits its own drags with (see `scrubWindow`).
   const handleScope = useCallback(
-    (next: [number, number] | null) => {
-      if (next === null) {
-        setState(windowTransition(state, null));
-        return;
-      }
-      const offset = state.window === null ? 0 : state.window[0];
-      setState(windowTransition(state, [next[0] + offset, next[1] + offset]));
-    },
+    (next: [number, number] | null) => setState(scrubWindow(state, next)),
     [state, setState]
   );
 
@@ -598,45 +608,50 @@ export const AnalysisPane = ({ paneIndex, logId, filters }: AnalysisPaneProps) =
           and this is the override (`by` in the URL). */}
       <RegroupStrip tabs={spec.regroupTabs} onRegroup={(dim) => setState(regroup(state, dim, caps))} />
 
-      <DpsChart
-        data={shownChartData}
-        labels={labels}
-        labelKey={labelKey}
-        // The table's own row-label key: the plot's series and the table's rows
-        // are one set of things, so the tooltip's breakdown heads itself with
-        // the same word the column below it does.
-        sectionKey={spec.table.rowsLabelKey}
-        format={format}
-        stacked={stacked}
-        onScope={handleScope}
-        markers={chartMarkers}
-        bands={maskBands}
-        windowBands={stateWindowBands}
-        windowTooltips={chartWindowTooltips}
-        smoothing={smoothing}
-        // Offered on RATE charts only. On a level (the undrilled SBA gauge, the
-        // aura stacks) `chartPresentation` pins smoothing to 1 whatever is
-        // chosen, so a control there would be a knob that does nothing.
-        onSmoothingChange={format === "amount" ? setRateSmoothing : undefined}
-        stackMode={chartSource === "stacks" ? stackMode : undefined}
-        onStackModeChange={chartSource === "stacks" ? setStackMode : undefined}
-        // In the chart's own control strip, beside the smoothing window: it
-        // belongs with the other knobs that change how the fight READS, not
-        // with the side switch, which changes WHOSE fight is being read. It
-        // folds the table as well as the plot, so it rides the strip as a
-        // caller-supplied control rather than as something the chart owns.
-        //
-        // Disabled rather than hidden, for the same reason HostilityToggle is:
-        // only Damage Done records supplementary damage, and a control that
-        // came and went with the tab would shift the whole strip each time.
-        controls={
-          <CollapseSupplementaryToggle
-            value={collapseSupplementary}
-            onChange={(next) => setSettings({ merge_supplementary: next })}
-            disabled={!caps.recordsSupplementary}
-          />
-        }
-      />
+      {/* Withheld while the frame overlays every pane on one plot: the same
+          data drawn twice, once per pane and once above them, is two answers to
+          one question and twice the height to scroll past. */}
+      {drawsChart && (
+        <DpsChart
+          data={shownChartData}
+          labels={labels}
+          labelKey={labelKey}
+          // The table's own row-label key: the plot's series and the table's
+          // rows are one set of things, so the tooltip's breakdown heads itself
+          // with the same word the column below it does.
+          sectionKey={spec.table.rowsLabelKey}
+          format={format}
+          stacked={stacked}
+          onScope={handleScope}
+          markers={chartMarkers}
+          bands={maskBands}
+          windowBands={stateWindowBands}
+          windowTooltips={chartWindowTooltips}
+          smoothing={smoothing}
+          // Offered on RATE charts only. On a level (the undrilled SBA gauge,
+          // the aura stacks) `chartPresentation` pins smoothing to 1 whatever is
+          // chosen, so a control there would be a knob that does nothing.
+          onSmoothingChange={format === "amount" ? setRateSmoothing : undefined}
+          stackMode={chartSource === "stacks" ? stackMode : undefined}
+          onStackModeChange={chartSource === "stacks" ? setStackMode : undefined}
+          // In the chart's own control strip, beside the smoothing window: it
+          // belongs with the other knobs that change how the fight READS, not
+          // with the side switch, which changes WHOSE fight is being read. It
+          // folds the table as well as the plot, so it rides the strip as a
+          // caller-supplied control rather than as something the chart owns.
+          //
+          // Disabled rather than hidden, for the same reason HostilityToggle is:
+          // only Damage Done records supplementary damage, and a control that
+          // came and went with the tab would shift the whole strip each time.
+          controls={
+            <CollapseSupplementaryToggle
+              value={collapseSupplementary}
+              onChange={(next) => setSettings({ merge_supplementary: next })}
+              disabled={!caps.recordsSupplementary}
+            />
+          }
+        />
+      )}
 
       {/* Dev builds only, the same guard the Debug tab uses. */}
       {import.meta.env.DEV && <DebugBar search={search} readout={debugReadout} actions={actions} />}

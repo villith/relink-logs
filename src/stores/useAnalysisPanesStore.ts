@@ -14,7 +14,23 @@ export type PaneSlice = {
   logId: number;
   base: EncounterStateResponse | null;
   scoped: EncounterStateResponse | null;
+  /** What this pane's plot comes to per bucket, published for the FRAME to
+   * overlay one line per log. The pane resolves it, because deciding what a
+   * plot totals is the chart model's job and there is one of those per pane.
+   * Empty until the pane has drawn something. */
+  chart: PaneChart;
 };
+
+/** One pane's plot, flattened for the compare overlay: the per-bucket totals
+ * and the axis format they are read in. The format rides along because every
+ * pane shares the metric, so one is the whole overlay's — and reading it off
+ * the panes keeps the frame from spelling out a rule the chart model owns. */
+export type PaneChart = {
+  totals: number[];
+  format: "amount" | "percent" | "count";
+};
+
+const EMPTY_PANE_CHART: PaneChart = { totals: [], format: "amount" };
 
 type AnalysisPanesState = {
   /** Ordered: pane 0 is the log in the path, the rest are the comparisons.
@@ -26,6 +42,7 @@ type AnalysisPanesState = {
   setPaneLogs: (logIds: number[]) => void;
   setPaneBase: (index: number, response: EncounterStateResponse) => void;
   setPaneScoped: (index: number, response: EncounterStateResponse | null) => void;
+  setPaneChart: (index: number, chart: PaneChart) => void;
 };
 
 const writeAt = (panes: PaneSlice[], index: number, change: (pane: PaneSlice) => PaneSlice): PaneSlice[] =>
@@ -43,7 +60,9 @@ export const useAnalysisPanesStore = create<AnalysisPanesState>((set) => ({
       // slice and one set of fetched data.
       panes: logIds.map((logId, index) => {
         const existing = state.panes[index];
-        return existing !== undefined && existing.logId === logId ? existing : { logId, base: null, scoped: null };
+        return existing !== undefined && existing.logId === logId
+          ? existing
+          : { logId, base: null, scoped: null, chart: EMPTY_PANE_CHART };
       }),
     })),
   setPaneBase: (index, response) =>
@@ -56,5 +75,9 @@ export const useAnalysisPanesStore = create<AnalysisPanesState>((set) => ({
   setPaneScoped: (index, response) =>
     set((state) => ({
       panes: writeAt(state.panes, index, (pane) => ({ ...pane, scoped: response })),
+    })),
+  setPaneChart: (index, chart) =>
+    set((state) => ({
+      panes: writeAt(state.panes, index, (pane) => ({ ...pane, chart })),
     })),
 }));

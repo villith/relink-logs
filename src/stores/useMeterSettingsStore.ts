@@ -104,6 +104,10 @@ export const DEFAULT_HEADER_SEGMENTS: HeaderSegment[] = [
  * longer load-bearing on its own — the Beta option says what it is instead. */
 export type LogsViewMode = "analysis" | "classic";
 
+/** How the Analysis view plots two or more compared logs: one line per log on
+ * one plot, or each pane keeping its own full chart. */
+export type CompareChartMode = "overlay" | "split";
+
 interface MeterSettings {
   color_1: string;
   color_2: string;
@@ -187,6 +191,13 @@ interface MeterSettings {
    * translated game name over a hand label that only exists in English;
    * `label-first` is the original order where any hand label wins. */
   skill_name_resolution: SkillNameResolutionMode;
+  /** How the Analysis view plots two or more compared logs: `overlay` draws one
+   * line per log on one plot, `split` leaves each pane its own full chart.
+   *
+   * A stored setting rather than a URL param, for the reason
+   * `merge_supplementary` is one: how someone reads a chart should outlive the
+   * logs they set it on. Inert while only one log is open. */
+  compare_chart_mode: CompareChartMode;
 }
 
 interface MeterStateFunctions {
@@ -234,6 +245,7 @@ const DEFAULT_METER_SETTINGS: MeterSettings = {
   logs_view: "classic",
   merge_supplementary: false,
   skill_name_resolution: "label-first",
+  compare_chart_mode: "overlay",
 };
 
 /* Cross-window sync lives in `durableStorage`: every write goes to settings.db,

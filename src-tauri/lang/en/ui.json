@@ -661,6 +661,7 @@
       "picker-none-selected": "Choose a log",
       "compare-add": "+ Compare",
       "compare-remove": "Remove this comparison",
+      "compare-series-label": "Log",
       "compare-chart-overlay": "One chart",
       "compare-chart-split": "One chart per log",
       "metric-damage-done": "Damage Done",

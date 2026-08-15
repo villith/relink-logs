@@ -1,16 +1,20 @@
-import { Box } from "@mantine/core";
+import { Box, SegmentedControl } from "@mantine/core";
 import { parseAsString, useQueryState, useQueryStates } from "nuqs";
 import { useCallback, useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
+import { useShallow } from "zustand/react/shallow";
 
 import { useAnalysisPanesStore } from "@/stores/useAnalysisPanesStore";
 import { useLogLibraryStore } from "@/stores/useLogLibraryStore";
 import { useMeterFilters } from "@/stores/useMeterFilterSync";
+import { useMeterSettingsStore, type CompareChartMode } from "@/stores/useMeterSettingsStore";
 
 import type { Hostility } from "../metrics/types";
 
 import { AnalysisPane } from "./AnalysisPane";
 import { AnalysisTopBar } from "./AnalysisTopBar";
+import { CompareChart } from "./CompareChart";
 import { CompareHeader } from "./CompareHeader";
 import { HostilityToggle } from "./HostilityToggle";
 import { MetricTabs } from "./MetricTabs";
@@ -20,7 +24,7 @@ import { CAPABILITIES } from "./machine/capabilities";
 import { SHARED_FIELDS, decodeCompare, encodeCompare, paneParamNames, removeCompareAt } from "./machine/paneParams";
 import { paneRemovalWrites, sharedControlWrites } from "./machine/paneWrites";
 import type { MetricKey } from "./machine/state";
-import { setHostility as hostilityTransition, setMetric as metricTransition } from "./machine/transitions";
+import { setHostility as hostilityTransition, setMetric as metricTransition, scrubWindow } from "./machine/transitions";
 import { useAnalysisState } from "./machine/useAnalysisState";
 
 /** The Analysis view's frame: the log pickers, the controls every pane shares,
@@ -35,6 +39,7 @@ import { useAnalysisState } from "./machine/useAnalysisState";
  * written before compare existed already carries (see `paneParamName`); the
  * rest ride the `compare` list. */
 export const AnalysisView = () => {
+  const { t } = useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();
   const filters = useMeterFilters();
@@ -82,10 +87,19 @@ export const AnalysisView = () => {
   // The frame's own reading of the SHARED fields. Pane 0's state carries them
   // (they are unsuffixed, so every pane's does) — this is a read, and the write
   // goes through `applyShared` so no pane is left behind.
-  const [state] = useAnalysisState(0);
+  const [state, setState] = useAnalysisState(0);
   const caps = CAPABILITIES[state.metric];
   const hostility: Hostility = caps.supportsHostility ? state.hostility : "friendly";
   const [tab, setTab] = useQueryState("tab", { history: "replace" });
+
+  // How the comparison is plotted. Inert with one log open — there is nothing
+  // to overlay, and the pane draws its own full chart either way.
+  const compareChartMode = useMeterSettingsStore((settings) => settings.compare_chart_mode);
+  const setSettings = useMeterSettingsStore((settings) => settings.set);
+  const comparing = paneCount > 1;
+  const overlaid = comparing && compareChartMode === "overlay";
+  // One entry per pane, published by the panes themselves (see `PaneChart`).
+  const paneCharts = useAnalysisPanesStore(useShallow((panes) => panes.panes.map((pane) => pane.chart)));
 
   /** A shared control's transition, applied to every pane. Both of them also
    * clear PANE fields — a side swap invalidates every pane's actor pins — so
@@ -156,6 +170,20 @@ export const AnalysisView = () => {
           onChange={(side) => applyShared((paneState) => hostilityTransition(paneState, side))}
           disabled={!caps.supportsHostility}
         />
+        {/* Only while comparing: with one log open there is nothing to lay out
+            two ways, and a control that did nothing would still invite a
+            click. */}
+        {comparing && (
+          <SegmentedControl
+            size="xs"
+            value={compareChartMode}
+            onChange={(value) => setSettings({ compare_chart_mode: value as CompareChartMode })}
+            data={[
+              { value: "overlay", label: t("ui.logs.compare-chart-overlay") },
+              { value: "split", label: t("ui.logs.compare-chart-split") },
+            ]}
+          />
+        )}
         <Box style={{ marginLeft: "auto" }}>
           <MetricTabs
             variant="inline"
@@ -185,6 +213,21 @@ export const AnalysisView = () => {
         onChange={(value) => applyShared((paneState) => metricTransition(paneState, value as MetricKey))}
       />
 
+      {/* One plot for the comparison, one line per log. Only while comparing:
+          a single log keeps its pane's own chart, bands and all. */}
+      {overlaid && (
+        <CompareChart
+          perPaneTotals={paneCharts.map((chart) => chart.totals)}
+          paneLogIds={paneLogIds}
+          // Every pane shares the metric, so pane 0's axis format is the
+          // comparison's. Missing only before the first pane has drawn.
+          format={paneCharts[0]?.format ?? "amount"}
+          // The zoom is shared, so a drag here commits for every pane — through
+          // the same rule a pane's own plot commits one with.
+          onScope={(next) => setState(scrubWindow(state, next))}
+        />
+      )}
+
       {/* One column per log. A single pane is a one-column grid, which is the
           layout the view has always had. */}
       <Box className="analysis-panes" style={{ gridTemplateColumns: `repeat(${paneCount}, minmax(0, 1fr))` }}>
@@ -197,7 +240,7 @@ export const AnalysisView = () => {
           // `undefined`, and nuqs's own `string | null` types hide it from
           // `tsc`. Keying by index makes a reindex unmount and remount, so the
           // pane mounts with the right keys on its first render.
-          <AnalysisPane key={paneIndex} paneIndex={paneIndex} logId={logId} filters={filters} />
+          <AnalysisPane key={paneIndex} paneIndex={paneIndex} logId={logId} filters={filters} drawsChart={!overlaid} />
         ))}
       </Box>
     </Box>

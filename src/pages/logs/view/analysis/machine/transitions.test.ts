@@ -10,6 +10,7 @@ import {
   pinRow,
   pinValueOf,
   regroup,
+  scrubWindow,
   setHostility,
   setMetric,
   setWindow,
@@ -233,5 +234,22 @@ describe("window filter", () => {
     next = setMetric(next, "sba");
     next = setHostility(next, "enemy");
     expect(next.win).toEqual(["link"]);
+  });
+});
+
+describe("scrubWindow", () => {
+  it("commits a drag on the whole fight as the buckets it covers", () => {
+    expect(scrubWindow(DEFAULT_STATE, [10, 40]).window).toEqual([10, 40]);
+  });
+
+  // The chart is given only the buckets inside the current zoom, so a drag
+  // there reports 0-based indexes into THAT slice. Committing them raw would
+  // walk the window back towards the start of the fight on every re-drag.
+  it("offsets a drag made while already zoomed back into whole-fight buckets", () => {
+    expect(scrubWindow(state({ window: [100, 200] }), [5, 20]).window).toEqual([105, 120]);
+  });
+
+  it("clears the zoom on a cleared drag, whatever the current one is", () => {
+    expect(scrubWindow(state({ window: [100, 200] }), null).window).toBeNull();
   });
 });
