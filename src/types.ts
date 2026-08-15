@@ -436,16 +436,52 @@ export type WireGroupQuery = {
   windows?: { fromMs: number; upToMs: number }[];
 };
 
-/** One row's totals in a `GroupAggregate` (mirrors the Rust `GroupMeasure`). */
-export type GroupMeasure = { amount: number; hits: number; min: number | null; max: number | null };
+type GroupMeasureTotals = { amount: number; hits: number; min: number | null; max: number | null };
+
+/** Five-way per-fact tally (mirrors the Rust `FactTally`). `unknown` sits
+ * OUTSIDE rate denominators — the inferred share of a fact is
+ * `inferredYes / (measuredYes + measuredNo + inferredYes + inferredNo)`. */
+export type FactTally = {
+  measuredYes: number;
+  measuredNo: number;
+  inferredYes: number;
+  inferredNo: number;
+  unknown: number;
+};
+
+/** The per-group damage-fact block (mirrors the Rust `GroupFacts`). Tallied
+ * from DIRECT hits only — a supplementary echo's instance belongs to the hit
+ * that triggered it, so an echo tallies nothing and its damage stays out of
+ * `overdriveDamage`/`breakDamage` too (the split answers "where did damage
+ * go", the tallies answer "how sure are we" — both cover the same direct
+ * hits). `overdriveDamage`/`breakDamage` count damage where the fact
+ * resolved measured-yes OR inferred-yes; the tallies above carry the
+ * provenance split that number doesn't. */
+export type GroupFacts = {
+  crit: FactTally;
+  weakPoint: FactTally;
+  backAttack: FactTally;
+  debuffed: FactTally;
+  overdrive: FactTally;
+  break: FactTally;
+  overdriveDamage: number;
+  breakDamage: number;
+};
+
+/** One row's totals in a `GroupAggregate` (mirrors the Rust `GroupMeasure`).
+ * `facts` is present only on `damage`-metric rows once at least one direct
+ * hit tallied — absent (not zeroed) on `taken` rows and on the top-N
+ * `other` rollup, which sums the tail's damage only. */
+export type GroupMeasure = GroupMeasureTotals & { facts?: GroupFacts };
 
 /** The same row under the LANDING model, where an echo is part of the hit that
  * caused it rather than a hit of its own (mirrors the Rust `MergedMeasure`).
  *
  * For a direct action, `hits` counts landings and the amounts include their
  * echoes. For an echo action, this describes its UNCLAIMED residue only —
- * a claimed echo's damage already sits on its trigger. */
-export type MergedMeasure = GroupMeasure & { supplementary: number };
+ * a claimed echo's damage already sits on its trigger. Never carries `facts`
+ * — the tallies live on the raw measure only. */
+export type MergedMeasure = GroupMeasureTotals & { supplementary: number };
 
 /** One (filters × groupBy) row/band pair from `aggregate_groups` (mirrors the
  * Rust `GroupAggregate`): the table (`key` + `measure`) and the chart
