@@ -159,6 +159,24 @@ mod tests {
         assert!(snap.builder_populated());
     }
 
+    /// Every gate byte reads from its own documented offset and no other:
+    /// setting exactly one byte lights exactly one variant, so an
+    /// adjacent-byte transposition inside `offset()` cannot pass silently.
+    #[test]
+    fn each_gate_byte_reads_its_own_offset_alone() {
+        for (i, byte) in GateByte::ALL.iter().enumerate() {
+            let blob = blob_with(&[(0x15D + i, &[1][..])]);
+            let snap = InstSnapshot::parse(Some(&blob)).expect("well-formed");
+            for other in GateByte::ALL {
+                assert_eq!(
+                    snap.gate(other),
+                    other == *byte,
+                    "{other:?} vs set byte {byte:?}"
+                );
+            }
+        }
+    }
+
     #[test]
     fn a_remote_style_snapshot_is_not_builder_populated() {
         // d0 == 0 and precap == 0.0 — the log-405 remote signature.
