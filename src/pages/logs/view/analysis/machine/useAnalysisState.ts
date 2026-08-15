@@ -14,14 +14,16 @@ import { decodeState, encodeState, type AnalysisState } from "./state";
  * and write one of each.
  *
  * A pane's `paneIndex` must NOT change while it stays mounted. A caller
- * reindexing panes (closing pane 0 and shifting the rest down, say) has to
- * remount the survivors — `key={paneIndex}` on whatever renders this hook —
- * rather than hand a live pane a new index. nuqs's reconcile is a
- * render-phase update: when a `useQueryState` key changes, the render that
- * observes the new key still reads the internal state cached under the OLD
- * key name, so it comes back `undefined` for exactly one render before
- * settling. `decodeState` below defends against that render, but a remount
- * avoids it happening at all, which is the real fix. */
+ * reindexing panes (closing pane 1 and shifting the rest down, say — pane 0 is
+ * the log in the path and is never closed) has to remount the survivors —
+ * `key={paneIndex}` on whatever renders this hook — rather than hand a live
+ * pane a new index. nuqs's reconcile is a render-phase update: when a
+ * `useQueryState` key changes, the render that observes the new key still reads
+ * the internal state cached under the OLD key name, so it comes back
+ * `undefined` for one render, then EMPTY for two more before the new key's real
+ * value arrives (measured across a 2 -> 1 move: undefined, null, null, "7").
+ * `decodeState` below defends against the undefined render, but a remount
+ * avoids the whole window, which is the real fix. */
 export const useAnalysisState = (paneIndex: number) => {
   const [metric, setMetric] = useQueryState("metric", { history: "replace" });
   const [side, setSide] = useQueryState("side", { history: "replace" });
