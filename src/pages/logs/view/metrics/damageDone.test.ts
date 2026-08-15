@@ -1,12 +1,93 @@
 import { describe, expect, it } from "vitest";
 
-import type { ComputedPlayerState, EnemyType, SkillState, SkillTargetState } from "@/types";
+import type { ComputedPlayerState, EnemyType, FactTally, SkillState, SkillTargetState } from "@/types";
 
 import { groupSkillsForRows, rowKeyingFor } from "../abilitySkills";
 import { parseEnemyRow } from "../rowKey";
 import type { SelectorPins } from "../selectorOptions";
-import { abilityRows, damageDone } from "./damageDone";
+import { abilityRows, damageDone, factCaption, factCell, factColumns, factRate, inferredShare } from "./damageDone";
 import type { MetricRow } from "./types";
+
+/** A `FactTally` with every field defaulted to 0 — spread over the fields a
+ * case cares about, so a test naming three fields cannot leave the other two
+ * to `undefined` and crash the fold. */
+const tally = (over: Partial<FactTally>): FactTally => ({
+  measuredYes: 0,
+  measuredNo: 0,
+  inferredYes: 0,
+  inferredNo: 0,
+  unknown: 0,
+  ...over,
+});
+
+describe("factRate / factCell / inferredShare — provenance-tallied rates", () => {
+  it("rates over counted hits only", () => {
+    expect(factRate(tally({ measuredYes: 3, measuredNo: 1, inferredYes: 2, inferredNo: 2, unknown: 4 }))).toBe("63%");
+  });
+
+  it("renders a dash when nothing was counted", () => {
+    expect(factRate(tally({ unknown: 9 }))).toBe("—");
+  });
+
+  it("marks inference-leaning rates with the tilde", () => {
+    expect(factCell(tally({ measuredYes: 1, measuredNo: 1, inferredYes: 1, inferredNo: 1 }))).toBe("50%~");
+  });
+
+  it("leaves fully measured rates unmarked", () => {
+    expect(factCell(tally({ measuredYes: 1, measuredNo: 1 }))).toBe("50%");
+  });
+
+  it("reports the inferred share of counted hits", () => {
+    expect(inferredShare(tally({ measuredYes: 1, measuredNo: 1, inferredYes: 1, inferredNo: 1 }))).toBe(0.5);
+  });
+
+  it("gives an absent tally the same dash as an all-unknown one", () => {
+    expect(factCell(undefined)).toBe("—");
+  });
+
+  it("gives an unrecorded tally zero inferred share, not a divide-by-zero", () => {
+    expect(inferredShare(tally({ unknown: 9 }))).toBe(0);
+  });
+
+  it("appends three dashes for an absent facts block", () => {
+    expect(factColumns(undefined)).toEqual(["—", "—", "—"]);
+  });
+
+  it("fills crit/weak-point/back-attack in that order", () => {
+    const crit = tally({ measuredYes: 1 });
+    const weakPoint = tally({ measuredYes: 3, measuredNo: 1 });
+    const backAttack = tally({ inferredYes: 1, inferredNo: 1 });
+    expect(
+      factColumns({
+        crit,
+        weakPoint,
+        backAttack,
+        debuffed: tally({}),
+        overdrive: tally({}),
+        break: tally({}),
+        overdriveDamage: 0,
+        breakDamage: 0,
+      })
+    ).toEqual([factCell(crit), factCell(weakPoint), factCell(backAttack)]);
+  });
+});
+
+describe("factCaption", () => {
+  it("captions a fully measured tally with nothing — the rate alone says enough", () => {
+    expect(factCaption(tally({ measuredYes: 1, measuredNo: 1 }))).toBeNull();
+  });
+
+  it("captions an inference-leaning tally with its rounded share", () => {
+    expect(factCaption(tally({ measuredYes: 1, inferredYes: 1 }))).toEqual({
+      key: "ui.logs.hover-fact-inferred",
+      params: { pct: 50 },
+    });
+  });
+
+  it("captions an uncounted tally as no data", () => {
+    expect(factCaption(tally({ unknown: 5 }))).toEqual({ key: "ui.logs.hover-fact-no-data" });
+  });
+});
 
 /** A per-enemy entry of a skill's breakdown, as the parser ships it. */
 const hit = (enemyType: EnemyType, totalDamage: number, hits: number): SkillTargetState => ({
@@ -187,8 +268,13 @@ describe("damageDone descriptor", () => {
       "ui.skill-columns.max",
       "ui.skill-columns.average",
       "ui.logs.column-share",
+      "ui.skill-columns.crit",
+      "ui.skill-columns.weak-point",
+      "ui.skill-columns.back-attack",
     ]);
-    expect(rows[0].columns).toEqual(["1.0k", "4", "100", "500", "250", "333.3%"]);
+    // The trailing "—"s are the crit/WP/BA cells: SkillState carries no fact
+    // tallies, so this (dead-at-runtime) fold reports honestly "no data".
+    expect(rows[0].columns).toEqual(["1.0k", "4", "100", "500", "250", "333.3%", "—", "—", "—"]);
   });
 
   it("takes the extremes across every skill behind one ability", () => {
@@ -291,8 +377,9 @@ describe("damageDone descriptor", () => {
       input("skills", { source: null, targets: [], ability: 'Group:normal-attack@"Pl0000"' }, party)
     );
 
-    expect(rows[0].columns.at(-1)).toBe("75.0%");
-    expect(rows[1].columns.at(-1)).toBe("25.0%");
+    // Share sits at index 5 (the crit/WP/BA cells trail it now).
+    expect(rows[0].columns[5]).toBe("75.0%");
+    expect(rows[1].columns[5]).toBe("25.0%");
   });
 
   it("gives a party-wide row no party colour", () => {
@@ -312,10 +399,11 @@ describe("damageDone descriptor", () => {
     expect(damageDone.rows(input("skills", { source: 99, targets: [], ability: "Normal:100" }))).toEqual([]);
   });
 
-  it("carries the share of the level's total as its last column", () => {
+  it("carries the share of the level's total as its third column", () => {
     const rows = damageDone.rows(input("players"));
-    expect(rows[0].columns.at(-1)).toBe("75.0%");
-    expect(rows[1].columns.at(-1)).toBe("25.0%");
+    // Share sits at index 2 (the crit/WP/BA cells trail it now).
+    expect(rows[0].columns[2]).toBe("75.0%");
+    expect(rows[1].columns[2]).toBe("25.0%");
   });
 });
 
@@ -359,8 +447,8 @@ describe("drilling a pinned ability with a friendly pinned", () => {
 
     // Total, hits, min, max, average, share — the same six the member rows
     // fill, so both shapes line up under one header.
-    expect(top.columns).toEqual(["90", "3", "—", "—", "30", "75.0%"]);
-    expect(second.columns).toEqual(["30", "1", "—", "—", "30", "25.0%"]);
+    expect(top.columns).toEqual(["90", "3", "—", "—", "30", "75.0%", "—", "—", "—"]);
+    expect(second.columns).toEqual(["30", "1", "—", "—", "30", "25.0%", "—", "—", "—"]);
   });
 
   it("leaves the per-enemy extremes blank rather than borrowing the ability's", () => {
@@ -467,8 +555,9 @@ describe("damageDone enemy side", () => {
     ]);
     expect(rows[0].kind).toBe("enemy");
     expect(rows[0].value).toBe(800);
-    // Amount, DPS-to-party over the 100s window, share.
-    expect(rows[0].columns).toEqual(["800", "8", "88.9%"]);
+    // Amount, DPS-to-party over the 100s window, share, then three dashes:
+    // DamageTakenState carries no fact tallies.
+    expect(rows[0].columns).toEqual(["800", "8", "88.9%", "—", "—", "—"]);
     expect(rows[0].pinOnClick).toBeNull();
   });
 
@@ -486,7 +575,7 @@ describe("damageDone enemy side", () => {
     expect(rows).toEqual([]);
   });
 
-  it("fills the full six-column drill-down shape below the players level", () => {
+  it("fills the full nine-column drill-down shape below the players level", () => {
     const players = [
       victimPlayer(0, [{ enemy: 0xaa, total: 500 }]),
       victimPlayer(1, [
@@ -505,7 +594,7 @@ describe("damageDone enemy side", () => {
       hostility: "enemy",
     } as never);
 
-    expect(rows[0].columns).toHaveLength(6);
+    expect(rows[0].columns).toHaveLength(9);
     // min is blank: DamageTakenState carries no minimum.
     expect(rows[0].columns[2]).toBe("—");
     // max folds across both victims' rows for 0xaa (500, 300) to the larger.
@@ -548,8 +637,8 @@ describe("damageDone.children — party-wide per-source split", () => {
     expect(children[0].pinOnClick).toEqual({ source: 0 });
     expect(children.map((child) => child.colorSlot)).toEqual([0, 1]);
     // The six damage drill-down cells, shared against the party total (400).
-    expect(children[0].columns).toEqual(["200", "2", "50", "150", "100", "50.0%"]);
-    expect(children[1].columns).toEqual(["100", "1", "100", "100", "100", "25.0%"]);
+    expect(children[0].columns).toEqual(["200", "2", "50", "150", "100", "50.0%", "—", "—", "—"]);
+    expect(children[1].columns).toEqual(["100", "1", "100", "100", "100", "25.0%", "—", "—", "—"]);
   });
 
   it("carries each player's own echo share, so a child bar splits like its parent", () => {

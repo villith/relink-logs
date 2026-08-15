@@ -390,11 +390,19 @@ export const MetricTable = ({
         // The key moves off the row and onto whichever element is the list
         // child: HoverCard clones its child and would otherwise lose it.
         const sections = sectionsByRow?.get(row.key);
+        // A row can carry facts with no breakdown sections at all (a terminal
+        // drilldown leaf), so "nothing to show" checks both rather than
+        // gating the card on sections alone.
+        const hasSections = !!sections && sections.length > 0;
         const parent =
-          !sections || sections.length === 0 || !cardAmount ? (
+          (!hasSections && !row.facts) || !cardAmount ? (
             <Box>{button}</Box>
           ) : (
-            <HoverCard sections={sections} {...cardAmount}>
+            <HoverCard
+              sections={sections ?? []}
+              damageFacts={row.facts ? { facts: row.facts, total: row.value } : undefined}
+              {...cardAmount}
+            >
               {button}
             </HoverCard>
           );

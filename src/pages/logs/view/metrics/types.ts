@@ -1,4 +1,4 @@
-import type { ComputedPlayerState, EncounterState, PlayerData, SkillState, StatusInterval } from "@/types";
+import type { ComputedPlayerState, EncounterState, GroupFacts, PlayerData, SkillState, StatusInterval } from "@/types";
 
 import type { RowKeying } from "../abilitySkills";
 import type { SelectorPins } from "../selectorOptions";
@@ -64,6 +64,15 @@ export type MetricRow = {
    * positional, and against a `%` column that already states the magnitude a
    * second reading of the same number says nothing. */
   timeline?: { startMs: number; endMs: number }[];
+  /** The row's provenance-tallied damage facts (crit/weak-point/back-attack,
+   * plus the Overdrive/Break damage split) — mirrors `GroupMeasure.facts`,
+   * carried through UNMERGED even where the row's own `columns` report the
+   * landing view, because the backend never tallies facts on a merged
+   * measure. Feeds the row hover card's "Damage facts" section; absent for
+   * everything `GroupMeasure.facts` itself is absent for (enemy-side rows,
+   * `taken` rows, the `other` rollup) and for every row the descriptors'
+   * SkillState-based fold produces, which has no facts to carry at all. */
+  facts?: GroupFacts;
 };
 
 /** What `label` should be resolved against before it is drawn.

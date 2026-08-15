@@ -2,6 +2,8 @@ import { MantineProvider } from "@mantine/core";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import type { FactTally, GroupFacts } from "@/types";
+
 import { HOVER_PANEL_CLASS, HoverCard, HoverCardBody, SECTION_ENTRY_CAP, type CardSection } from "./HoverCard";
 
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
@@ -248,6 +250,111 @@ describe("HoverCard", () => {
     const card = document.querySelector('[data-testid="metric-hover-card"]');
     expect(card?.closest(".analysis")).toBeNull();
     for (const name of HOVER_PANEL_CLASS.split(" ")) expect([...card!.classList]).toContain(name);
+  });
+
+  it("still shows a card for a row with facts and no breakdown sections", () => {
+    render(
+      <MantineProvider>
+        <HoverCard sections={[]} {...DAMAGE_AMOUNT} damageFacts={{ facts: FACTS(), total: 1000 }}>
+          <button>row</button>
+        </HoverCard>
+      </MantineProvider>
+    );
+    fireEvent.mouseEnter(screen.getByText("row"));
+    expect(document.querySelector('[data-testid="metric-hover-card"]')).not.toBeNull();
+  });
+
+  it("renders the row alone when there is neither a section nor facts to explain", () => {
+    render(
+      <MantineProvider>
+        <HoverCard sections={[]} {...DAMAGE_AMOUNT}>
+          <button>row</button>
+        </HoverCard>
+      </MantineProvider>
+    );
+    fireEvent.mouseEnter(screen.getByText("row"));
+    expect(document.querySelector('[data-testid="metric-hover-card"]')).toBeNull();
+  });
+});
+
+const tally = (over: Partial<FactTally>): FactTally => ({
+  measuredYes: 0,
+  measuredNo: 0,
+  inferredYes: 0,
+  inferredNo: 0,
+  unknown: 0,
+  ...over,
+});
+
+const FACTS = (over: Partial<GroupFacts> = {}): GroupFacts => ({
+  // Fully measured: 3 of 4 counted hits crit, no inference involved.
+  crit: tally({ measuredYes: 3, measuredNo: 1 }),
+  // Half inferred: the tilde/caption case.
+  weakPoint: tally({ inferredYes: 1, inferredNo: 1 }),
+  // Nothing counted: the dash/no-data case.
+  backAttack: tally({ unknown: 4 }),
+  debuffed: tally({}),
+  overdrive: tally({}),
+  break: tally({}),
+  overdriveDamage: 200,
+  breakDamage: 50,
+  ...over,
+});
+
+describe("HoverCardBody — Damage facts", () => {
+  const renderFacts = (facts: GroupFacts, total = 1000) =>
+    render(
+      <MantineProvider>
+        <HoverCardBody sections={[]} {...DAMAGE_AMOUNT} damageFacts={{ facts, total }} />
+      </MantineProvider>
+    );
+
+  it("names the section and each fact row", () => {
+    renderFacts(FACTS());
+    expect(screen.getByText("ui.logs.hover-damage-facts")).toBeTruthy();
+    expect(screen.getByText("ui.skill-columns.crit")).toBeTruthy();
+    expect(screen.getByText("ui.skill-columns.weak-point")).toBeTruthy();
+    expect(screen.getByText("ui.skill-columns.back-attack")).toBeTruthy();
+  });
+
+  it("writes each rate with the same tilde marker the table cell carries", () => {
+    renderFacts(FACTS());
+    expect(screen.getByText("75%")).toBeTruthy(); // fully measured crit — unmarked
+    expect(screen.getByText("50%~")).toBeTruthy(); // half-inferred weak point
+    expect(screen.getByText("—")).toBeTruthy(); // nothing counted for back attack
+  });
+
+  it("captions only the rate that leans on inference", () => {
+    renderFacts(FACTS());
+    expect(screen.getByText("ui.logs.hover-fact-inferred")).toBeTruthy();
+    expect(screen.getByText("ui.logs.hover-fact-no-data")).toBeTruthy();
+  });
+
+  it("skips the inferred caption for a fully measured rate", () => {
+    // Weak point (half-inferred) and back attack (uncounted) each get a
+    // caption; crit (fully measured) does not get a third.
+    const { container } = renderFacts(FACTS());
+    const captions = container.querySelectorAll("[data-card-caption]");
+    expect(captions).toHaveLength(2);
+  });
+
+  it("renders the Overdrive/Break split as an amount and its share of the row total", () => {
+    renderFacts(FACTS(), 1000);
+    expect(screen.getByText("ui.logs.hover-in-overdrive")).toBeTruthy();
+    expect(screen.getByText("ui.logs.hover-in-break")).toBeTruthy();
+    expect(screen.getByText("200")).toBeTruthy();
+    expect(screen.getByText("20.0%")).toBeTruthy(); // 200 / 1000
+    expect(screen.getByText("50")).toBeTruthy();
+    expect(screen.getByText("5.0%")).toBeTruthy(); // 50 / 1000
+  });
+
+  it("renders nothing where the row carries no facts", () => {
+    render(
+      <MantineProvider>
+        <HoverCardBody sections={[]} {...DAMAGE_AMOUNT} />
+      </MantineProvider>
+    );
+    expect(screen.queryByText("ui.logs.hover-damage-facts")).toBeNull();
   });
 });
 

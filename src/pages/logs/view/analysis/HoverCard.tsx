@@ -3,12 +3,15 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { CursorCard } from "@/components/CursorCard";
-import { cn } from "@/components/ui/cn";
 import { EntityIcon } from "@/components/ui/EntityIcon";
 import { Figure } from "@/components/ui/Figure";
 import { Label } from "@/components/ui/Label";
+import { cn } from "@/components/ui/cn";
 import { useCtrlHeld } from "@/components/useCtrlHeld";
-import { share } from "@/utils";
+import type { GroupFacts } from "@/types";
+import { humanizeNumber, share } from "@/utils";
+
+import { factCaption, factCell } from "../metrics/damageDone";
 
 import { MetricBar } from "./MetricBar";
 import { RowArt } from "./RowArt";
@@ -110,6 +113,14 @@ export type HoverCardBodyProps = {
    * so its grow-up offset and viewport clamps — stale for the rest of the
    * hover. It is also the seam future detail content branches on. */
   detailed?: boolean;
+  /** The row's damage-fact tallies, for the "Damage facts" section — absent
+   * wherever `MetricRow.facts` is (see its own doc): the enemy side, `taken`
+   * rows, `other`, and everything the descriptors' SkillState-based fold
+   * produces. `total` is the ROW's own value, not this section's — the
+   * Overdrive/Break split answers "what share of the row happened there",
+   * and an Overdrive+Break sum does not equal the row (a hit can be in
+   * neither, or the row's damage can predate either state). */
+  damageFacts?: { facts: GroupFacts; total: number };
 } & CardAmount;
 
 /** WCL's cap: a section shows its top five entries and stays silent about
@@ -266,18 +277,93 @@ export const CardNotes = ({ headingKey, notes }: { headingKey: string; notes: Ca
   );
 };
 
+/** The Crit%/WP%/BA% rows the "Damage facts" section fills — the same three
+ * `GroupFacts` fields `factColumns` reads, kept in the SAME order the table's
+ * own trailing columns already show them in. */
+const FACT_ROWS: { field: "crit" | "weakPoint" | "backAttack"; labelKey: string }[] = [
+  { field: "crit", labelKey: "ui.skill-columns.crit" },
+  { field: "weakPoint", labelKey: "ui.skill-columns.weak-point" },
+  { field: "backAttack", labelKey: "ui.skill-columns.back-attack" },
+];
+
+/** The Overdrive/Break rows: which `GroupFacts` damage field, and what to call
+ * it. */
+const SPLIT_ROWS: { field: "overdriveDamage" | "breakDamage"; labelKey: string }[] = [
+  { field: "overdriveDamage", labelKey: "ui.logs.hover-in-overdrive" },
+  { field: "breakDamage", labelKey: "ui.logs.hover-in-break" },
+];
+
+/** A row hover card's "Damage facts" section: the same crit/weak-point/
+ * back-attack rates the table's own trailing three columns show (`~` marker
+ * included, from the same `factCell`), each captioned where its rate needs
+ * explaining (`factCaption`); then the Overdrive/Break damage split, as an
+ * amount plus its share of the ROW's own total.
+ *
+ * Rendered directly rather than through `CardSection`/`Section`: every
+ * section of a `HoverCardBody` reads ONE shared `amountKey`/`format`
+ * (`CardAmount`), which fits a breakdown of contributors but not a
+ * percentage rate sitting in the same card as a damage split. Fixed-size —
+ * three rates plus two split rows, each with at most one caption line — so
+ * it never needs the five-entry cap the breakdown sections do. */
+const DamageFactsSection = ({ facts, total }: { facts: GroupFacts; total: number }) => {
+  const { t } = useTranslation();
+  return (
+    <Box data-card-section className={SECTION_CLASS}>
+      <Box data-card-head className="flex h-head items-center bg-raised px-2">
+        <Label className="flex-1">{t("ui.logs.hover-damage-facts")}</Label>
+      </Box>
+      {FACT_ROWS.map(({ field, labelKey }) => {
+        const factTally = facts[field];
+        const caption = factCaption(factTally);
+        return (
+          <Box key={field} data-card-row className="relative mx-1 my-0.5 flex flex-col justify-center px-2 py-1">
+            <Box className="flex items-center">
+              <Text data-card-name className="relative min-w-0 flex-1 truncate text-md">
+                {t(labelKey)}
+              </Text>
+              <Figure data-card-amount size="sm" className={`relative ${AMOUNT_W} text-right`}>
+                {factCell(factTally)}
+              </Figure>
+            </Box>
+            {caption && (
+              <Text data-card-caption className="relative text-xs text-ink-2">
+                {t(caption.key, "params" in caption ? caption.params : undefined)}
+              </Text>
+            )}
+          </Box>
+        );
+      })}
+      {SPLIT_ROWS.map(({ field, labelKey }) => (
+        <Box key={field} data-card-row className={CARD_ROW_CLASS}>
+          <Text data-card-name className="relative min-w-0 flex-1 truncate text-md">
+            {t(labelKey)}
+          </Text>
+          <Figure data-card-amount size="sm" className={`relative ${AMOUNT_W} text-right`}>
+            {humanizeNumber(facts[field])}
+          </Figure>
+          <Figure data-card-share size="sm" tone="muted" className={`relative ${SHARE_W} text-right`}>
+            {share(facts[field], total)}
+          </Figure>
+        </Box>
+      ))}
+    </Box>
+  );
+};
+
 /** The card's contents, separated from its positioning so it can be tested
  * without a cursor.
  *
  * At rest each section truncates to its top `SECTION_ENTRY_CAP` entries;
  * `detailed` lifts that. The portal's 70vh max-height stays as the guard
  * behind both, since a card can stack several sections and a detailed one can
- * be arbitrarily long. */
-export const HoverCardBody = ({ sections, detailed = false, amountKey, format }: HoverCardBodyProps) => (
+ * be arbitrarily long. The "Damage facts" section ignores `detailed` — it is
+ * already fixed-size, so there is nothing for Ctrl to lift. */
+export const HoverCardBody = ({ sections, detailed = false, amountKey, format, damageFacts }: HoverCardBodyProps) => (
   <Box>
     {sections.map((section) => (
       <Section key={section.headingKey} {...section} detailed={detailed} amountKey={amountKey} format={format} />
     ))}
+    {damageFacts && <DamageFactsSection facts={damageFacts.facts} total={damageFacts.total} />}
   </Box>
 );
 
@@ -303,7 +389,7 @@ export const HoverCard = ({
   const content = useMemo(() => <HoverCardBody {...body} detailed={detailed} />, [body, detailed]);
 
   // Nothing to explain — render the row alone rather than an empty card.
-  if (body.sections.every((section) => section.entries.length === 0)) {
+  if (!body.damageFacts && body.sections.every((section) => section.entries.length === 0)) {
     return children;
   }
 

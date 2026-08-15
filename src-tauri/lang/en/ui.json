@@ -543,7 +543,13 @@
       "overcap": "Overcap",
       "overcap-description": "Overcap Percentage",
       "percentage": "%",
-      "percentage-description": "Damage in Percentage"
+      "percentage-description": "Damage in Percentage",
+      "crit": "Crit%",
+      "crit-description": "Critical Hit Rate",
+      "weak-point": "WP%",
+      "weak-point-description": "Weak Point Hit Rate",
+      "back-attack": "BA%",
+      "back-attack-description": "Back Attack Hit Rate"
     },
     "stats": {
       "level": "Level",
@@ -759,6 +765,11 @@
       "hover-by-hits": "Hits",
       "hover-count": "Count",
       "hover-capped": "Capped",
+      "hover-damage-facts": "Damage facts",
+      "hover-in-overdrive": "In Overdrive",
+      "hover-in-break": "In Break",
+      "hover-fact-inferred": "{{pct}}% of counted hits inferred",
+      "hover-fact-no-data": "No hits counted for this fact",
       "chart-dps-label": "Damage per second",
       "chart-sba-label": "Skybound Arts gauge",
       "chart-stun-drill-label": "Stun by Ability",

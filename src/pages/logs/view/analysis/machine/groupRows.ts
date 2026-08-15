@@ -1,9 +1,18 @@
-import type { ActionType, CharacterType, GroupAggregate, GroupKey, GroupMeasure, MergedMeasure } from "@/types";
+import type {
+  ActionType,
+  CharacterType,
+  FactTally,
+  GroupAggregate,
+  GroupFacts,
+  GroupKey,
+  GroupMeasure,
+  MergedMeasure,
+} from "@/types";
 import { humanizeNumber, isSupplementaryAction } from "@/utils";
 
 import { abilityKey, skillKey } from "../../abilityKey";
 import { abilityRowKey, groupOfPin, supplementarySubValue, type RowKeying } from "../../abilitySkills";
-import { damageColumns, playersColumns } from "../../metrics/damageDone";
+import { damageColumns, factColumns, playersColumns } from "../../metrics/damageDone";
 import { drilldownColumns } from "../../metrics/damageTaken";
 import type { Hostility, MetricRow } from "../../metrics/types";
 import { enemyRowKey, playerRowKey, spawnRowKey, takenAttackRowLabel, takenRowKey } from "../../rowKey";
@@ -41,17 +50,30 @@ const extreme = (value: number | null): string => (value === null ? NOT_RECORDED
 /** The numeric cells for one measure, in the exact shape the metric's
  * `columnKeys(groupBy)` headers promise (see CAPABILITIES): the source
  * grouping keeps each metric's players-level shape, everything else fills the
- * metric's drill-down shape. */
-const columnsFor = (ctx: GroupRowsContext, measure: GroupMeasure, total: number): string[] => {
+ * metric's drill-down shape.
+ *
+ * `facts` is a SEPARATE parameter from `measure` rather than read off it,
+ * because `measure` here is the REPORTED view — raw or landings, per the
+ * collapse toggle — and a `MergedMeasure` never carries facts at all (see
+ * `GroupFacts`'s doc). The caller passes the row's own RAW facts regardless
+ * of which view its other cells report, so the crit/WP/BA rate never goes
+ * blank just because the reader turned Merge Sup DMG on. */
+const columnsFor = (ctx: GroupRowsContext, measure: GroupMeasure, total: number, facts?: GroupFacts): string[] => {
   const { amount, hits } = measure;
-  if (ctx.groupBy === "source") {
-    // Both metrics' `columnKeys("players")` promise the same shape here, so
-    // this branch is metric-agnostic.
-    return playersColumns(amount, total, ctx.fightDurationMs);
-  }
-  return ctx.metric === "damage"
-    ? damageColumns(amount, hits, extreme(measure.min), extreme(measure.max), total)
-    : drilldownColumns(amount, hits, ctx.fightDurationMs);
+  const base = (() => {
+    if (ctx.groupBy === "source") {
+      // Both metrics' `columnKeys("players")` promise the same shape here, so
+      // this branch is metric-agnostic.
+      return playersColumns(amount, total, ctx.fightDurationMs);
+    }
+    return ctx.metric === "damage"
+      ? damageColumns(amount, hits, extreme(measure.min), extreme(measure.max), total)
+      : drilldownColumns(amount, hits, ctx.fightDurationMs);
+  })();
+  // Crit/WP/BA are a damage-only reading — `damageTaken.columnKeys` promises
+  // no such cells, and appending them there would render three columns past
+  // what its own header row declares.
+  return ctx.metric === "damage" ? [...base, ...factColumns(facts)] : base;
 };
 
 /** What clicking a row pins: always the dimension the table is grouped by,
@@ -70,11 +92,43 @@ const foldMin = (a: number | null, b: number | null): number | null =>
 const foldMax = (a: number | null, b: number | null): number | null =>
   a === null ? b : b === null ? a : Math.max(a, b);
 
+const addFactTally = (a: FactTally, b: FactTally): FactTally => ({
+  measuredYes: a.measuredYes + b.measuredYes,
+  measuredNo: a.measuredNo + b.measuredNo,
+  inferredYes: a.inferredYes + b.inferredYes,
+  inferredNo: a.inferredNo + b.inferredNo,
+  unknown: a.unknown + b.unknown,
+});
+
+/** Field-wise `GroupFacts` sum, absent-safe like `foldMin`/`foldMax` above: one
+ * side missing keeps the other, both missing stays absent. A skill group is
+ * several backend aggregates folded into one row, and facts fold the same way
+ * every other field here does — sibling-action summing IS the same
+ * aggregation a single row's own facts already are, unlike the mixed `other`
+ * tail (which never reaches `addMeasure` at all; see the `case "other"` below).
+ * Echo aggregates carry no facts of their own (tallied from direct hits
+ * only), so folding one in is a no-op here — exactly the "both absent" case. */
+const addFacts = (a: GroupFacts | undefined, b: GroupFacts | undefined): GroupFacts | undefined => {
+  if (a === undefined) return b;
+  if (b === undefined) return a;
+  return {
+    crit: addFactTally(a.crit, b.crit),
+    weakPoint: addFactTally(a.weakPoint, b.weakPoint),
+    backAttack: addFactTally(a.backAttack, b.backAttack),
+    debuffed: addFactTally(a.debuffed, b.debuffed),
+    overdrive: addFactTally(a.overdrive, b.overdrive),
+    break: addFactTally(a.break, b.break),
+    overdriveDamage: a.overdriveDamage + b.overdriveDamage,
+    breakDamage: a.breakDamage + b.breakDamage,
+  };
+};
+
 const addMeasure = (into: GroupMeasure, measure: GroupMeasure): void => {
   into.amount += measure.amount;
   into.hits += measure.hits;
   into.min = foldMin(into.min, measure.min);
   into.max = foldMax(into.max, measure.max);
+  into.facts = addFacts(into.facts, measure.facts);
 };
 
 const emptyMeasure = (): GroupMeasure => ({ amount: 0, hits: 0, min: null, max: null });
@@ -207,9 +261,10 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
           label: String(key.index),
           kind: "player",
           value: view.amount,
-          columns: columnsFor(ctx, view, total),
+          columns: columnsFor(ctx, view, total, measure.facts),
           pinOnClick: pinFor(ctx, key.index),
           colorSlot: ctx.partySlots.get(key.index) ?? -1,
+          ...(measure.facts !== undefined ? { facts: measure.facts } : {}),
         });
         break;
 
@@ -219,9 +274,10 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
           label: spawnRowKey(key.segment),
           kind: "target",
           value: view.amount,
-          columns: columnsFor(ctx, view, total),
+          columns: columnsFor(ctx, view, total, measure.facts),
           pinOnClick: pinFor(ctx, key.segment),
           colorSlot: -1,
+          ...(measure.facts !== undefined ? { facts: measure.facts } : {}),
         });
         break;
 
@@ -233,9 +289,10 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
           label,
           kind: "enemy",
           value: view.amount,
-          columns: columnsFor(ctx, view, total),
+          columns: columnsFor(ctx, view, total, measure.facts),
           pinOnClick: null,
           colorSlot: -1,
+          ...(measure.facts !== undefined ? { facts: measure.facts } : {}),
         });
         break;
       }
@@ -327,9 +384,10 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
                 kind: "ability",
                 value: reportedMeasure(ctx, member.split).amount,
                 ...subValueOf(ctx, member.split),
-                columns: columnsFor(ctx, reportedMeasure(ctx, member.split), total),
+                columns: columnsFor(ctx, reportedMeasure(ctx, member.split), total, member.split.raw.facts),
                 pinOnClick: { ability: memberKey },
                 colorSlot: abilitySlot,
+                ...(member.split.raw.facts !== undefined ? { facts: member.split.raw.facts } : {}),
               })
             )
             .sort((a, b) => b.value - a.value);
@@ -340,9 +398,10 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
       kind: "ability",
       value: reportedMeasure(ctx, bucket).amount,
       ...subValueOf(ctx, bucket),
-      columns: columnsFor(ctx, reportedMeasure(ctx, bucket), total),
+      columns: columnsFor(ctx, reportedMeasure(ctx, bucket), total, bucket.raw.facts),
       pinOnClick: { ability: rowKey },
       colorSlot: abilitySlot,
+      ...(bucket.raw.facts !== undefined ? { facts: bucket.raw.facts } : {}),
       ...(children === undefined ? {} : { children }),
     });
   }
