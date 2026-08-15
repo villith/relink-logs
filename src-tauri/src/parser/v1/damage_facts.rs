@@ -24,7 +24,6 @@ pub enum GateByte {
     Break,      // +0x163 — target mode
 }
 
-#[allow(dead_code)]
 impl GateByte {
     pub const ALL: [GateByte; 7] = [
         GateByte::Crit,
@@ -90,7 +89,6 @@ pub enum Fact {
     Unknown,
 }
 
-#[allow(dead_code)]
 impl Fact {
     pub fn measured(yes: bool) -> Self {
         if yes {
@@ -110,7 +108,6 @@ impl Fact {
 
 /// The six facts for one damage event.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(dead_code)]
 pub struct HitFacts {
     pub crit: Fact,
     pub weak_point: Fact,
