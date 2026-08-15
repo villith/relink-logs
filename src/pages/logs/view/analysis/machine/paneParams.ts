@@ -37,3 +37,37 @@ export const _sharedFieldsExhaustive: Exhaustive<keyof SharedRaw, typeof SHARED_
  * suffix their index. */
 export const paneParamName = (field: keyof PaneRaw, index: number): string =>
   index === 0 ? field : `${field}${index}`;
+
+/** The compared log ids, pane 1 upward. Per ENTRY degradation, the same rule
+ * `decodeList` follows one level down: a hand-edited id that cannot name a log
+ * discards itself and leaves the rest standing.
+ *
+ * An id equal to the log in the path is KEPT — one run against itself down two
+ * different drill paths is a real comparison. A REPEATED id is dropped, because
+ * two panes carrying one log and one set of pins are the same pane twice. */
+export const decodeCompare = (raw: string | null): number[] => {
+  if (raw === null) return [];
+  const ids = raw
+    .split(",")
+    .map((value) => Number(value))
+    .filter((value) => Number.isInteger(value) && value > 0);
+  return [...new Set(ids)];
+};
+
+/** Empty encodes as null so the param drops out of the URL — a closed
+ * comparison leaves the same address a never-opened one does. */
+export const encodeCompare = (ids: number[]): string | null => (ids.length === 0 ? null : ids.join(","));
+
+/** Drop pane `index` from the comparison. Pane 0 is the log in the path and is
+ * the page itself, so it is not removable here — closing it means navigating. */
+export const removeCompareAt = (ids: number[], index: number): number[] =>
+  index <= 0 ? ids : ids.filter((_, position) => position !== index - 1);
+
+/** Every URL key belonging to one pane.
+ *
+ * Derived from `PANE_FIELDS` rather than spelled out, so a field added to
+ * `PaneRaw` cannot be left behind here — which matters because this is what a
+ * pane REMOVAL clears. nuqs keeps a param it no longer reads, so a suffixed key
+ * left standing after a removal is dormant rather than gone, and reopening a
+ * pane at that index would revive someone else's old filter. */
+export const paneParamNames = (index: number): string[] => PANE_FIELDS.map((field) => paneParamName(field, index));
