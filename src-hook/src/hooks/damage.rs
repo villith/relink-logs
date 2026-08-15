@@ -559,9 +559,6 @@ impl OnProcessDamageHook {
 
         unsafe { ProcessDamageBypass.call(a1, a2, a3) };
 
-        let instance_snapshot =
-            snapshot_window(a2 as usize, INSTANCE_SNAPSHOT_START, INSTANCE_SNAPSHOT_LEN);
-
         let source_specified_instance_ptr = match pre_call_source_ptr {
             Some(ptr) => ptr,
             None => return,
@@ -642,6 +639,14 @@ impl OnProcessDamageHook {
         if player_victim_slot(target_specified_instance_ptr).is_some() {
             return;
         }
+
+        // Post-call, and only on this emit path (after every null-source/
+        // zero-damage/player-victim bail above) — see `run`'s matching
+        // comment for why: the gate bytes are written INSIDE the original
+        // call, so a pre-call copy would miss them, and a rejected hit
+        // shouldn't pay for the copy.
+        let instance_snapshot =
+            snapshot_window(a2 as usize, INSTANCE_SNAPSHOT_START, INSTANCE_SNAPSHOT_LEN);
 
         let _ = self.tx.send(Message::DamageEvent(build_damage_event(
             damage_instance,
