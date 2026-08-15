@@ -938,6 +938,8 @@ mod data_coverage_tests {
             source_current_hp: None,
             source_max_hp: None,
             source_statuses: None,
+            inst_snapshot: None,
+            attacker_snapshot: None,
         })
     }
 
@@ -4746,6 +4748,8 @@ mod tests {
             source_current_hp: None,
             source_max_hp: None,
             source_statuses: None,
+            inst_snapshot: None,
+            attacker_snapshot: None,
         }
     }
 
@@ -4779,6 +4783,8 @@ mod tests {
             source_current_hp: None,
             source_max_hp: None,
             source_statuses: None,
+            inst_snapshot: None,
+            attacker_snapshot: None,
         }
     }
 
@@ -6707,6 +6713,8 @@ mod tests {
             source_current_hp: None,
             source_max_hp: None,
             source_statuses: None,
+            inst_snapshot: None,
+            attacker_snapshot: None,
         }
     }
 
@@ -9610,6 +9618,8 @@ mod tests {
                 source_current_hp: None,
                 source_max_hp: None,
                 source_statuses: None,
+                inst_snapshot: None,
+                attacker_snapshot: None,
             }),
         ));
 
@@ -9648,6 +9658,8 @@ mod tests {
                 source_current_hp: None,
                 source_max_hp: None,
                 source_statuses: None,
+                inst_snapshot: None,
+                attacker_snapshot: None,
             }),
         ));
 
@@ -9679,6 +9691,8 @@ mod tests {
                 source_current_hp: None,
                 source_max_hp: None,
                 source_statuses: None,
+                inst_snapshot: None,
+                attacker_snapshot: None,
             }),
         ));
 
@@ -9722,6 +9736,8 @@ mod tests {
                 source_current_hp: None,
                 source_max_hp: None,
                 source_statuses: None,
+                inst_snapshot: None,
+                attacker_snapshot: None,
             }),
         ));
 
@@ -9753,6 +9769,8 @@ mod tests {
                 source_current_hp: None,
                 source_max_hp: None,
                 source_statuses: None,
+                inst_snapshot: None,
+                attacker_snapshot: None,
             }),
         ));
 
@@ -9798,6 +9816,8 @@ mod tests {
                 source_current_hp: None,
                 source_max_hp: None,
                 source_statuses: None,
+                inst_snapshot: None,
+                attacker_snapshot: None,
             }
         }
 

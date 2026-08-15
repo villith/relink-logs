@@ -1022,6 +1022,7 @@ pub(crate) fn snapshot_player_statuses(actor: *const usize) -> Option<Vec<protoc
         out.push(protocol::SourceStatus {
             status_id,
             stacks: stacks_for(status_id, Some(raw_stacks)),
+            term_bits: None,
         });
     }
     Some(out)

@@ -253,6 +253,22 @@ pub struct DamageEvent {
     /// missing buff as evidence a conditional cap source did NOT apply.
     #[serde(default)]
     pub source_statuses: Option<Vec<SourceStatus>>,
+    /// Raw DamageInstance window `0xC0..0x340` (640 bytes), copied AFTER the
+    /// game's own damage call so the gate bytes the call writes (crit
+    /// +0x15D .. Break +0x163) are visible. The hook records, it does not
+    /// interpret: the offset map lives in `parser::v1::damage_facts`, so a
+    /// wrong interpretation is a parser fix and the logs stay good. `None` on
+    /// old logs, DoT ticks, and when the window fails its readability probe.
+    #[serde(default)]
+    pub inst_snapshot: Option<Vec<u8>>,
+    /// Raw ATTACKER-instance window `0x2480..0x24A0` (32 bytes), captured
+    /// pre-call (the builder computed this hit from pre-call state), and only
+    /// for attackers whose own record carries a party slot — the offsets are
+    /// verified against the `Pl####` layout alone. Known residents: elemental
+    /// base `+0x2488`, at-cap overflow k `+0x249C`; the rest of the window is
+    /// captured for future interpretation.
+    #[serde(default)]
+    pub attacker_snapshot: Option<Vec<u8>>,
 }
 
 /// One status held by the attacker at the moment of a hit, as
@@ -271,6 +287,13 @@ pub struct SourceStatus {
     /// object's `+0xb0` count for the classes `status.tbl` marks `HasLevels`,
     /// and 1 for everything else.
     pub stacks: u32,
+    /// Candidate cached per-status term, as raw f32 bits (`status+0x8`).
+    /// Proven live for cap buffs (`IStatusDamageLimitBuff+8` holds the live
+    /// cap term); a PROBE for every other status class — downstream code
+    /// interprets or ignores it per class, and a relabel never touches logs.
+    /// `None` when the read is unavailable or the bits are not a finite f32.
+    #[serde(default)]
+    pub term_bits: Option<u32>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -1120,6 +1143,8 @@ mod source_state_tests {
             source_current_hp: Some(4_200),
             source_max_hp: Some(10_000),
             source_statuses: Some(Vec::new()),
+            inst_snapshot: None,
+            attacker_snapshot: None,
         };
 
         let round_trip = |e: &DamageEvent| -> DamageEvent {
@@ -1136,10 +1161,12 @@ mod source_state_tests {
             SourceStatus {
                 status_id: 4,
                 stacks: 3,
+                term_bits: None,
             },
             SourceStatus {
                 status_id: 0,
                 stacks: 1,
+                term_bits: None,
             },
         ]);
         let back = round_trip(&event);
@@ -1148,11 +1175,13 @@ mod source_state_tests {
             Some(vec![
                 SourceStatus {
                     status_id: 4,
-                    stacks: 3
+                    stacks: 3,
+                    term_bits: None,
                 },
                 SourceStatus {
                     status_id: 0,
-                    stacks: 1
+                    stacks: 1,
+                    term_bits: None,
                 },
             ])
         );

@@ -1131,6 +1131,8 @@ mod tests {
             source_current_hp: None,
             source_max_hp: None,
             source_statuses: None,
+            inst_snapshot: None,
+            attacker_snapshot: None,
         }
     }
 
@@ -1180,6 +1182,8 @@ mod tests {
             source_current_hp: None,
             source_max_hp: None,
             source_statuses: None,
+            inst_snapshot: None,
+            attacker_snapshot: None,
         }
     }
 
@@ -1589,6 +1593,8 @@ mod tests {
             source_current_hp: None,
             source_max_hp: None,
             source_statuses: None,
+            inst_snapshot: None,
+            attacker_snapshot: None,
         };
 
         // Self-parented Pl2000, matching `dragon_form_damage_attributes_to_the_id_player`.
