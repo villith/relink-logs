@@ -119,6 +119,11 @@ const STATUS_REMAINING_OFFSET: usize = 0x80;
 /// that may turn this into a published number.
 const STATUS_STACKS_OFFSET: usize = 0xb0;
 
+/// Candidate cached-term field on every status object. Proven for cap buffs
+/// (IStatusDamageLimitBuff+8, the live cap term); a probe elsewhere —
+/// published raw, interpreted downstream.
+const STATUS_TERM_OFFSET: usize = 0x8;
+
 /// The ACTOR's current-action id (v2.0.3). Verified statically: FUN_140b06d20
 /// — the proven Pl2000 function that applies Burn with cause 1100 — compares
 /// `[RSI+0x1b690]` against `0x578` (1400 "Fourfold Vengeance (Dragonform)") and
@@ -1019,10 +1024,11 @@ pub(crate) fn snapshot_player_statuses(actor: *const usize) -> Option<Vec<protoc
         let status_id = unsafe { ((status + STATUS_ID_OFFSET) as *const u32).read_unaligned() };
         let raw_stacks =
             unsafe { ((status + STATUS_STACKS_OFFSET) as *const i32).read_unaligned() };
+        let term_raw = unsafe { ((status + STATUS_TERM_OFFSET) as *const u32).read_unaligned() };
         out.push(protocol::SourceStatus {
             status_id,
             stacks: stacks_for(status_id, Some(raw_stacks)),
-            term_bits: None,
+            term_bits: f32::from_bits(term_raw).is_finite().then_some(term_raw),
         });
     }
     Some(out)
@@ -1303,7 +1309,7 @@ mod snapshot_tests {
     struct FakeActor {
         actor: Vec<u64>,
         _statuses: Vec<Vec<u64>>,
-        _slots: Vec<usize>,
+        slots: Vec<usize>,
     }
 
     impl FakeActor {
@@ -1344,12 +1350,18 @@ mod snapshot_tests {
             Self {
                 actor,
                 _statuses: statuses,
-                _slots: slots,
+                slots,
             }
         }
 
         fn ptr(&self) -> *const usize {
             self.actor.as_ptr() as *const usize
+        }
+
+        /// Base address of the `i`-th status object, for tests that need to
+        /// write into a status past what `with_statuses` populates.
+        fn slot(&self, i: usize) -> usize {
+            self.slots[i]
         }
     }
 
@@ -1364,8 +1376,14 @@ mod snapshot_tests {
         assert_eq!(snapshot.len(), 2);
         assert_eq!(snapshot[0].status_id, 4);
         assert_eq!(snapshot[0].stacks, 3);
+        // The fake writes nothing at +0x8 (the term field), so it reads as a
+        // zeroed heap: 0.0f32 is finite, so the walk publishes `Some(0)` — a
+        // genuinely-zero cached term is real information, not a special case
+        // for `None`.
+        assert_eq!(snapshot[0].term_bits, Some(0));
         assert_eq!(snapshot[1].status_id, 0);
         assert_eq!(snapshot[1].stacks, 1);
+        assert_eq!(snapshot[1].term_bits, Some(0));
     }
 
     /// "Captured, and the attacker held nothing" is `Some(vec![])`. A consumer
@@ -1422,6 +1440,20 @@ mod snapshot_tests {
     #[test]
     fn a_null_actor_captures_nothing() {
         assert_eq!(snapshot_player_statuses(std::ptr::null()), None);
+    }
+
+    /// The raw term rides along exactly as stored; non-finite bits publish
+    /// None so garbage can never masquerade as a live term.
+    #[test]
+    fn snapshot_publishes_finite_terms_and_drops_nan() {
+        let fake = FakeActor::with_statuses(&[(4, 3), (7, 1)]);
+        unsafe {
+            ((fake.slot(0) + 0x8) as *mut u32).write(1.25f32.to_bits());
+            ((fake.slot(1) + 0x8) as *mut u32).write(f32::NAN.to_bits());
+        }
+        let snapshot = snapshot_player_statuses(fake.ptr()).expect("captured");
+        assert_eq!(snapshot[0].term_bits, Some(1.25f32.to_bits()));
+        assert_eq!(snapshot[1].term_bits, None);
     }
 }
 

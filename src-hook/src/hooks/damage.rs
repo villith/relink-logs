@@ -559,6 +559,9 @@ impl OnProcessDamageHook {
 
         unsafe { ProcessDamageBypass.call(a1, a2, a3) };
 
+        let instance_snapshot =
+            snapshot_window(a2 as usize, INSTANCE_SNAPSHOT_START, INSTANCE_SNAPSHOT_LEN);
+
         let source_specified_instance_ptr = match pre_call_source_ptr {
             Some(ptr) => ptr,
             None => return,
@@ -642,6 +645,7 @@ impl OnProcessDamageHook {
 
         let _ = self.tx.send(Message::DamageEvent(build_damage_event(
             damage_instance,
+            instance_snapshot,
             Actor {
                 index: source_idx,
                 // See the main path: resolved so summons sharing a body class
@@ -1181,8 +1185,16 @@ impl OnProcessDamageHook {
             return original_value;
         }
 
+        // Post-call: the gate bytes at 0x15D..0x163 are written INSIDE the
+        // original call, so a pre-call copy would miss them. Computed only on
+        // this emit path (after every whiff/zero-damage/victim-slot bail
+        // above), not on every evaluated hit.
+        let instance_snapshot =
+            snapshot_window(a2 as usize, INSTANCE_SNAPSHOT_START, INSTANCE_SNAPSHOT_LEN);
+
         let _ = self.tx.send(Message::DamageEvent(build_damage_event(
             damage_instance,
+            instance_snapshot,
             Actor {
                 index: source_idx,
                 // Resolved, not reported: summons sharing a generic body all
@@ -1617,11 +1629,21 @@ impl OnPlayerHitApplyHook {
                 .as_ref()
         };
         let (target_current_hp, target_max_hp) = read_actor_hp_pair(victim_ptr).unzip();
+        // Late — after every early-return gate above — so a rejected call
+        // never pays for the copy. `snapshot_window` does its own readability
+        // probe for the full `INSTANCE_SNAPSHOT_LEN` span (0x340, wider than
+        // the 0x2D8 already proven above), same as the dealt paths.
+        let instance_snapshot = snapshot_window(
+            damage_instance_ptr as usize,
+            INSTANCE_SNAPSHOT_START,
+            INSTANCE_SNAPSHOT_LEN,
+        );
         // `victim_slot` rather than letting the builder resolve it: that lookup
         // keys only actors carrying a slot identity THEMSELVES, while the
         // resolution above also covers owned bodies (dragon form).
         let _ = self.tx.send(Message::DamageEvent(build_damage_event(
             damage_instance,
+            instance_snapshot,
             source,
             // No attacker state on the taken stream. A player source is
             // rejected outright above, so every attacker reaching here is an
@@ -1660,6 +1682,10 @@ struct SourceState {
     current_hp: Option<u64>,
     max_hp: Option<u64>,
     statuses: Option<Vec<protocol::SourceStatus>>,
+    /// Raw attacker window (`SOURCE_SNAPSHOT_START`), same player-family gate
+    /// as everything else here — including the dragon-form owner walk, which
+    /// reads the HUMAN body.
+    source_snapshot: Option<Vec<u8>>,
 }
 
 impl SourceState {
@@ -1696,6 +1722,11 @@ impl SourceState {
             current_hp,
             max_hp,
             statuses: super::status::snapshot_player_statuses(body),
+            source_snapshot: snapshot_window(
+                body as usize,
+                SOURCE_SNAPSHOT_START,
+                SOURCE_SNAPSHOT_LEN,
+            ),
         }
     }
 }
@@ -1718,6 +1749,7 @@ struct Victim {
 /// sanity guard and the per-spawn target id.
 fn build_damage_event(
     damage_instance: &DamageInstance,
+    instance_snapshot: Option<Vec<u8>>,
     source: Actor,
     source_state: SourceState,
     target: Victim,
@@ -1728,6 +1760,7 @@ fn build_damage_event(
         current_hp: source_current_hp,
         max_hp: source_max_hp,
         statuses: source_statuses,
+        source_snapshot,
     } = source_state;
     let Victim {
         specified_instance_ptr: target_specified_instance_ptr,
@@ -1810,8 +1843,8 @@ fn build_damage_event(
         source_current_hp,
         source_max_hp,
         source_statuses,
-        instance_snapshot: None,
-        source_snapshot: None,
+        instance_snapshot,
+        source_snapshot,
     }
 }
 
@@ -1880,6 +1913,11 @@ pub(crate) const SOURCE_SNAPSHOT_LEN: usize = 0x20;
 /// and one memcpy, because this runs per hit on a game thread (per-call guard
 /// cost is what caused the v1.9.2 in-combat slowdown). `None` (never a
 /// partial copy) when the span is unreadable.
+///
+/// Only ever point this at heap structs (see `readable`'s `IsBadReadPtr`/
+/// PAGE_GUARD caveat): never a guard-page frontier like a growing stack's
+/// tip; established stack-built instances are fine — the taken path has
+/// probed one since 2026-08-05.
 fn snapshot_window(base: usize, start: usize, len: usize) -> Option<Vec<u8>> {
     if base == 0 {
         return None;
