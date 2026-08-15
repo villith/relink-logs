@@ -136,7 +136,7 @@ export const auraPinKey = (aura: string): string => aura.slice(4);
 /** How a window filter is spelled: the kind, optionally `:index` for one
  * individual window. The gate every `win` value passes on the way out of the
  * URL — a value it rejects makes the filter inert, exactly like `AURA_KEY`. */
-const WIN_KEY = /^(sba|link|break)(:\d+)?$/;
+const WIN_KEY = /^(sba|link|overdrive|break)(:\d+)?$/;
 
 /** The kind and 0-based per-kind index a `win` value names; null index = the
  * whole kind. Only call on a value `WIN_KEY` admits. */

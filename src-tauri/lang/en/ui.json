@@ -781,6 +781,7 @@
       "chart-marker-sba": "SBA",
       "chart-window-sba": "SBA windows",
       "chart-window-link": "Link Time",
+      "chart-window-overdrive": "Overdrive",
       "chart-window-break": "Break",
       "chart-marker-death-line": "☠ {{name}} died",
       "chart-marker-sba-line": "{{name}} — Skybound Art",

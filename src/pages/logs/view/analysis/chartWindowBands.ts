@@ -2,8 +2,8 @@ import type { ChartWindow } from "@/types";
 
 import { toBands, type Band } from "../statusBands";
 
-/** The three battle-state windows the chart shades, in draw order. */
-export const WINDOW_KINDS = ["sba", "link", "break"] as const;
+/** The four battle-state windows the chart shades, in draw order. */
+export const WINDOW_KINDS = ["sba", "link", "overdrive", "break"] as const;
 export type WindowKind = (typeof WINDOW_KINDS)[number];
 
 /** One shaded battle-state span, ready for the chart: the kind (for the
@@ -20,11 +20,15 @@ export type WindowBand = { kind: WindowKind; color: string; band: Band };
  *   opening edge, and one entity wears one hue.
  * - `link` takes indigo — cooler than the drag accent's cyan (`--color-accent`),
  *   which only ever appears mid-drag anyway.
+ * - `overdrive` takes yellow — the enemy is heightened but not yet down, so it
+ *   gets the warm-but-not-yet-`break` amber reading, distinct from both `break`'s
+ *   orange and any party colour.
  * - `break` takes orange: the "enemy is down, burn it" reading, and the only
- *   warm hue on the plot. */
+ *   other warm hue on the plot. */
 export const WINDOW_BAND_COLOR: Record<WindowKind, string> = {
   sba: "var(--mantine-color-grape-4)",
   link: "var(--mantine-color-indigo-4)",
+  overdrive: "var(--mantine-color-yellow-5)",
   break: "var(--mantine-color-orange-5)",
 };
 
@@ -32,6 +36,7 @@ export const WINDOW_BAND_COLOR: Record<WindowKind, string> = {
 export const WINDOW_LABEL_KEY: Record<WindowKind, string> = {
   sba: "ui.logs.chart-window-sba",
   link: "ui.logs.chart-window-link",
+  overdrive: "ui.logs.chart-window-overdrive",
   break: "ui.logs.chart-window-break",
 };
 

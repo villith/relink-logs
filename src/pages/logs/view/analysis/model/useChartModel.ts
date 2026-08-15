@@ -467,7 +467,10 @@ export const useChartModel = ({
           // still leads with the enemy — that is what distinguishes two Breaks
           // of the same kind from each other.
           text: (span, amount) => {
-            const enemy = span.kind === "break" ? breakEnemyOf(span.actorIndex, span) : null;
+            // Overdrive windows carry a per-enemy actor index exactly like
+            // Break's.
+            const enemy =
+              span.kind === "break" || span.kind === "overdrive" ? breakEnemyOf(span.actorIndex, span) : null;
             const withAmount = amount !== null;
             return t(
               enemy === null

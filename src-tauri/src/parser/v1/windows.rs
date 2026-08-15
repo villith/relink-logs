@@ -1,8 +1,8 @@
 //! Chart windows: spans of fight time during which a party-wide (or
 //! per-enemy) battle state held — Link Time, an SBA performance, an enemy's
-//! Break — assembled from the transition events the hook records. The
-//! analysis chart shades them behind its series, the way the aura filter's
-//! bands already shade exclusions.
+//! Overdrive or Break — assembled from the transition events the hook
+//! records. The analysis chart shades them behind its series, the way the
+//! aura filter's bands already shade exclusions.
 //!
 //! Assembled on read from the raw event log (like `assemble_intervals`), so
 //! nothing has to hold open windows across a reparse and older logs simply
@@ -19,6 +19,8 @@ pub enum ChartWindowKind {
     Sba,
     /// Link Time.
     Link,
+    /// An enemy sitting in Overdrive (heightened, pre-Break).
+    Overdrive,
     /// An enemy sitting in Break after its overdrive gauge depleted.
     Break,
 }
@@ -31,9 +33,9 @@ pub struct ChartWindow {
     pub kind: ChartWindowKind,
     pub start_ms: i64,
     pub end_ms: i64,
-    /// The breaking enemy's actor index for `Break` windows (so two bosses'
-    /// breaks stay distinguishable in a tooltip); `None` for the party-wide
-    /// kinds.
+    /// The enemy's actor index for `Overdrive`/`Break` windows (so two
+    /// bosses' state stays distinguishable in a tooltip); `None` for the
+    /// party-wide kinds.
     pub actor_index: Option<u32>,
 }
 
@@ -98,10 +100,16 @@ pub fn corroborated_sba_activations(events: &[(i64, Message)]) -> HashSet<usize>
 
 /// Walks the raw log and pairs each state's transitions into windows.
 ///
-/// Link and Break come from the hook's latched transition events; the walk
-/// still tolerates repeats (a re-sent `active=true` extends nothing) and a
-/// window still open at the last event closes at `fight_end_ms` — the state
-/// genuinely held to the end of what was recorded.
+/// Link, Overdrive and Break come from the hook's latched transition events;
+/// the walk still tolerates repeats (a re-sent `active=true`, or a mode event
+/// repeating the mode already open, extends nothing) and a window still open
+/// at the last event closes at `fight_end_ms` — the state genuinely held to
+/// the end of what was recorded.
+///
+/// Overdrive and Break are mutually exclusive per enemy — an `EnemyMode`
+/// event names the ONE mode that enemy is now in, so a transition between
+/// them closes whichever was open and opens the other in the same step; a
+/// transition to Normal closes whichever was open and opens neither.
 ///
 /// SBA windows are DERIVED, not captured, by CLUSTERING the log's SBA
 /// activity: every SBA-typed damage event plus every corroborated activation
@@ -126,6 +134,8 @@ pub fn assemble_chart_windows(
     let mut link_open: Option<i64> = None;
     // Per-enemy: the break's opening timestamp, keyed by actor index.
     let mut break_open: HashMap<u32, i64> = HashMap::new();
+    // Per-enemy: the overdrive's opening timestamp, keyed by actor index.
+    let mut overdrive_open: HashMap<u32, i64> = HashMap::new();
     // The open SBA cluster, as [first, last] activity timestamps.
     let mut sba_cluster: Option<(i64, i64)> = None;
     let corroborated = corroborated_sba_activations(events);
@@ -165,21 +175,27 @@ pub fn assemble_chart_windows(
                 _ => {}
             },
             Message::EnemyMode(event) => {
-                let breaking = event.mode == protocol::EnemyModeEvent::MODE_BREAK;
-                match (breaking, break_open.get(&event.actor_index).copied()) {
-                    (true, None) => {
-                        break_open.insert(event.actor_index, at);
+                let actor = event.actor_index;
+                // An EnemyMode event names the ONE mode this enemy is now
+                // in, so entering one of Overdrive/Break closes the other if
+                // it was open (a direct 2->1 or 1->2 transition) before
+                // opening the new one; entering Normal closes whichever was
+                // open and opens neither. `or_insert` on the still-open side
+                // is what makes a repeated mode extend nothing.
+                if event.mode != protocol::EnemyModeEvent::MODE_OVERDRIVE {
+                    if let Some(start) = overdrive_open.remove(&actor) {
+                        windows.push(window(ChartWindowKind::Overdrive, start, at, Some(actor)));
                     }
-                    (false, Some(start)) => {
-                        windows.push(window(
-                            ChartWindowKind::Break,
-                            start,
-                            at,
-                            Some(event.actor_index),
-                        ));
-                        break_open.remove(&event.actor_index);
+                }
+                if event.mode != protocol::EnemyModeEvent::MODE_BREAK {
+                    if let Some(start) = break_open.remove(&actor) {
+                        windows.push(window(ChartWindowKind::Break, start, at, Some(actor)));
                     }
-                    _ => {}
+                }
+                if event.mode == protocol::EnemyModeEvent::MODE_OVERDRIVE {
+                    overdrive_open.entry(actor).or_insert(at);
+                } else if event.mode == protocol::EnemyModeEvent::MODE_BREAK {
+                    break_open.entry(actor).or_insert(at);
                 }
             }
             _ => {}
@@ -197,6 +213,14 @@ pub fn assemble_chart_windows(
     for (actor_index, start) in break_open {
         windows.push(window(
             ChartWindowKind::Break,
+            start,
+            fight_end_ms,
+            Some(actor_index),
+        ));
+    }
+    for (actor_index, start) in overdrive_open {
+        windows.push(window(
+            ChartWindowKind::Overdrive,
             start,
             fight_end_ms,
             Some(actor_index),
@@ -445,6 +469,17 @@ mod tests {
         assert_eq!(
             windows,
             vec![
+                // Enemy 7's own Overdrive phase, before it broke — this
+                // fixture predates the Overdrive kind and originally only
+                // asserted the Break window below; now that Overdrive is
+                // tracked too, the 1->2 hand-off at 2_000 genuinely produces
+                // both windows.
+                ChartWindow {
+                    kind: ChartWindowKind::Overdrive,
+                    start_ms: 1_000,
+                    end_ms: 2_000,
+                    actor_index: Some(7)
+                },
                 ChartWindow {
                     kind: ChartWindowKind::Break,
                     start_ms: 2_000,
@@ -457,6 +492,36 @@ mod tests {
                     start_ms: 2_500,
                     end_ms: 8_000,
                     actor_index: Some(9)
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn overdrive_and_break_are_separate_windows_that_hand_off_directly() {
+        // One enemy's full arc: Normal -> Overdrive -> Break -> Normal. The
+        // 1->2 transition at 2_000 must close the Overdrive window and open
+        // Break in the same step — not merge the two kinds into one span.
+        let events = vec![
+            mode(1_000, 7, EnemyModeEvent::MODE_OVERDRIVE),
+            mode(2_000, 7, EnemyModeEvent::MODE_BREAK),
+            mode(5_000, 7, EnemyModeEvent::MODE_NORMAL),
+        ];
+        let windows = assemble_chart_windows(&events, 0, 8_000);
+        assert_eq!(
+            windows,
+            vec![
+                ChartWindow {
+                    kind: ChartWindowKind::Overdrive,
+                    start_ms: 1_000,
+                    end_ms: 2_000,
+                    actor_index: Some(7)
+                },
+                ChartWindow {
+                    kind: ChartWindowKind::Break,
+                    start_ms: 2_000,
+                    end_ms: 5_000,
+                    actor_index: Some(7)
                 },
             ]
         );
