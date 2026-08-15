@@ -396,32 +396,46 @@ const critSection = (
 const classSection = (hit: ExplainHit): ExplainSection => {
   const cls = capClassOf(hit.class_flags);
   const record = parseRecordSnapshot(hit.record_snapshot);
-  // Only Skill and SBA read a record dmg% term (formula tree f24); Normal
-  // does not, so a resolved "normal" class is a real "other-class" exclusion
-  // rather than a missing capture, even when the snapshot itself is present.
+  // class UNKNOWN (old log, unreadable class_flags) is checked FIRST: "no
+  // record term for this class" is only proven for a RESOLVED "normal"
+  // class, and asserting it when the class itself is unknown would overclaim
+  // — the honest read there is "nothing recorded", same as a missing snapshot.
+  //
+  // Otherwise, only Skill and SBA read a record dmg% term (formula tree
+  // f24); Normal does not, so a resolved "normal" class is a real
+  // "other-class" exclusion rather than a missing capture, even when the
+  // snapshot itself is present.
   const recordLine: ExplainLine =
-    cls === "skill" || cls === "sba"
-      ? record === null
-        ? {
-            key: "record",
-            name: { kind: "key", value: "ui.debug.dmg-line-record" },
-            value: absent,
-            source: { kind: "literal", value: "record+0x24 (Skill) / +0x1C (SBA)" },
-            excluded: "value-unrecorded",
-          }
-        : {
-            key: "record",
-            name: { kind: "key", value: "ui.debug.dmg-line-record" },
-            value: { kind: "percent", value: cls === "skill" ? record.skill : record.sba },
-            source: { kind: "literal", value: cls === "skill" ? "record+0x24" : "record+0x1C" },
-          }
-      : {
+    cls === null
+      ? {
           key: "record",
           name: { kind: "key", value: "ui.debug.dmg-line-record" },
           value: absent,
           source: { kind: "literal", value: "record+0x24 (Skill) / +0x1C (SBA)" },
-          excluded: "other-class",
-        };
+          excluded: "value-unrecorded",
+        }
+      : cls === "skill" || cls === "sba"
+        ? record === null
+          ? {
+              key: "record",
+              name: { kind: "key", value: "ui.debug.dmg-line-record" },
+              value: absent,
+              source: { kind: "literal", value: "record+0x24 (Skill) / +0x1C (SBA)" },
+              excluded: "value-unrecorded",
+            }
+          : {
+              key: "record",
+              name: { kind: "key", value: "ui.debug.dmg-line-record" },
+              value: { kind: "percent", value: cls === "skill" ? record.skill : record.sba },
+              source: { kind: "literal", value: cls === "skill" ? "record+0x24" : "record+0x1C" },
+            }
+        : {
+            key: "record",
+            name: { kind: "key", value: "ui.debug.dmg-line-record" },
+            value: absent,
+            source: { kind: "literal", value: "record+0x24 (Skill) / +0x1C (SBA)" },
+            excluded: "other-class",
+          };
   return {
     key: "dmg-class",
     titleKey: "ui.debug.dmg-sec-class",

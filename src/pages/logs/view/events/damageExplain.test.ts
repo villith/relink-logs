@@ -370,6 +370,18 @@ describe("class section", () => {
     expect(normal.excluded).toBe("other-class");
     expect(normal.value).toEqual({ kind: "absent" });
   });
+
+  it("excludes the record dmg% line as value-unrecorded (not other-class) when the class itself is unknown", () => {
+    // "no record term for this class" is only proven for a RESOLVED Normal
+    // class — an unknown class_flags (old log) must not overclaim it, even
+    // with a snapshot present.
+    const unknown = line("dmg-class", "record", {
+      class_flags: null,
+      record_snapshot: recordBlob([[0x24, f32Bytes(15)]]),
+    });
+    expect(unknown.excluded).toBe("value-unrecorded");
+    expect(unknown.value).toEqual({ kind: "absent" });
+  });
 });
 
 describe("taken/variance section", () => {

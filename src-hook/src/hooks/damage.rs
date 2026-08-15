@@ -1983,6 +1983,12 @@ fn within_module_image(addr: usize, module_base: usize) -> bool {
 /// the module": a garbage vtable pointer (unfamiliar actor class, shifted
 /// layout) must never be called through, and an ordinary heap address is
 /// exactly the shape that check has to catch.
+///
+/// Accepted residual: an in-image-but-WRONG slot value — a future vtable
+/// reshuffle that lands some other function at `+0x9f0` — calls that
+/// function with `holder` as `this`. Nothing here can catch that; it is the
+/// same residual every other virtual call in this file already carries
+/// unguarded (`actor_type_id`'s vtable dispatch, for one).
 fn resolve_player_record(attacker: usize) -> Option<usize> {
     use crate::hooks::diag::{read_ptr_guarded, MODULE_BASE};
 
