@@ -39,6 +39,9 @@ docs/damage-calculators/
 # Superpowers specs/plans are local working notes — never commit them
 docs/superpowers/
 
+# Python bytecode caches for scripts/*.py
+__pycache__/
+
 # CI-only Tauri config overlay (carries bundle.windows.signCommand), written
 # by .github/workflows/release.yaml at build time — never committed
 .tauri-release-config.json
