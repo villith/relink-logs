@@ -1,5 +1,16 @@
 # Damage facts capture — live-gate handoff (2026-08-15)
 
+**2026-08-15 afternoon update:** `feat/remote-sba-gains` (36 commits — the
+predicted-cap card, blind sweep, grid-state registry and the SBA weight-share
+validation arc) is now MERGED into this branch (`74cc2aa2`; the two lines had
+forked from the same dev commit and never met, which is why the debug panel
+knew nothing about cap prediction). On top of the merge, `b0e7863e` pivots
+the cap debug tab's capless branch to a PREDICTED cap section using the
+card's own gates and arithmetic, so a remote player's hit now derives
+`trunc(base × (1 + record + DMG Cap + active channel))` with itemized rows
+instead of stopping at "no cap". Also `0e1990be` fixed the builder-populated
+discriminator (precap-only; see gate (b) below).
+
 Branch `feat/damage-facts` (off `dev` at `6aa417e4`), through `d27246ac`.
 Ships raw per-hit snapshot windows — DamageInstance `0xC0..0x340` post-call,
 source actor `0x2480..0x24A0` + record `record+0x18..0x28` pre-call, raw
