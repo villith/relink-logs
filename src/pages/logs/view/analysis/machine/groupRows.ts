@@ -37,6 +37,12 @@ export type GroupRowsContext = {
    * agree about which row an echo is on, and deriving it three times is how
    * they would come to differ. Absent = the uncollapsed fold. */
   keying?: RowKeying;
+  /** The `show_damage_facts` setting: whether the WP%/BA% columns are filled
+   * and the rows carry their `facts` at all. Off (the default) it gates BOTH —
+   * the columns here and, because `MetricTable` forwards `row.facts` into the
+   * hover card, that card's "Damage facts" section with them. One flag, so the
+   * columns can never appear without the section that explains their `~`. */
+  showDamageFacts?: boolean;
 };
 
 /** Shown where a measure never recorded an extreme (a walk with no per-hit
@@ -70,14 +76,20 @@ const columnsFor = (ctx: GroupRowsContext, measure: GroupMeasure, total: number,
       ? damageColumns(amount, hits, extreme(measure.min), extreme(measure.max), total)
       : drilldownColumns(amount, hits, ctx.fightDurationMs);
   })();
-  // Crit/WP/BA are a damage-only reading — `damageTaken.columnKeys` promises
-  // no such cells, and appending them there would render three columns past
-  // what its own header row declares.
-  return ctx.metric === "damage" ? [...base, ...factColumns(facts)] : base;
+  // WP/BA are a damage-only reading — `damageTaken.columnKeys` promises no such
+  // cells, and appending them there would render two columns past what its own
+  // header row declares. `factColumns` is empty unless the setting is on, which
+  // is the same flag `columnKeys` withholds the headers on.
+  return ctx.metric === "damage" ? [...base, ...factColumns(facts, ctx.showDamageFacts)] : base;
 };
 
-/** The row's own fact tallies, gated on the METRIC rather than on whether the
- * measure happens to carry them.
+/** The row's own fact tallies, gated on the SETTING and on the METRIC rather
+ * than on whether the measure happens to carry them.
+ *
+ * The setting gate is here rather than at the card, because this is the one
+ * place every fact-carrying surface reads through: with it off no row carries
+ * facts, so the hover card's "Damage facts" section has nothing to render and
+ * disappears without a second condition anywhere to keep in step.
  *
  * `GroupMeasure.facts` is documented absent on `taken` rows, but a row/column
  * fold that trusted that alone is one backend skew away from lighting the
@@ -87,7 +99,7 @@ const columnsFor = (ctx: GroupRowsContext, measure: GroupMeasure, total: number,
  * directly, so `MetricTable`'s forwarding of `row.facts` into the hover card
  * inherits the gate for free. */
 const factsOf = (ctx: GroupRowsContext, measure: GroupMeasure): GroupFacts | undefined =>
-  ctx.metric === "damage" ? measure.facts : undefined;
+  ctx.metric === "damage" && ctx.showDamageFacts === true ? measure.facts : undefined;
 
 /** What clicking a row pins: always the dimension the table is grouped by,
  * carried in the existing `SelectorPins` wire shape (`source`/`targets[0]`/

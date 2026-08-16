@@ -113,16 +113,10 @@ describe("groupRowsFor — player rows", () => {
     expect(rows[0].colorSlot).toBe(3);
     expect(rows[1].colorSlot).toBe(0);
     expect(rows[0].kind).toBe("player");
-    // The damage source shape: amount, rate, share of the fetched total, then
-    // three dashes — this fixture's `measure` carries no facts.
-    expect(rows[0].columns).toEqual([
-      humanizeNumber(3000),
-      ratePerSecond(3000, 10_000),
-      share(3000, 4000),
-      "—",
-      "—",
-      "—",
-    ]);
+    // The damage source shape: amount, rate, share of the fetched total. The
+    // WP/BA cells are off by default (`show_damage_facts`), so the row ends
+    // here — see the damage-facts block below for the shape with them on.
+    expect(rows[0].columns).toEqual([humanizeNumber(3000), ratePerSecond(3000, 10_000), share(3000, 4000)]);
   });
 
   it("pins the TARGET dimension when players are the grouped targets (enemy side)", () => {
@@ -183,8 +177,8 @@ describe("groupRowsFor — skill-group fold", () => {
   it("fills the six damage drill-down columns from the summed measure", () => {
     const rows = groupRowsFor(members, ctx({ groupBy: "ability", source: 0 }));
     const total = 450;
-    // amount, hits, min, max, average, share, then the crit/WP/BA cells —
-    // dashes here, since these fixtures carry no facts.
+    // amount, hits, min, max, average, share. The WP/BA cells are off by
+    // default, so nothing trails the share.
     expect(rows[0].columns).toEqual([
       humanizeNumber(400),
       "4",
@@ -192,9 +186,6 @@ describe("groupRowsFor — skill-group fold", () => {
       humanizeNumber(150),
       humanizeNumber(100),
       share(400, total),
-      "—",
-      "—",
-      "—",
     ]);
   });
 
@@ -740,17 +731,36 @@ describe("groupRowsFor — damage facts", () => {
     });
     const rows = groupRowsFor(
       [agg({ kind: "player", index: 0 }, withFacts(measure(1000, 4), rowFacts))],
-      ctx({ groupBy: "source" })
+      ctx({ showDamageFacts: true, groupBy: "source" })
     );
-    // amount, rate, share, then crit% (75%), WP% (50%~, all inferred), BA% (—, nothing counted).
-    expect(rows[0].columns.slice(3)).toEqual(["75%", "50%~", "—"]);
+    // amount, rate, share, then WP% (50%~, all inferred) and BA% (—, nothing
+    // counted). Crit is tallied onto `MetricRow.facts` for the hover card but
+    // has no column of its own.
+    expect(rows[0].columns.slice(3)).toEqual(["50%~", "—"]);
     expect(rows[0].facts).toEqual(rowFacts);
   });
 
   it("leaves facts absent, and the trailing cells dashes, where the aggregate carries none", () => {
-    const rows = groupRowsFor([agg({ kind: "player", index: 0 }, measure(1000, 4))], ctx({ groupBy: "source" }));
+    const rows = groupRowsFor(
+      [agg({ kind: "player", index: 0 }, measure(1000, 4))],
+      ctx({ showDamageFacts: true, groupBy: "source" })
+    );
     expect(rows[0].facts).toBeUndefined();
-    expect(rows[0].columns.slice(3)).toEqual(["—", "—", "—"]);
+    expect(rows[0].columns.slice(3)).toEqual(["—", "—"]);
+  });
+
+  // `show_damage_facts` is off by default, and it gates BOTH surfaces from one
+  // place: no fact cells (the headers are withheld on the same flag), and no
+  // `MetricRow.facts`, which is what makes the hover card's "Damage facts"
+  // section disappear with them.
+  it("withholds both the cells and the row's facts while the setting is off", () => {
+    const rows = groupRowsFor(
+      [agg({ kind: "player", index: 0 }, withFacts(measure(1000, 4), facts({ crit: tally({ measuredYes: 4 }) })))],
+      ctx({ groupBy: "source" })
+    );
+
+    expect(rows[0].columns).toHaveLength(3);
+    expect(rows[0].facts).toBeUndefined();
   });
 
   it("never appends fact cells to a taken row, even if its measure carried them", () => {
@@ -758,7 +768,7 @@ describe("groupRowsFor — damage facts", () => {
     // the column fold must not lean on that alone — it gates on the METRIC.
     const rows = groupRowsFor(
       [agg({ kind: "player", index: 0 }, withFacts(measure(1000, 4), facts()))],
-      ctx({ metric: "taken", groupBy: "source" })
+      ctx({ showDamageFacts: true, metric: "taken", groupBy: "source" })
     );
     expect(rows[0].columns).toHaveLength(3);
     // Same gate: a taken row must never carry `MetricRow.facts` either, or the
@@ -779,7 +789,7 @@ describe("groupRowsFor — damage facts", () => {
         withFacts(measure(100, 1), facts({ crit: tally({ measuredYes: 1 }), overdriveDamage: 50, breakDamage: 20 }))
       ),
     ];
-    const [parent] = groupRowsFor(grouped, ctx({ groupBy: "ability" }));
+    const [parent] = groupRowsFor(grouped, ctx({ showDamageFacts: true, groupBy: "ability" }));
     expect(parent.facts?.crit).toEqual(tally({ measuredYes: 3, measuredNo: 1 }));
     expect(parent.facts?.overdriveDamage).toBe(150);
     expect(parent.facts?.breakDamage).toBe(20);
@@ -793,7 +803,7 @@ describe("groupRowsFor — damage facts", () => {
       ),
       agg({ kind: "friendlyAbility", actionType: { Normal: 110 }, childCharacterType: "Pl0000" }, measure(100, 1)),
     ];
-    const [parent] = groupRowsFor(grouped, ctx({ groupBy: "ability" }));
+    const [parent] = groupRowsFor(grouped, ctx({ showDamageFacts: true, groupBy: "ability" }));
     expect(parent.facts?.crit).toEqual(tally({ measuredYes: 2 }));
   });
 
@@ -802,7 +812,7 @@ describe("groupRowsFor — damage facts", () => {
       agg({ kind: "friendlyAbility", actionType: { Normal: 100 }, childCharacterType: "Pl0000" }, measure(300, 3)),
       agg({ kind: "friendlyAbility", actionType: { Normal: 110 }, childCharacterType: "Pl0000" }, measure(100, 1)),
     ];
-    const [parent] = groupRowsFor(grouped, ctx({ groupBy: "ability" }));
+    const [parent] = groupRowsFor(grouped, ctx({ showDamageFacts: true, groupBy: "ability" }));
     expect(parent.facts).toBeUndefined();
   });
 
@@ -817,7 +827,7 @@ describe("groupRowsFor — damage facts", () => {
         withFacts(measure(100, 1), facts({ crit: tally({ measuredNo: 1 }) }))
       ),
     ];
-    const [parent] = groupRowsFor(grouped, ctx({ groupBy: "ability" }));
+    const [parent] = groupRowsFor(grouped, ctx({ showDamageFacts: true, groupBy: "ability" }));
     const member100 = parent.children?.find((child) => child.key === "skill:Normal:100");
     const member110 = parent.children?.find((child) => child.key === "skill:Normal:110");
     expect(member100?.facts?.crit).toEqual(tally({ measuredYes: 2 }));
@@ -827,10 +837,10 @@ describe("groupRowsFor — damage facts", () => {
   it("reads facts off the RAW measure even when the collapse reports the landing view", () => {
     // The merged view never carries facts (see `GroupFacts`'s doc) — the fact
     // cells must not go blank just because the reader turned Merge Sup DMG on.
-    const rowFacts = facts({ crit: tally({ measuredYes: 1 }) });
+    const rowFacts = facts({ weakPoint: tally({ measuredYes: 1 }) });
     const rows = groupRowsFor(
       [agg({ kind: "player", index: 0 }, withFacts(measure(1000, 4), rowFacts), merged(1300, 4, null, null, 300))],
-      ctx({ groupBy: "source", keying: rowKeyingFor([], true) })
+      ctx({ showDamageFacts: true, groupBy: "source", keying: rowKeyingFor([], true) })
     );
     // The amount reports the merged view (1300, not 1000) while the fact cell
     // still reads.

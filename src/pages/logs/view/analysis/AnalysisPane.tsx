@@ -134,6 +134,10 @@ export const AnalysisPane = ({ paneIndex, logId, filters, drawsChart }: Analysis
     // is a preference that should outlive the log they set it on, and the param
     // put it back to off on every log they opened.
     collapseSupplementary,
+    // Whether the damage table carries WP%/BA% and its rows explain them. Off
+    // by default — the rates are only as good as what the hook measured per
+    // hit, and on most rows they read as a dash.
+    showDamageFacts,
   } = useMeterSettingsStore(
     useShallow((state) => ({
       show_display_names: state.show_display_names,
@@ -144,6 +148,7 @@ export const AnalysisPane = ({ paneIndex, logId, filters, drawsChart }: Analysis
       color_3: state.color_3,
       color_4: state.color_4,
       collapseSupplementary: state.merge_supplementary,
+      showDamageFacts: state.show_damage_facts,
     }))
   );
   const setSettings = useMeterSettingsStore((state) => state.set);
@@ -162,7 +167,10 @@ export const AnalysisPane = ({ paneIndex, logId, filters, drawsChart }: Analysis
   const [tab] = useQueryState("tab", { history: "replace" });
   const body = bodyFor(tab);
   const caps = CAPABILITIES[state.metric];
-  const spec = useMemo(() => resolveViewSpec(state, caps), [state, caps]);
+  // The setting rides in because it decides the table's HEADER list — the cells
+  // that fill it are gated on the same flag in `groupRowsFor`, so the two can
+  // only move together.
+  const spec = useMemo(() => resolveViewSpec(state, caps, showDamageFacts), [state, caps, showDamageFacts]);
 
   const metricKey = state.metric;
   // Effective hostility — the resolver's own rule: `side=enemy` is reachable
@@ -328,6 +336,7 @@ export const AnalysisPane = ({ paneIndex, logId, filters, drawsChart }: Analysis
     statusWindow,
     fightDurationMs,
     rowKeying,
+    showDamageFacts,
     shownEncounter,
     sourcePin: state.source,
     identity,

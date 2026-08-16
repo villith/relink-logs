@@ -283,9 +283,11 @@ export const CardNotes = ({ headingKey, notes }: { headingKey: string; notes: Ca
   );
 };
 
-/** The Crit%/WP%/BA% rows the "Damage facts" section fills — the same three
- * `GroupFacts` fields `factColumns` reads, kept in the SAME order the table's
- * own trailing columns already show them in. */
+/** The Crit%/WP%/BA% rows the "Damage facts" section fills, in the order the
+ * table's own trailing columns show them.
+ *
+ * Crit leads and has no column of its own — the card is where it is read (see
+ * `factColumns`) — so this list is one longer than the table's, deliberately. */
 const FACT_ROWS: { field: "crit" | "weakPoint" | "backAttack"; labelKey: string }[] = [
   { field: "crit", labelKey: "ui.skill-columns.crit" },
   { field: "weakPoint", labelKey: "ui.skill-columns.weak-point" },

@@ -109,6 +109,9 @@ export type RowModelInput = {
   statusWindow: { startMs: number; endMs: number };
   fightDurationMs: number;
   rowKeying: RowKeying;
+  /** The `show_damage_facts` setting — whether damage rows carry their WP%/BA%
+   * cells and their fact tallies at all (see `GroupRowsContext`). */
+  showDamageFacts: boolean;
   shownEncounter: EncounterState | null;
   sourcePin: number | null;
   identity: ActorIdentity;
@@ -134,6 +137,7 @@ export const useRowModel = ({
   statusWindow,
   fightDurationMs,
   rowKeying,
+  showDamageFacts,
   shownEncounter,
   sourcePin,
   identity,
@@ -175,6 +179,7 @@ export const useRowModel = ({
         // It also carries which view the rows report: landings only when the
         // reader asked for echoes to be merged.
         keying: rowKeying,
+        showDamageFacts,
       });
     }
     return shownEncounter
@@ -214,6 +219,7 @@ export const useRowModel = ({
     statusWindow,
     hostility,
     rowKeying,
+    showDamageFacts,
   ]);
 
   // Child rows behind one table row — the descriptor's split bound to the

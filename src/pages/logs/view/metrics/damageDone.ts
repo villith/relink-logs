@@ -81,14 +81,26 @@ export const factCell = (tally?: FactTally): string => {
   return rate === NOT_RECORDED || inferredShare(tally) === 0 ? rate : `${rate}~`;
 };
 
-/** The Crit%/WP%/BA% cells appended after every damage row's own columns —
- * see `columnKeys`. `~` is an intentional glyph, not prose: `factCell` is the
- * one place it is written, so no JSX ever spells it out literally. */
-export const factColumns = (facts?: GroupFacts): string[] => [
-  factCell(facts?.crit),
-  factCell(facts?.weakPoint),
-  factCell(facts?.backAttack),
-];
+/** The headers the WP%/BA% cells sit under. Declared beside the cells that fill
+ * them because the two must agree exactly: a header list and a cell list that
+ * disagree render the trailing columns under the wrong names, or under none. */
+export const FACT_COLUMN_KEYS = ["ui.skill-columns.weak-point", "ui.skill-columns.back-attack"];
+
+/** The WP%/BA% cells appended after every damage row's own columns — see
+ * `columnKeys`. `~` is an intentional glyph, not prose: `factCell` is the
+ * one place it is written, so no JSX ever spells it out literally.
+ *
+ * Empty unless `show`, which is the `show_damage_facts` setting: the columns
+ * are off by default (see the store), and `columnKeys` withholds
+ * `FACT_COLUMN_KEYS` on the same flag so the header row and the cells can only
+ * appear together.
+ *
+ * Crit% is tallied like the other two but has no column in either state — it is
+ * read in the row's hover card (`FACT_ROWS`), because the damage row already
+ * spends six columns before these and a crit rate is wanted when a row is being
+ * explained rather than when the table is being scanned. */
+export const factColumns = (facts?: GroupFacts, show: boolean = false): string[] =>
+  show ? [factCell(facts?.weakPoint), factCell(facts?.backAttack)] : [];
 
 /** What the hover card's "Damage facts" section captions a fact row with, or
  * null where the rate alone says enough (fully measured). Kept beside
@@ -395,16 +407,14 @@ export const damageDone: MetricDescriptor = {
   // advance whether it will decompose into member skills, enemies or players,
   // and the columns line up under it either way — a shape with no extremes to
   // report leaves those two cells blank rather than moving the ones after them.
-  columnKeys: (level) =>
-    level === "players"
-      ? [
-          "ui.meter-columns.damage",
-          "ui.meter-columns.dps",
-          "ui.logs.column-share",
-          "ui.skill-columns.crit",
-          "ui.skill-columns.weak-point",
-          "ui.skill-columns.back-attack",
-        ]
+  //
+  // `showFacts` is the `show_damage_facts` setting, and it appends the SAME
+  // `FACT_COLUMN_KEYS` the cells come from (see `factColumns`, which is off by
+  // the same default). Both lists gate on one flag, so the WP%/BA% headers and
+  // the cells under them can only ever appear together.
+  columnKeys: (level, showFacts = false) => [
+    ...(level === "players"
+      ? ["ui.meter-columns.damage", "ui.meter-columns.dps", "ui.logs.column-share"]
       : [
           "ui.skill-columns.total",
           "ui.skill-columns.hits",
@@ -412,10 +422,9 @@ export const damageDone: MetricDescriptor = {
           "ui.skill-columns.max",
           "ui.skill-columns.average",
           "ui.logs.column-share",
-          "ui.skill-columns.crit",
-          "ui.skill-columns.weak-point",
-          "ui.skill-columns.back-attack",
-        ],
+        ]),
+    ...(showFacts ? FACT_COLUMN_KEYS : []),
+  ],
 
   labelKind: (level) => (level === "players" ? "player" : "ability"),
 

@@ -186,6 +186,18 @@ interface MeterSettings {
    * Only Damage Done records supplementary damage, so it has no effect
    * elsewhere (see `caps.recordsSupplementary`). */
   merge_supplementary: boolean;
+  /** Whether the Damage Done table carries its WP%/BA% columns and its rows'
+   * hover cards carry the "Damage facts" section.
+   *
+   * OFF, and currently with NO control anywhere — the feature is not ready to
+   * be used, and a switch that offered it would. The flag stays because the
+   * gating it drives is the part worth keeping: `factsOf` withholds
+   * `MetricRow.facts` (which empties the card section) and `columnKeys` /
+   * `factColumns` withhold the columns, all from this one boolean. Re-exposing
+   * it is a control that writes this key and nothing else.
+   *
+   * The tallies are computed either way; this is only the reading. */
+  show_damage_facts: boolean;
   /** How skill and cause names resolve across languages — see
    * `SkillNameResolutionMode`. `language-first` prefers the current language's
    * translated game name over a hand label that only exists in English;
@@ -244,6 +256,7 @@ const DEFAULT_METER_SETTINGS: MeterSettings = {
   ...DEFAULT_BAR_APPEARANCE,
   logs_view: "classic",
   merge_supplementary: false,
+  show_damage_facts: false,
   skill_name_resolution: "label-first",
   compare_chart_mode: "overlay",
 };

@@ -78,7 +78,14 @@ const actorRef = (dim: "source" | "target", index: number | null, hostility: Hos
   return universeOf(dim, hostility) === "player" ? { kind: "player", index } : { kind: "enemySpawn", segment: index };
 };
 
-export const resolveViewSpec = (state: AnalysisState, caps: MetricCapabilities): ViewSpec => {
+export const resolveViewSpec = (
+  state: AnalysisState,
+  caps: MetricCapabilities,
+  /** The `show_damage_facts` setting. A parameter rather than a machine field:
+   * it is a stored preference about how damage READS, not part of the selection
+   * the URL carries — the same standing as `merge_supplementary`. */
+  showDamageFacts: boolean = false
+): ViewSpec => {
   const groupBy = resolveGroupBy(state, caps);
   // Effective hostility: `side=enemy` is reachable in the URL on any metric,
   // including one whose capabilities don't support it, so every field below
@@ -118,7 +125,7 @@ export const resolveViewSpec = (state: AnalysisState, caps: MetricCapabilities):
     groupBy,
     regroupTabs,
     table: {
-      columnKeys: caps.columnKeys(groupBy),
+      columnKeys: caps.columnKeys(groupBy, showDamageFacts),
       rowsLabelKey: rowsLabelKeyFor(groupBy, hostility, caps),
       ...(emptyKey === undefined ? {} : { emptyKey }),
     },

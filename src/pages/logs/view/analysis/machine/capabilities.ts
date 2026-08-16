@@ -60,8 +60,11 @@ export type MetricCapabilities = {
    * supported entry; all pinned → the last entry (one-row table). */
   dimensionOrder: Dimension[];
   dimensions: Record<Dimension, DimensionDecl>;
-  /** Header keys for the numeric columns when grouped by `dim`. */
-  columnKeys: (dim: Dimension) => string[];
+  /** Header keys for the numeric columns when grouped by `dim`.
+   *
+   * `showFacts` is the `show_damage_facts` setting — see `MetricDescriptor`.
+   * Only Damage Done has columns behind it. */
+  columnKeys: (dim: Dimension, showFacts?: boolean) => string[];
   /** Which hover card explains a row under this grouping and side. */
   cardKind: (dim: Dimension, hostility: Hostility) => CardKind;
   /** Whether the chart stacks the fetched groups' series. False = the metric's
@@ -133,7 +136,7 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
       ability: SUPPORTED("ui.logs.groupby-damage-ability", "ui.logs.groupby-damage-ability"),
       target: SUPPORTED("ui.logs.groupby-damage-target", "ui.logs.groupby-damage-target-enemy"),
     },
-    columnKeys: (dim) => damageDone.columnKeys(levelFor(dim)),
+    columnKeys: (dim, showFacts) => damageDone.columnKeys(levelFor(dim), showFacts),
     // Friendly rows decompose at every grouping — a target row still leaves
     // ability and source free (see targetCardSectionsFor). The enemy side
     // has a builder only for its attacker rows.

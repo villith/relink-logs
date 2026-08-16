@@ -134,8 +134,12 @@ export type MetricDescriptor = {
    *
    * A function of the level, not a fixed list: descending from players to
    * abilities swaps DPS for a hit count, and a header that keeps saying DPS
-   * over a column of hit counts is worse than no header at all. */
-  columnKeys: (level: RowLevel) => string[];
+   * over a column of hit counts is worse than no header at all.
+   *
+   * `showFacts` is the `show_damage_facts` setting. Only Damage Done offers any
+   * — the WP%/BA% pair, off by default (see `factColumns`) — so every other
+   * descriptor ignores it and declares one parameter. */
+  columnKeys: (level: RowLevel, showFacts?: boolean) => string[];
   /** How the table should resolve each row's `label` at this level. */
   labelKind: (level: RowLevel) => LabelKind;
   /** What a row's hover card decomposes, or absent where the metric has

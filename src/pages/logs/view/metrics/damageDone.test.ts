@@ -49,26 +49,37 @@ describe("factRate / factCell / inferredShare — provenance-tallied rates", () 
     expect(inferredShare(tally({ unknown: 9 }))).toBe(0);
   });
 
-  it("appends three dashes for an absent facts block", () => {
-    expect(factColumns(undefined)).toEqual(["—", "—", "—"]);
+  const facts = (crit: FactTally, weakPoint: FactTally, backAttack: FactTally) => ({
+    crit,
+    weakPoint,
+    backAttack,
+    debuffed: tally({}),
+    overdrive: tally({}),
+    break: tally({}),
+    overdriveDamage: 0,
+    breakDamage: 0,
   });
 
-  it("fills crit/weak-point/back-attack in that order", () => {
+  // The `show_damage_facts` default. Empty, not dashes: `columnKeys` withholds
+  // the two headers on the same flag, so cells here would sit under nothing.
+  it("appends no cells at all while the setting is off", () => {
+    expect(factColumns(undefined)).toEqual([]);
+    expect(factColumns(facts(tally({ measuredYes: 1 }), tally({ measuredYes: 1 }), tally({ measuredYes: 1 })))).toEqual(
+      []
+    );
+  });
+
+  it("appends a dash per column for an absent facts block", () => {
+    expect(factColumns(undefined, true)).toEqual(["—", "—"]);
+  });
+
+  // Crit is tallied and shown in the hover card, but has no column: the damage
+  // row already spends six before these two.
+  it("fills weak-point/back-attack in that order, and leaves crit to the card", () => {
     const crit = tally({ measuredYes: 1 });
     const weakPoint = tally({ measuredYes: 3, measuredNo: 1 });
     const backAttack = tally({ inferredYes: 1, inferredNo: 1 });
-    expect(
-      factColumns({
-        crit,
-        weakPoint,
-        backAttack,
-        debuffed: tally({}),
-        overdrive: tally({}),
-        break: tally({}),
-        overdriveDamage: 0,
-        breakDamage: 0,
-      })
-    ).toEqual([factCell(crit), factCell(weakPoint), factCell(backAttack)]);
+    expect(factColumns(facts(crit, weakPoint, backAttack), true)).toEqual([factCell(weakPoint), factCell(backAttack)]);
   });
 });
 
@@ -175,23 +186,34 @@ describe("damageDone descriptor", () => {
     expect(rows[1].value).toBe(100);
   });
 
-  it("fills the exact players-level column shape: amount, DPS, share, then crit/WP/BA", () => {
+  it("fills the exact players-level column shape: amount, DPS, share", () => {
     // The header/cell parity the abilities-level test below pins, at the
-    // players level: `columnKeys("players")` promises six keys, and a row
-    // built from it must fill exactly six cells or the trailing ones render
+    // players level: `columnKeys("players")` promises three keys, and a row
+    // built from it must fill exactly three cells or the trailing ones render
     // under no header at all.
     const rows = damageDone.rows(input("players"));
     expect(damageDone.columnKeys("players")).toEqual([
       "ui.meter-columns.damage",
       "ui.meter-columns.dps",
       "ui.logs.column-share",
-      "ui.skill-columns.crit",
+    ]);
+    expect(rows[0].columns).toEqual(["300", "30", "75.0%"]);
+  });
+
+  // The `show_damage_facts` setting adds the same two headers `factColumns`
+  // fills, at both levels and nowhere else in the list.
+  it("appends the WP/BA headers, last, when damage facts are shown", () => {
+    expect(damageDone.columnKeys("players", true)).toEqual([
+      "ui.meter-columns.damage",
+      "ui.meter-columns.dps",
+      "ui.logs.column-share",
       "ui.skill-columns.weak-point",
       "ui.skill-columns.back-attack",
     ]);
-    // SkillState carries no fact tallies, so the trailing three are honestly
-    // "no data".
-    expect(rows[0].columns).toEqual(["300", "30", "75.0%", "—", "—", "—"]);
+    expect(damageDone.columnKeys("abilities", true).slice(-2)).toEqual([
+      "ui.skill-columns.weak-point",
+      "ui.skill-columns.back-attack",
+    ]);
   });
 
   it("makes a player row pin that player as the source", () => {
@@ -287,13 +309,8 @@ describe("damageDone descriptor", () => {
       "ui.skill-columns.max",
       "ui.skill-columns.average",
       "ui.logs.column-share",
-      "ui.skill-columns.crit",
-      "ui.skill-columns.weak-point",
-      "ui.skill-columns.back-attack",
     ]);
-    // The trailing "—"s are the crit/WP/BA cells: SkillState carries no fact
-    // tallies, so this (dead-at-runtime) fold reports honestly "no data".
-    expect(rows[0].columns).toEqual(["1.0k", "4", "100", "500", "250", "333.3%", "—", "—", "—"]);
+    expect(rows[0].columns).toEqual(["1.0k", "4", "100", "500", "250", "333.3%"]);
   });
 
   it("takes the extremes across every skill behind one ability", () => {
@@ -396,7 +413,7 @@ describe("damageDone descriptor", () => {
       input("skills", { source: null, targets: [], ability: 'Group:normal-attack@"Pl0000"' }, party)
     );
 
-    // Share sits at index 5 (the crit/WP/BA cells trail it now).
+    // Share is the last of the six, with the WP/BA cells off by default.
     expect(rows[0].columns[5]).toBe("75.0%");
     expect(rows[1].columns[5]).toBe("25.0%");
   });
@@ -420,7 +437,7 @@ describe("damageDone descriptor", () => {
 
   it("carries the share of the level's total as its third column", () => {
     const rows = damageDone.rows(input("players"));
-    // Share sits at index 2 (the crit/WP/BA cells trail it now).
+    // Share is the last of the three, with the WP/BA cells off by default.
     expect(rows[0].columns[2]).toBe("75.0%");
     expect(rows[1].columns[2]).toBe("25.0%");
   });
@@ -466,8 +483,8 @@ describe("drilling a pinned ability with a friendly pinned", () => {
 
     // Total, hits, min, max, average, share — the same six the member rows
     // fill, so both shapes line up under one header.
-    expect(top.columns).toEqual(["90", "3", "—", "—", "30", "75.0%", "—", "—", "—"]);
-    expect(second.columns).toEqual(["30", "1", "—", "—", "30", "25.0%", "—", "—", "—"]);
+    expect(top.columns).toEqual(["90", "3", "—", "—", "30", "75.0%"]);
+    expect(second.columns).toEqual(["30", "1", "—", "—", "30", "25.0%"]);
   });
 
   it("leaves the per-enemy extremes blank rather than borrowing the ability's", () => {
@@ -576,7 +593,7 @@ describe("damageDone enemy side", () => {
     expect(rows[0].value).toBe(800);
     // Amount, DPS-to-party over the 100s window, share, then three dashes:
     // DamageTakenState carries no fact tallies.
-    expect(rows[0].columns).toEqual(["800", "8", "88.9%", "—", "—", "—"]);
+    expect(rows[0].columns).toEqual(["800", "8", "88.9%"]);
     expect(rows[0].pinOnClick).toBeNull();
   });
 
@@ -594,7 +611,7 @@ describe("damageDone enemy side", () => {
     expect(rows).toEqual([]);
   });
 
-  it("fills the full nine-column drill-down shape below the players level", () => {
+  it("fills the full six-column drill-down shape below the players level", () => {
     const players = [
       victimPlayer(0, [{ enemy: 0xaa, total: 500 }]),
       victimPlayer(1, [
@@ -613,7 +630,7 @@ describe("damageDone enemy side", () => {
       hostility: "enemy",
     } as never);
 
-    expect(rows[0].columns).toHaveLength(9);
+    expect(rows[0].columns).toHaveLength(6);
     // min is blank: DamageTakenState carries no minimum.
     expect(rows[0].columns[2]).toBe("—");
     // max folds across both victims' rows for 0xaa (500, 300) to the larger.
@@ -656,8 +673,8 @@ describe("damageDone.children — party-wide per-source split", () => {
     expect(children[0].pinOnClick).toEqual({ source: 0 });
     expect(children.map((child) => child.colorSlot)).toEqual([0, 1]);
     // The six damage drill-down cells, shared against the party total (400).
-    expect(children[0].columns).toEqual(["200", "2", "50", "150", "100", "50.0%", "—", "—", "—"]);
-    expect(children[1].columns).toEqual(["100", "1", "100", "100", "100", "25.0%", "—", "—", "—"]);
+    expect(children[0].columns).toEqual(["200", "2", "50", "150", "100", "50.0%"]);
+    expect(children[1].columns).toEqual(["100", "1", "100", "100", "100", "25.0%"]);
   });
 
   it("carries each player's own echo share, so a child bar splits like its parent", () => {
