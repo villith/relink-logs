@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, Window};
 
 use super::{
-    constants::{CharacterType, EnemyType},
+    constants::{CharacterType, EnemyType, SIR_BARROLD},
     v0,
 };
 
@@ -4409,8 +4409,11 @@ impl Parser {
             .get_primary_target()
             .map(|target| target.raw_target_type);
 
-        // Sir Barrold should never save quest ID, as it could be stale.
-        if primary_target == Some(0xA379AC65) {
+        // Sir Barrold should never save quest ID, as it could be stale. What
+        // the runs are FILED under instead is decided when they are handed out
+        // (`db::logs::quest_id_for_display`), which reaches the ones saved
+        // before this guard existed and kept a stale id.
+        if primary_target == Some(SIR_BARROLD) {
             self.encounter.quest_id = None;
             self.encounter.quest_timer = None;
         }

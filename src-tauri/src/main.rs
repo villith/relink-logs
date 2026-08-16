@@ -1201,7 +1201,11 @@ fn fetch_logs(
             }
         }
 
-        if let Some(quest_id) = quest_id {
+        // Through the SAME display rule `get_logs` files each row under, or the
+        // filter offers ids no row is labelled with and withholds the one every
+        // dummy row IS labelled with — leaving that branch of
+        // `apply_log_filters` unreachable from this dropdown.
+        if let Some(quest_id) = db::logs::quest_id_for_display(quest_id, primary_target) {
             if !quest_ids.contains(&quest_id) {
                 quest_ids.push(quest_id);
             }

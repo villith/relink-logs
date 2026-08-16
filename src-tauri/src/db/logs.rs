@@ -8,7 +8,53 @@ use sea_query::{
 use sea_query_rusqlite::RusqliteBinder;
 use serde::Serialize;
 
-use crate::parser::constants::EnemyType;
+use crate::parser::constants::{EnemyType, SIR_BARROLD, TRAINING_DUMMY_QUEST_ID};
+
+/// Whether a log's fight was against the training room's dummy. The one test
+/// every display rule below keys on, named once so a second site cannot come to
+/// spell it differently.
+pub(crate) fn is_training_dummy(primary_target: Option<u32>) -> bool {
+    primary_target == Some(SIR_BARROLD)
+}
+
+/// The quest a log is filed under when it is handed out, which is not always
+/// the one stored against it: a training-dummy run has no quest of its own (see
+/// [`TRAINING_DUMMY_QUEST_ID`]), so it is filed under the dummy.
+///
+/// Applied on the way OUT rather than on the way in. The stored row keeps
+/// saying exactly what the game reported, so this is a naming rule the app can
+/// change its mind about — and it reaches logs recorded before there was one,
+/// which is most of them.
+///
+/// `pub` — the binary's, not just this crate's — because the quest FILTER's
+/// option list is built in `main.rs` from its own scan of the table: a facet
+/// list that did not read through this would never offer the id every dummy row
+/// is now labelled with, leaving the dummy branch of `apply_log_filters`
+/// unreachable from the UI. `main.rs` is a separate crate target that reaches
+/// this one through `gbfr_logs::db`, so `pub(crate)` does not carry there.
+pub fn quest_id_for_display(stored: Option<u32>, primary_target: Option<u32>) -> Option<u32> {
+    if is_training_dummy(primary_target) {
+        return Some(TRAINING_DUMMY_QUEST_ID);
+    }
+
+    stored
+}
+
+/// A training run clears nothing — there is no quest to clear, and the stored
+/// flag is whatever the game last reported, the same staleness
+/// [`quest_id_for_display`] exists for.
+///
+/// Load-bearing rather than tidy: the quest list's cleared/not-cleared cell is
+/// gated on the quest id being non-null, which the rule above has just made
+/// true for every dummy row. Left standing, the stored `false` renders a ✕
+/// against every run in the training room.
+fn quest_completed_for_display(stored: Option<bool>, primary_target: Option<u32>) -> Option<bool> {
+    if is_training_dummy(primary_target) {
+        return None;
+    }
+
+    stored
+}
 
 pub enum SortType {
     Time,
@@ -225,7 +271,27 @@ fn apply_log_filters(query: &mut SelectStatement, filters: &LogFilters) {
         .conditions(
             filter_by_quest_id.is_some(),
             |q| {
-                q.and_where(Expr::col(Logs::QuestId).eq(filter_by_quest_id.unwrap()));
+                // The dummy's is the app's own id and no row carries it, so it
+                // is asked of the column that DOES identify the fight — the
+                // mirror of `quest_id_for_display`, which is what put that id
+                // in the filter's list in the first place.
+                //
+                // BOTH halves mirror it. A dummy run saved before the parser
+                // started nulling the field still carries the stale id of the
+                // quest before it, and matching that column alone would hand
+                // that quest back rows the list draws as "Training Dummy" — and
+                // count them against it in `get_counts`.
+                let quest_id = filter_by_quest_id.unwrap();
+                if quest_id == TRAINING_DUMMY_QUEST_ID {
+                    q.and_where(Expr::col(Logs::PrimaryTarget).eq(SIR_BARROLD));
+                } else {
+                    q.and_where(Expr::col(Logs::QuestId).eq(quest_id))
+                        .and_where(
+                            Expr::col(Logs::PrimaryTarget)
+                                .ne(SIR_BARROLD)
+                                .or(Expr::col(Logs::PrimaryTarget).is_null()),
+                        );
+                }
             },
             |_| {},
         )
@@ -440,13 +506,15 @@ pub fn get_logs(
     let rows = stmt
         .query(&*params)?
         .mapped(|row| {
+            let primary_target = row.get::<usize, Option<u32>>(5)?;
+
             Ok(LogEntry {
                 id: row.get(0)?,
                 name: row.get(1)?,
                 time: row.get(2)?,
                 duration: row.get(3)?,
                 version: row.get(4)?,
-                primary_target: row.get::<usize, Option<u32>>(5)?.map(EnemyType::from_hash),
+                primary_target: primary_target.map(EnemyType::from_hash),
                 p1_name: row.get(6)?,
                 p1_type: row.get(7)?,
                 p2_name: row.get(8)?,
@@ -455,9 +523,9 @@ pub fn get_logs(
                 p3_type: row.get(11)?,
                 p4_name: row.get(12)?,
                 p4_type: row.get(13)?,
-                quest_id: row.get(14)?,
+                quest_id: quest_id_for_display(row.get(14)?, primary_target),
                 quest_elapsed_time: row.get(15)?,
-                quest_completed: row.get(16)?,
+                quest_completed: quest_completed_for_display(row.get(16)?, primary_target),
                 imported: row.get(17)?,
                 repeat_group: row.get(18)?,
             })
@@ -535,16 +603,30 @@ pub struct LogSummary {
     pub duration: i64,
     pub quest_id: Option<u32>,
     pub quest_elapsed_time: Option<u32>,
+    /// Who was in the party, paired as the quest list reads them: the character
+    /// each slot played, and the display name of whoever played it (null for an
+    /// AI companion, and for imported logs where the name was never recorded).
+    /// The picker filters on both.
+    pub p1_name: Option<String>,
     pub p1_type: Option<String>,
+    pub p2_name: Option<String>,
     pub p2_type: Option<String>,
+    pub p3_name: Option<String>,
     pub p3_type: Option<String>,
+    pub p4_name: Option<String>,
     pub p4_type: Option<String>,
     /// Id of the first run of this log's Repeat Quest chain, null when it is
     /// the first run or is unchained. The picker groups on it.
     pub repeat_group: Option<i64>,
 }
 
-/// Every log, newest first, as picker rows. Unpaginated on purpose — the picker
+/// Every log, newest first, as picker rows. Conflux ROOMS are excluded, the
+/// same `run_id IS NULL` the quest list and its facet scan apply: a room is a
+/// `logs` row belonging to the Conflux tab, it carries no quest id to name it
+/// by, and offering one in the picker opens a room log in a pane the frame
+/// treats as an ordinary quest.
+///
+/// Unpaginated on purpose — the picker
 /// searches client-side, which needs the whole library in hand. That is cheap:
 /// measured against the real 71 MB `logs.db` (`SUM(LENGTH(json_object(...)))`
 /// over its 1,881 rows), a summary row averages ~179 bytes — ~465 KB at 2,600
@@ -556,9 +638,15 @@ pub struct LogSummary {
 /// are permanent — left unindexed on purpose, not an oversight.
 pub fn fetch_log_summaries(conn: &Connection) -> Result<Vec<LogSummary>> {
     let mut stmt = conn.prepare(
+        // `primary_target` is selected but not returned: it is here to file a
+        // training-dummy run under the dummy (see `quest_id_for_display`), and
+        // the picker draws the quest, never the enemy.
         "SELECT id, time, duration, quest_id, quest_elapsed_time,
-                p1_type, p2_type, p3_type, p4_type, repeat_group
+                p1_name, p1_type, p2_name, p2_type,
+                p3_name, p3_type, p4_name, p4_type, repeat_group,
+                primary_target
          FROM logs
+         WHERE run_id IS NULL
          ORDER BY time DESC",
     )?;
     let rows = stmt
@@ -567,13 +655,17 @@ pub fn fetch_log_summaries(conn: &Connection) -> Result<Vec<LogSummary>> {
                 id: row.get(0)?,
                 time: row.get(1)?,
                 duration: row.get(2)?,
-                quest_id: row.get(3)?,
+                quest_id: quest_id_for_display(row.get(3)?, row.get(14)?),
                 quest_elapsed_time: row.get(4)?,
-                p1_type: row.get(5)?,
-                p2_type: row.get(6)?,
-                p3_type: row.get(7)?,
-                p4_type: row.get(8)?,
-                repeat_group: row.get(9)?,
+                p1_name: row.get(5)?,
+                p1_type: row.get(6)?,
+                p2_name: row.get(7)?,
+                p2_type: row.get(8)?,
+                p3_name: row.get(9)?,
+                p3_type: row.get(10)?,
+                p4_name: row.get(11)?,
+                p4_type: row.get(12)?,
+                repeat_group: row.get(13)?,
             })
         })?
         .collect::<rusqlite::Result<Vec<LogSummary>>>()?;
@@ -929,12 +1021,12 @@ mod tests {
     /// how long, and who was in the party. Anything more is bytes the dropdown
     /// never draws, multiplied by a library that can hold thousands of rows.
     ///
-    /// Every one of the ten selected columns gets a distinct value and its own
-    /// assertion — the query maps them positionally (`row.get(0)` … `row.get(9)`),
-    /// and several are type-compatible with a neighbor (`time`/`duration` are
-    /// both `i64`; the four `p*_type` are all `Option<String>`), so a swap
-    /// within one of those groups would still compile. Distinct values are what
-    /// makes such a swap fail here instead of passing by coincidence.
+    /// Every one of the selected columns gets a distinct value and its own
+    /// assertion — the query maps them positionally, and several are
+    /// type-compatible with a neighbor (`time`/`duration` are both `i64`; the
+    /// four `p*_type` and the four `p*_name` are all `Option<String>`), so a
+    /// swap within one of those groups would still compile. Distinct values are
+    /// what makes such a swap fail here instead of passing by coincidence.
     #[test]
     fn summary_carries_what_the_picker_draws() {
         let conn = db_with(&[(1, false)]);
@@ -943,7 +1035,9 @@ mod tests {
                 time = 111, duration = 222,
                 quest_id = 2657, quest_elapsed_time = 180,
                 p1_type = 'Pl1400', p2_type = 'Pl1300',
-                p3_type = 'Pl1200', p4_type = 'Pl1100'
+                p3_type = 'Pl1200', p4_type = 'Pl1100',
+                p1_name = 'Rain', p2_name = 'Manmoth',
+                p3_name = 'Kahs', p4_name = 'Eustace'
              WHERE id = 1",
             [],
         )
@@ -962,31 +1056,173 @@ mod tests {
         assert_eq!(summary.p2_type.as_deref(), Some("Pl1300"));
         assert_eq!(summary.p3_type.as_deref(), Some("Pl1200"));
         assert_eq!(summary.p4_type.as_deref(), Some("Pl1100"));
+        // The picker filters by who was playing, which needs the display names
+        // the quest list already draws — the columns were there all along, only
+        // this query left them behind.
+        assert_eq!(summary.p1_name.as_deref(), Some("Rain"));
+        assert_eq!(summary.p2_name.as_deref(), Some("Manmoth"));
+        assert_eq!(summary.p3_name.as_deref(), Some("Kahs"));
+        assert_eq!(summary.p4_name.as_deref(), Some("Eustace"));
         assert_eq!(summary.repeat_group, None);
+    }
+
+    /// One log against one enemy, filed under whatever quest the game last
+    /// reported — the two columns the training-dummy rule reads.
+    fn db_with_run(primary_target: Option<u32>, quest_id: Option<u32>) -> Connection {
+        let mut conn = Connection::open_in_memory().expect("in-memory db");
+        crate::db::migrations()
+            .to_latest(&mut conn)
+            .expect("migrations apply");
+        conn.execute(
+            "INSERT INTO logs (id, name, time, duration, data, version, primary_target, quest_id)
+             VALUES (1, '', 1, 1, x'00', 1, ?, ?)",
+            params![primary_target, quest_id],
+        )
+        .expect("insert log");
+
+        conn
+    }
+
+    /// The training room is not a quest, so a dummy run carries no quest id to
+    /// name it by — the save path nulls it deliberately, since whatever the
+    /// game still had in the field belongs to the quest before it. Filed under
+    /// nothing, every one of them reads as "No quest recorded", which in a
+    /// library where the dummy is the most-fought enemy is the top entry of the
+    /// quest filter.
+    #[test]
+    fn a_training_dummy_run_is_filed_under_the_dummy_quest() {
+        let conn = db_with_run(Some(SIR_BARROLD), None);
+
+        let summaries = fetch_log_summaries(&conn).expect("query");
+
+        assert_eq!(summaries[0].quest_id, Some(TRAINING_DUMMY_QUEST_ID));
+    }
+
+    /// The quest list reads the same rule. Dummy runs saved before the save
+    /// path started nulling the field kept the STALE id of the quest before
+    /// them, which is where the quest filter's `5f65b940` comes from — an id
+    /// the game's own packing rules say cannot be a quest (its high nibble is
+    /// set), rendered as if it were one.
+    #[test]
+    fn a_dummy_run_with_a_stale_quest_id_is_filed_under_the_dummy_quest_too() {
+        let conn = db_with_run(Some(SIR_BARROLD), Some(0x5f65_b940));
+
+        let logs = fetch(&conn, false);
+
+        assert_eq!(logs[0].quest_id, Some(TRAINING_DUMMY_QUEST_ID));
+    }
+
+    /// Every other run keeps the id the game gave it.
+    #[test]
+    fn a_real_quest_keeps_the_id_the_game_gave_it() {
+        let conn = db_with_run(Some(0x0014_a1b8), Some(0x0021_0421));
+
+        assert_eq!(
+            fetch_log_summaries(&conn).expect("query")[0].quest_id,
+            Some(0x0021_0421)
+        );
+        assert_eq!(fetch(&conn, false)[0].quest_id, Some(0x0021_0421));
+    }
+
+    /// Narrowing the quest list to the dummy has to REACH the runs it labelled:
+    /// the id they are filed under is the app's own, and no row carries it.
+    #[test]
+    fn the_dummy_quest_filter_finds_the_dummy_runs() {
+        let conn = db_with_run(Some(SIR_BARROLD), None);
+
+        let logs = get_logs(
+            &conn,
+            &LogFilters {
+                quest_id: Some(TRAINING_DUMMY_QUEST_ID),
+                ..filters(false)
+            },
+            10,
+            0,
+            &SortType::Time,
+            &SortDirection::Ascending,
+        )
+        .expect("query");
+
+        assert_eq!(ids(&logs), vec![1]);
     }
 
     /// Newest first — the picker's most likely target is the run just finished.
     ///
-    /// The fixture's ids and times run in OPPOSITE directions, so this only
-    /// passes under `ORDER BY time DESC`; an id-keyed order (ascending or
-    /// descending) comes back wrong. That distinction is not academic: an
-    /// imported log gets a fresh local rowid but keeps its original timestamp,
-    /// so id order and time order routinely disagree on the real database.
+    /// The fixture's ids ASCEND with their times, so the expected order is the
+    /// reverse of both the rowid order SQLite hands back with no `ORDER BY` at
+    /// all and the ascending id order. Dropping or inverting the clause fails
+    /// here rather than passing by coincidence, which the earlier fixture
+    /// (times descending WITH the ids) could not tell apart. That distinction
+    /// is not academic: an imported log gets a fresh local rowid but keeps its
+    /// original timestamp, so id order and time order routinely disagree on the
+    /// real database.
     #[test]
     fn summaries_come_back_newest_first() {
         let conn = db_with(&[(1, false), (2, false), (3, false)]);
-        conn.execute("UPDATE logs SET time = 300 WHERE id = 1", [])
+        conn.execute("UPDATE logs SET time = 100 WHERE id = 1", [])
             .expect("set time");
         conn.execute("UPDATE logs SET time = 200 WHERE id = 2", [])
             .expect("set time");
-        conn.execute("UPDATE logs SET time = 100 WHERE id = 3", [])
+        conn.execute("UPDATE logs SET time = 300 WHERE id = 3", [])
             .expect("set time");
 
         let summaries = fetch_log_summaries(&conn).expect("query");
 
         assert_eq!(
             summaries.iter().map(|s| s.id).collect::<Vec<_>>(),
-            vec![1, 2, 3]
+            vec![3, 2, 1]
         );
+    }
+
+    /// A Conflux ROOM is a `logs` row with a `run_id`, and it belongs to the
+    /// Conflux tab. The picker offering one opens a room log in a pane that
+    /// draws it as an ordinary quest — and it has no quest id to be named by,
+    /// so it lands under "No quest recorded" in the picker's own filter.
+    #[test]
+    fn summaries_leave_conflux_rooms_to_the_conflux_tab() {
+        let conn = db_with(&[(1, false), (2, false)]);
+        conn.execute("UPDATE logs SET run_id = 7 WHERE id = 2", [])
+            .expect("tag the room");
+
+        let summaries = fetch_log_summaries(&conn).expect("query");
+
+        assert_eq!(summaries.iter().map(|s| s.id).collect::<Vec<_>>(), vec![1]);
+    }
+
+    /// Training clears nothing, so the cell that says whether a quest was
+    /// cleared has nothing to report. Load-bearing: the quest list gates that
+    /// cell on the quest id being non-null, which `quest_id_for_display` has
+    /// just made true for every dummy row — so a stored `false` left standing
+    /// draws a ✕ against every run in the training room.
+    #[test]
+    fn a_dummy_run_reports_no_cleared_verdict() {
+        let conn = db_with_run(Some(SIR_BARROLD), None);
+        conn.execute("UPDATE logs SET quest_completed = 0 WHERE id = 1", [])
+            .expect("stamp the flag");
+
+        assert_eq!(fetch(&conn, false)[0].quest_completed, None);
+    }
+
+    /// The mirror direction: narrowing to a REAL quest must not hand back the
+    /// dummy runs that merely kept its id. They are drawn as "Training Dummy",
+    /// so returning them means a filter whose page contradicts its own label.
+    #[test]
+    fn a_real_quest_filter_skips_the_dummy_runs_that_kept_its_id() {
+        let conn = db_with_run(Some(SIR_BARROLD), Some(0x0021_0421));
+
+        let logs = get_logs(
+            &conn,
+            &LogFilters {
+                quest_id: Some(0x0021_0421),
+                ..filters(false)
+            },
+            10,
+            0,
+            &SortType::Time,
+            &SortDirection::Ascending,
+        )
+        .expect("query");
+
+        assert!(ids(&logs).is_empty());
     }
 }

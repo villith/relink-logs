@@ -138,6 +138,26 @@ impl EnemyType {
     }
 }
 
+/// Sir Barrold (`EM2700`), the training room's dummy. Hit more often than any
+/// real enemy in the library and the one enemy the app has a rule about, so the
+/// hash is named once here rather than written out at each site that knows it.
+pub const SIR_BARROLD: u32 = 0xA379_AC65;
+
+/// The quest a training-dummy run is filed under when a log is HANDED OUT (see
+/// `db::logs`). Training is not a quest and carries no id — the save path nulls
+/// whatever the game still had in the field, because it belongs to the quest
+/// before it — so without this every dummy run reads as "No quest recorded",
+/// which in a library where the dummy is the most-fought enemy is the top entry
+/// of the quest filter.
+///
+/// The enemy's own hash, deliberately: it is what identifies the fight, and one
+/// constant defined as the other cannot drift from it. It also cannot collide
+/// with a real quest id — a quest id packs its category into the low 28 bits and
+/// the game never sets the high nibble (`src-hook`'s `assist` rejects any id
+/// that does), while this one begins with `A`. Nor with a real quest KEY: the
+/// name tables key quests by six hex digits and this is eight.
+pub const TRAINING_DUMMY_QUEST_ID: u32 = SIR_BARROLD;
+
 #[repr(u32)]
 #[derive(Copy, Clone)]
 pub enum FerrySkillId {

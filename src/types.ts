@@ -888,9 +888,16 @@ export type LogSummary = {
   duration: number;
   questId: number | null;
   questElapsedTime: number | null;
+  /** Who was in the party, paired slot by slot: the character played, and the
+   * display name of whoever played it — null for an AI companion, and for an
+   * imported log whose names were never recorded. The picker filters on both. */
+  p1Name: string | null;
   p1Type: string | null;
+  p2Name: string | null;
   p2Type: string | null;
+  p3Name: string | null;
   p3Type: string | null;
+  p4Name: string | null;
   p4Type: string | null;
   repeatGroup: number | null;
 };
