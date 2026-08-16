@@ -105,17 +105,17 @@ describe("removeCompareAt", () => {
 
 describe("paneParamNames", () => {
   it("names every pane-scoped key for a pane, so a remover can clear them all", () => {
-    expect(paneParamNames(1)).toEqual(["src1", "tgt1", "abil1", "by1", "aura1"]);
+    expect(paneParamNames(1)).toEqual(["src1", "tgt1", "abil1", "by1", "aura1", "win1"]);
   });
 
   it("names pane 0's bare keys", () => {
-    expect(paneParamNames(0)).toEqual(["src", "tgt", "abil", "by", "aura"]);
+    expect(paneParamNames(0)).toEqual(["src", "tgt", "abil", "by", "aura", "win"]);
   });
 });
 
 describe("clearablePaneParamNames", () => {
   it("clears a compared pane's keys", () => {
-    expect(clearablePaneParamNames(1)).toEqual(["src1", "tgt1", "abil1", "by1", "aura1"]);
+    expect(clearablePaneParamNames(1)).toEqual(["src1", "tgt1", "abil1", "by1", "aura1", "win1"]);
   });
 
   it("clears nothing for pane 0, whose keys are the path log's own pins", () => {

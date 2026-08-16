@@ -10,8 +10,8 @@ import { decodeState, encodeState, type AnalysisState } from "./state";
  * `paneIndex` picks which pane's keys are read and written: pane 0 uses the
  * bare names every link written before compare existed already carries, later
  * panes suffix their index (see `paneParamName`). The SHARED fields — metric,
- * side, zoom, window filter — are unsuffixed for every pane, so all panes read
- * and write one of each.
+ * side, zoom — are unsuffixed for every pane, so all panes read and write one
+ * of each.
  *
  * A pane's `paneIndex` must NOT change while it stays mounted. A caller
  * reindexing panes (closing pane 1 and shifting the rest down, say — pane 0 is
@@ -29,13 +29,13 @@ export const useAnalysisState = (paneIndex: number) => {
   const [side, setSide] = useQueryState("side", { history: "replace" });
   const [from, setFrom] = useQueryState("from", { history: "replace" });
   const [to, setTo] = useQueryState("to", { history: "replace" });
-  const [win, setWinParam] = useQueryState("win", { history: "replace" });
 
   const [src, setSrc] = useQueryState(paneParamName("src", paneIndex), { history: "replace" });
   const [tgt, setTgt] = useQueryState(paneParamName("tgt", paneIndex), { history: "replace" });
   const [abil, setAbil] = useQueryState(paneParamName("abil", paneIndex), { history: "replace" });
   const [by, setBy] = useQueryState(paneParamName("by", paneIndex), { history: "replace" });
   const [aura, setAuraParam] = useQueryState(paneParamName("aura", paneIndex), { history: "replace" });
+  const [win, setWinParam] = useQueryState(paneParamName("win", paneIndex), { history: "replace" });
 
   const state = useMemo(
     // nuqs hands back `undefined` — not `null` — for one render after a key

@@ -1,15 +1,20 @@
-import type { PaneRaw, SharedRaw } from "./state";
+import { encodeList as encodeListParam, type PaneRaw, type SharedRaw } from "./state";
 
 /** The URL fields that belong to ONE pane: the three pins, the grouping
- * override and the aura filter. Each pane holds its own, because comparing
- * two logs means comparing two independent selections — the same character
- * pinned in both panes is one useful comparison, but so is one player in
- * pane A against a different player in pane B. */
-export const PANE_FIELDS = ["src", "tgt", "abil", "by", "aura"] as const satisfies readonly (keyof PaneRaw)[];
+ * override, the aura filter and the battle-window filter. Each pane holds its
+ * own, because comparing two logs means comparing two independent selections —
+ * the same character pinned in both panes is one useful comparison, but so is
+ * one player in pane A against a different player in pane B.
+ *
+ * `win` is here for a harder reason than taste: its entries can name one window
+ * by ordinal within a log (see `PaneRaw`), so there is no reading of a shared
+ * `win` that means the same thing in two fights. */
+export const PANE_FIELDS = ["src", "tgt", "abil", "by", "aura", "win"] as const satisfies readonly (keyof PaneRaw)[];
 
-/** The URL fields every pane shares: which metric, which side, the committed
- * zoom, and the battle-window filter. One of each across the whole view. */
-export const SHARED_FIELDS = ["metric", "side", "from", "to", "win"] as const satisfies readonly (keyof SharedRaw)[];
+/** The URL fields every pane shares: which metric, which side, and the
+ * committed zoom. One of each across the whole view — and each of them means
+ * the same thing whatever log is under it, which is what makes sharing safe. */
+export const SHARED_FIELDS = ["metric", "side", "from", "to"] as const satisfies readonly (keyof SharedRaw)[];
 
 /** `[Key] extends [Listed[number]]` (tuple-wrapped so the check runs on the
  * whole union at once, not member-by-member) collapses to the field(s) still
@@ -57,9 +62,9 @@ export const decodeCompare = (raw: string | null): number[] =>
         .map((value) => Number(value))
         .filter((value) => Number.isSafeInteger(value) && value > 0);
 
-/** Empty encodes as null so the param drops out of the URL — a closed
- * comparison leaves the same address a never-opened one does. */
-export const encodeCompare = (ids: number[]): string | null => (ids.length === 0 ? null : ids.join(","));
+/** Through `encodeList`, so "empty encodes as null" — a closed comparison
+ * leaves the same address a never-opened one does — has one author. */
+export const encodeCompare = (ids: number[]): string | null => encodeListParam(ids.map(String));
 
 /** Drop pane `index` from the comparison. Pane 0 is the log in the path and is
  * the page itself, so it is not removable here — closing it means navigating. */
