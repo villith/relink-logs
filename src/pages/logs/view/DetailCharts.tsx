@@ -3,7 +3,7 @@ import { Group, Paper, Text, UnstyledButton } from "@mantine/core";
 import { t } from "i18next";
 import { memo } from "react";
 
-import { humanizeNumbers } from "@/utils";
+import { humanizeNumbers, millisecondsToElapsedFormat } from "@/utils";
 
 /** One series per charted player, as the DPS chart's `series` prop wants it. */
 export type Label = {
@@ -64,6 +64,13 @@ export const ChartTooltip = ({ label, payload, formatValue }: ChartTooltipProps)
 // index IS the elapsed second. Every bucket-index↔milliseconds conversion must
 // go through this constant — a silent `* 1000` breaks if the width changes.
 export const DPS_BUCKET_MS = 1000;
+
+/** Bucket index → "M:SS", the clock every plotted point and window readout is
+ * labelled with. One author: the compare overlay's x-values have to match the
+ * per-pane charts' for the split and overlaid layouts to be the same reading,
+ * and two spellings of this would put two different times on one axis. */
+export const bucketLabel = (bucket: number, bucketMs: number = DPS_BUCKET_MS): string =>
+  millisecondsToElapsedFormat(bucket * bucketMs);
 
 // DPS points are smoothed with a trailing moving average this many seconds wide.
 export const DPS_SMOOTHING_WINDOW = 10;

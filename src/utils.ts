@@ -1883,6 +1883,16 @@ export const deriveNavState = (pathname: string) => {
 export const resolveAvailableTab = <T extends string>(tab: string | null, available: readonly T[], fallback: T): T =>
   available.includes(tab as T) ? (tab as T) : fallback;
 
+/** `set` with `member` flipped in or out, as a NEW set — the shape a set held as
+ * React state is updated in. One author, because a set-as-state that is mutated
+ * in place instead of replaced does not re-render, and that mistake reads as
+ * "the click did nothing" rather than as a bug. */
+export const toggled = <T>(set: ReadonlySet<T>, member: T): Set<T> => {
+  const next = new Set(set);
+  if (!next.delete(member)) next.add(member);
+  return next;
+};
+
 /// Hook that returns the previous value of a variable.
 export const usePrevious = <T>(value: T): T | undefined => {
   const ref = useRef<T>();

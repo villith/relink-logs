@@ -1,13 +1,13 @@
 import { MantineProvider } from "@mantine/core";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { ChartDatapoint, Label } from "../DetailCharts";
 
 import type { ChartMarker } from "./chartMarkers";
 import { TOTAL_SERIES_KEY } from "./chartSeries";
 import type { WindowKind } from "./chartWindowBands";
-import { ChartTooltip, DpsChart } from "./DpsChart";
+import { ChartTooltip, DpsChart, visibleEndLines } from "./DpsChart";
 import { SECTION_ENTRY_CAP } from "./HoverCard";
 
 const LABELS: Label = [
@@ -696,6 +696,49 @@ describe("DpsChart — the header control strip", () => {
       </MantineProvider>
     );
 
+  const MARKERS = [
+    { kind: "death" as const, atMs: 1000, color: "#f00", label: "Rain died" },
+    { kind: "sba" as const, atMs: 1500, color: "#0f0", label: "Rain SBA" },
+  ];
+
+  // The kind switches are CONTROLLED when the caller owns them, so several
+  // plots of one comparison share one set: the split layout draws the same
+  // fight twice, and one chart hiding deaths while the other shows them is not
+  // one reading.
+  it("reports a kind toggle to the caller instead of hiding it itself", () => {
+    const onToggleMarkerKind = vi.fn();
+    renderChart({
+      markers: MARKERS,
+      hiddenMarkerKinds: new Set(),
+      onToggleMarkerKind,
+    });
+
+    fireEvent.click(screen.getByLabelText("ui.logs.chart-marker-deaths"));
+
+    expect(onToggleMarkerKind).toHaveBeenCalledWith("death");
+  });
+
+  it("draws the caller's hidden set rather than its own", () => {
+    renderChart({
+      markers: MARKERS,
+      hiddenMarkerKinds: new Set(["death" as const]),
+      onToggleMarkerKind: () => {},
+    });
+
+    expect(screen.getByLabelText("ui.logs.chart-marker-deaths").getAttribute("aria-pressed")).toBe("false");
+    expect(screen.getByLabelText("ui.logs.chart-marker-sba").getAttribute("aria-pressed")).toBe("true");
+  });
+
+  // A lone plot still owns its own switches — the control is optional, and
+  // without it the chart must keep working on its own.
+  it("keeps its own kind state when the caller does not own it", () => {
+    renderChart({ markers: MARKERS });
+
+    fireEvent.click(screen.getByLabelText("ui.logs.chart-marker-deaths"));
+
+    expect(screen.getByLabelText("ui.logs.chart-marker-deaths").getAttribute("aria-pressed")).toBe("false");
+  });
+
   /** The caller's own controls belong in the SAME strip as the chart's, not on
    * a row of their own: they are the same kind of thing — a knob that changes
    * the reading — and a second row would push the plot down and split one set
@@ -713,5 +756,39 @@ describe("DpsChart — the header control strip", () => {
 
     expect(screen.queryByText("merge-switch")).toBeNull();
     expect(screen.getByTestId("chart-controls")).toBeTruthy();
+  });
+});
+
+/** Which "the other log ended here" rules a chart draws. Comparing two runs of
+ * different lengths, the shorter one's line simply stops while the longer
+ * carries on — which reads as a fight that went quiet rather than one that
+ * ended. */
+describe("visibleEndLines", () => {
+  const line = (bucket: number) => ({ bucket, color: "#abc", label: `#${bucket}` });
+
+  it("draws a rule for a log that ended before this one", () => {
+    expect(visibleEndLines([line(3)], 10).map((end) => end.bucket)).toEqual([3]);
+  });
+
+  // No "it ended here" to point at, and a clamped rule would sit on the axis
+  // edge claiming otherwise.
+  it("drops a log that outlasted this one", () => {
+    expect(visibleEndLines([line(11)], 10)).toEqual([]);
+  });
+
+  // The two runs are the same length: the axis edge already says where both
+  // stopped.
+  it("drops a log that ended exactly with this one", () => {
+    expect(visibleEndLines([line(10)], 10)).toEqual([]);
+  });
+
+  // A pane whose chart has not landed publishes a length of 0, so its end
+  // arrives as bucket -1.
+  it("drops a pane that has not drawn anything yet", () => {
+    expect(visibleEndLines([line(-1)], 10)).toEqual([]);
+  });
+
+  it("keeps every shorter log, in the order given", () => {
+    expect(visibleEndLines([line(7), line(2)], 10).map((end) => end.bucket)).toEqual([7, 2]);
   });
 });

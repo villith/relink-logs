@@ -1,3 +1,5 @@
+import { PLAYER_COLORS } from "@/utils";
+
 import type { ChartDatapoint, Label } from "../DetailCharts";
 
 import { TOTAL_SERIES_KEY } from "./chartSeries";
@@ -6,6 +8,14 @@ import { TOTAL_SERIES_KEY } from "./chartSeries";
  * two panes with different pins, and two series sharing a key would collapse
  * into one line. */
 export const compareSeriesKey = (paneIndex: number): string => `pane${paneIndex}`;
+
+/** A pane's series colour. */
+export const paneSeriesColor = (paneIndex: number): string => PLAYER_COLORS[paneIndex % PLAYER_COLORS.length];
+
+/** A pane's series name as the reader sees it: a log id, not a quest name — two
+ * panes may carry one quest, and the id is what the picker beside them writes. */
+export const paneSeriesLabel = (paneLogIds: number[], paneIndex: number): string =>
+  `#${paneLogIds[paneIndex] ?? paneIndex}`;
 
 /** One pane's plot, flattened to a single number per bucket — what an overlay
  * of two runs compares.
@@ -28,9 +38,9 @@ export const paneTotals = (data: ChartDatapoint[], labels: Label): number[] =>
  * series is simply absent past its end — absent, not zero: zero would draw a
  * line along the floor and read as "did nothing" rather than "was over".
  *
- * The bucket LABEL comes from the caller because it is the view's own clock
- * formatting, and two spellings of it would put two different times on one
- * axis. */
+ * The bucket LABEL comes from the caller, which passes the shared `bucketLabel`
+ * — one author for the clock, so the overlay's x-values and the per-pane
+ * charts' cannot put two different times on one axis. */
 export const compareChartData = (
   perPaneTotals: number[][],
   bucketLabel: (bucket: number) => string

@@ -9,7 +9,7 @@ import { AnimatedHeight } from "@/components/AnimatedHeight";
 import { Label as UiLabel } from "@/components/ui/Label";
 import { PillGroup } from "@/components/ui/PillGroup";
 import { useCtrlHeld } from "@/components/useCtrlHeld";
-import { humanizeNumber } from "@/utils";
+import { humanizeNumber, toggled } from "@/utils";
 
 import { DPS_BUCKET_MS, type ChartDatapoint, type Label } from "../DetailCharts";
 import { bandOpacity, type Band } from "../statusBands";
@@ -95,6 +95,26 @@ export type DpsChartProps = {
    * `bands`). Drawn as vertical reference lines and appended to the tooltip of
    * the bucket they land in; a control row above the plot toggles each kind. */
   markers?: ChartMarker[];
+  /** Where ANOTHER log being compared ran out, in buckets on this chart's own
+   * axis. Drawn as a labelled dashed rule.
+   *
+   * Comparing two runs of different lengths, the shorter one's line simply
+   * stops and the longer one carries on — which reads as the shorter run having
+   * gone quiet rather than having ended. This is the line that says which. No
+   * control-row switch: it is not a class of event the reader turns off, it is
+   * a fact about the comparison currently on screen, and it disappears on its
+   * own the moment there is only one log. */
+  endLines?: EndLine[];
+  /** Which marker and window KINDS are hidden, and how to flip one.
+   *
+   * CONTROLLED when given, so several plots of one comparison can share one set
+   * of switches — the split layout draws the same fight twice, and two charts
+   * that each hid a different kind would not be showing the same thing. Omitted,
+   * the chart keeps its own set, which is what a lone plot wants. */
+  hiddenMarkerKinds?: ReadonlySet<MarkerKind>;
+  onToggleMarkerKind?: (kind: MarkerKind) => void;
+  hiddenWindowKinds?: ReadonlySet<WindowKind>;
+  onToggleWindowKind?: (kind: WindowKind) => void;
   /** For the STACKS chart (aura holder/effect series): whether the areas
    * overlap ("normal", WCL's default) or sum into a stack. Absent, a stacked
    * chart stacks — the damage drills are decompositions whose stack height IS
@@ -141,7 +161,39 @@ export type DpsChartProps = {
  * would silently claim the bucket for one of them, so it goes neutral (the same
  * grey the Total series uses) and the tooltip, which still lists every marker,
  * names who died. */
+/** The end rules this chart actually draws.
+ *
+ * A line at or past the chart's own last bucket is DROPPED rather than clamped
+ * onto it: the run being marked is as long as or longer than this one, so there
+ * is no "the other log ended here" to point at, and a clamped rule would sit on
+ * the axis edge claiming otherwise. Negative buckets are the empty-pane case —
+ * a pane whose chart has not landed publishes a length of 0, hence -1.
+ *
+ * Exported for its own test: the drawing is recharts SVG, but the rule about
+ * which lines exist is this project's and is what regresses. */
+export const visibleEndLines = (endLines: EndLine[], maxIndex: number): EndLine[] =>
+  endLines.filter((line) => line.bucket >= 0 && line.bucket < maxIndex);
+
+/** The `endLines` default, hoisted so it is one identity across renders —
+ * a fresh `[]` in the parameter list re-runs the memo that reads it every time. */
+const EMPTY_END_LINES: EndLine[] = [];
+
 const MIXED_MARKER_COLOR = "var(--mantine-color-gray-5)";
+
+/** Where another compared log's fight ended, on this chart's axis.
+ *
+ * `bucket` rather than milliseconds because the caller comparing two plots
+ * already holds both in buckets (a series index IS a bucket), and converting to
+ * ms here only to divide it back would be two chances to disagree about the
+ * rounding. */
+export type EndLine = {
+  bucket: number;
+  /** The log's own line colour on the compare overlay, so the rule and the
+   * series it belongs to read as one thing. */
+  color: string;
+  /** What ended — the log id, as the picker and the overlay's legend name it. */
+  label: string;
+};
 
 /** The chart tooltip's width, in pixels.
  *
@@ -422,6 +474,11 @@ export const DpsChart = ({
   onSmoothingChange,
   stackMode = "stacked",
   onStackModeChange,
+  endLines = EMPTY_END_LINES,
+  hiddenMarkerKinds: controlledMarkerKinds,
+  onToggleMarkerKind,
+  hiddenWindowKinds: controlledWindowKinds,
+  onToggleWindowKind,
   controls,
 }: DpsChartProps) => {
   const { t } = useTranslation();
@@ -436,19 +493,29 @@ export const DpsChart = ({
   // reason to hide the others.
   const [hidden, setHidden] = useState<Set<string>>(new Set());
 
-  // Which marker KINDS are hidden. Component-local like the legend's hidden
-  // set, but not reset with it: hiding deaths is a way of reading every chart,
-  // not a property of one pin's series keys.
-  const [hiddenMarkerKinds, setHiddenMarkerKinds] = useState<Set<MarkerKind>>(new Set());
+  // Which marker KINDS are hidden. Not reset with the legend's hidden set:
+  // hiding deaths is a way of reading every chart, not a property of one pin's
+  // series keys — which is also why the caller may own it (see the prop).
+  const [ownMarkerKinds, setOwnMarkerKinds] = useState<Set<MarkerKind>>(new Set());
+  const hiddenMarkerKinds = controlledMarkerKinds ?? ownMarkerKinds;
+  const toggleMarkerKind = (kind: MarkerKind) => {
+    if (onToggleMarkerKind) return onToggleMarkerKind(kind);
+    setOwnMarkerKinds((previous) => toggled(previous, kind));
+  };
 
   const markerKinds = useMemo(
     () => (["death", "sba"] as const).filter((kind) => (markers ?? []).some((marker) => marker.kind === kind)),
     [markers]
   );
 
-  // Which window KINDS are hidden — same lifecycle reasoning as the marker
-  // kinds: a way of reading every chart, not a property of one pin's series.
-  const [hiddenWindowKinds, setHiddenWindowKinds] = useState<Set<WindowKind>>(new Set());
+  // Which window KINDS are hidden — same reasoning, and the same caller-owns-it
+  // option, as the marker kinds above.
+  const [ownWindowKinds, setOwnWindowKinds] = useState<Set<WindowKind>>(new Set());
+  const hiddenWindowKinds = controlledWindowKinds ?? ownWindowKinds;
+  const toggleWindowKind = (kind: WindowKind) => {
+    if (onToggleWindowKind) return onToggleWindowKind(kind);
+    setOwnWindowKinds((previous) => toggled(previous, kind));
+  };
 
   const windowKinds = useMemo(
     () => WINDOW_KINDS.filter((kind) => (windowBands ?? []).some((band) => band.kind === kind)),
@@ -460,24 +527,10 @@ export const DpsChart = ({
     [windowBands, hiddenWindowKinds]
   );
 
-  const toggleWindowKind = (kind: WindowKind) =>
-    setHiddenWindowKinds((previous) => {
-      const next = new Set(previous);
-      if (!next.delete(kind)) next.add(kind);
-      return next;
-    });
-
   const shownMarkers = useMemo(
     () => (markers ?? []).filter((marker) => !hiddenMarkerKinds.has(marker.kind)),
     [markers, hiddenMarkerKinds]
   );
-
-  const toggleMarkerKind = (kind: MarkerKind) =>
-    setHiddenMarkerKinds((previous) => {
-      const next = new Set(previous);
-      if (!next.delete(kind)) next.add(kind);
-      return next;
-    });
 
   // Bands ranked past the chart's cap. Plotted like any other, but hidden
   // until the legend switches them on, with `other` standing in for whichever
@@ -702,6 +755,34 @@ export const DpsChart = ({
     ));
   }, [bucketedMarkers]);
 
+  // The other logs' end rules. Longer dashes than a marker's "3 3" and a label
+  // at the top, because this line means something different in kind: a marker
+  // says an event happened, this says a whole series stopped having data.
+  //
+  // A line at or past this chart's own last bucket is dropped rather than
+  // clamped onto it: the run being marked is as long as or longer than this
+  // one, so there is no "the other log ended here" to point at, and a clamped
+  // rule would sit on the axis edge claiming otherwise.
+  const endLineRules = useMemo(
+    () =>
+      visibleEndLines(endLines, maxIndex).map((line, index) => (
+        <ReferenceLine
+          key={`end-${index}`}
+          x={data[line.bucket]?.timestamp}
+          stroke={line.color}
+          strokeDasharray="6 4"
+          strokeOpacity={0.75}
+          label={{
+            value: line.label,
+            position: "insideTopRight",
+            fill: line.color,
+            fontSize: "var(--text-xs)",
+          }}
+        />
+      )),
+    [endLines, data, maxIndex]
+  );
+
   // The markers of each bucket, keyed by that bucket's x label — which is what
   // the recharts tooltip hands its content, so the lookup is one map get.
   const markersByLabel = useMemo(() => {
@@ -837,12 +918,14 @@ export const DpsChart = ({
           >
             {statusBands}
             {markerLines}
+            {endLineRules}
             {scopeBand}
           </AreaChart>
         ) : (
           <LineChart {...shared} lineChartProps={interaction} tooltipProps={tooltip}>
             {statusBands}
             {markerLines}
+            {endLineRules}
             {scopeBand}
           </LineChart>
         )}
