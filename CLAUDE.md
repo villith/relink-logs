@@ -51,6 +51,7 @@ Data flows **game → hook → pipe → parser → frontend**:
 
 ## Conventions and gotchas
 
+- **Few comments.** Much of `src/` carries long prose comments — that is history, not the standard to match. A comment goes stale and then quietly misleads the next reader, human or agent, while the code it describes still compiles and passes. Write one only where the code cannot say it: a non-obvious invariant, an RE'd offset or hash, a workaround for a library bug. Never restate the line below it, and never argue a design decision at paragraph length — that belongs in the commit message. When you touch a file, delete the comments you pass that no longer earn their place; keeping one is a choice, not the default.
 - **Do NOT use git worktrees** in this repo — create branches in the main checkout instead. (Windows file locks make worktree directories fail to clean up, and shells/monitors holding a worktree cwd keep it busy.)
 - **`target/` needs periodic pruning — `npm run clean:target`.** Cargo's `-C metadata`
   hash (which names every artifact *and* every rustc `incremental/` directory)
