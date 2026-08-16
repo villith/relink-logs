@@ -18,7 +18,18 @@ export type MarkerEvent = { kind: MarkerKind; atMs: number; actorIndex: number }
  * and that resolver has no picture for a character it cannot identify. It
  * matters most on the SBA markers: those all draw in one colour, so the swatch
  * says "an SBA happened" and only the name and the art say whose. */
-export type ChartMarker = { kind: MarkerKind; atMs: number; color: string; label: string; icon?: string };
+export type ChartMarker = {
+  kind: MarkerKind;
+  atMs: number;
+  color: string;
+  label: string;
+  icon?: string;
+  /** Which LOG this marker belongs to, where more than one fight is drawn — the
+   * id in that log's own compare colour, exactly as a window line carries it
+   * (`WindowTooltipEntry.tag`). Absent with one log open, where every marker on
+   * the plot is the same fight's and naming it would say nothing. */
+  tag?: { text: string; color: string };
+};
 
 /** The SBA markers' colour. Deaths take the dead player's colour, so this one
  * has to stay distinct from three sets at once, all of which share the plot:

@@ -21,7 +21,7 @@ import { actionsForPin, rowKeyingFor, type RowKeying } from "../../abilitySkills
 import { takenAttackRowParts } from "../../metrics/damageTaken";
 import type { SelectorPins } from "../../selectorOptions";
 import { isStatusPin } from "../../statusUptime";
-import { answeredGroups } from "../machine/answeredGroups";
+import { answeredGroups, type GroupReading } from "../machine/answeredGroups";
 import type { MetricCapabilities } from "../machine/capabilities";
 import type { ViewSpec } from "../machine/resolve";
 import type { Dimension, MetricKey } from "../machine/state";
@@ -60,6 +60,10 @@ export type EncounterData = {
    * not always the one now requested (see `answeredGroups`). */
   groups: GroupAggregate[];
   chartGroupBy: Dimension;
+  /** Whether those aggregates answer the request now on screen. False while a
+   * fetch is out and what is in hand answers a different grouping — or, since
+   * the reading is stamped too, a different metric or side entirely. */
+  groupsSettled: boolean;
   scopedAbilitySeries: Record<number, AbilitySeries[]>;
   shownEncounter: EncounterState | null;
   facts: SelectionFact[];
@@ -73,6 +77,15 @@ export type EncounterData = {
    * response supplied the aggregates. Empty when the request narrowed no time
    * — then the aggregates ARE that ranking. */
   groupReference: GroupReference[];
+  /** A fetch is in flight and what is on screen is not yet its answer.
+   *
+   * BOTH fetches, because either one leaves the view showing a previous
+   * reading: the base load between logs, the scoped fetch between pins. It is
+   * what the pane draws its loading overlay from — the rows, the plot and the
+   * columns below all change on their own schedules as a response lands, and
+   * without something over them a pin click reads as three separate flickers
+   * rather than one wait. */
+  pending: boolean;
 };
 
 export type EncounterDataInput = {
@@ -139,6 +152,11 @@ export const useEncounterData = ({
      * `answeredGroups`, which is where this is read. Null when the request
      * carried no group query, which is every non-groups metric. */
     groupsGroupBy: Dimension | null;
+    /** And WHAT they are a measurement of — the metric and side. Carried for the
+     * same reason and read in the same place: a grouping alone cannot tell
+     * Damage Done's source rows from Damage Taken's. Null alongside the
+     * grouping. */
+    groupsReading: GroupReading | null;
     /** The drilled Stun/SBA bands, keyed by player. Only this fetch carries
      * them — the base load ignores pins, and a drill IS a pin. */
     abilitySeries: Record<number, AbilitySeries[]>;
@@ -172,6 +190,22 @@ export const useEncounterData = ({
   const loadGeneration = useRef(0);
   const scopeGeneration = useRef(0);
 
+  // Whether each fetch has an answer outstanding. Two flags rather than one
+  // counter, because the two are independent: a pin change fires a scoped fetch
+  // without cancelling a load, and a load in flight must not be un-marked by a
+  // scoped response landing first.
+  //
+  // Each is cleared only by a response of the CURRENT generation — the same
+  // guard the data itself passes through. A superseded response clearing it
+  // would say "settled" while the request that actually answers the screen is
+  // still out, which is the one moment the overlay exists for.
+  //
+  // Both start TRUE: the base load is dispatched from an effect, so between the
+  // first render and that effect there is genuinely nothing in hand, and a flag
+  // starting false would flash the empty view before the spinner.
+  const [baseLoading, setBaseLoading] = useState(true);
+  const [scopeLoading, setScopeLoading] = useState(true);
+
   // The wire query the base load sent (as its JSON identity), so the scoped
   // effect can tell "the base response already answered this grouping" from
   // "a regroup needs its own fetch". Refs rather than deps: the base load
@@ -180,7 +214,13 @@ export const useEncounterData = ({
   const baseQueryKeyRef = useRef<string | null>(null);
   // And which grouping the base load's own aggregates answer — null when it
   // carried no group query at all. The base-load half of `answeredGroups`.
+  //
+  // The base load runs ONCE per log, so whatever metric and side were showing at
+  // mount is what its aggregates measure — for the rest of the session, however
+  // many tabs are visited. That is precisely why the reading has to travel with
+  // them: unstamped, they were handed to every groups-path tab as its own.
   const baseGroupByRef = useRef<Dimension | null>(null);
+  const baseReadingRef = useRef<GroupReading | null>(null);
 
   // The base load: the full fight, unpinned. Owns the charts, the party and the
   // quest metadata, none of which a pin changes. Carries the CURRENT group
@@ -191,9 +231,13 @@ export const useEncounterData = ({
     const groupQuery = wireQueryRef.current;
     baseQueryKeyRef.current = groupQuery === undefined ? null : JSON.stringify(groupQuery);
     baseGroupByRef.current = groupQuery?.groupBy ?? null;
+    baseReadingRef.current =
+      groupQuery === undefined ? null : { metric: groupQuery.metric, hostility: groupQuery.hostility };
+    setBaseLoading(true);
     invoke("fetch_encounter_state", { id: Number(id), options: { filters, groupQuery } })
       .then((result) => {
         if (generation !== loadGeneration.current) return;
+        setBaseLoading(false);
         // Into THIS pane's slice — the only holder of a compared log's fight.
         // The single encounter store is left to the live meter and the Classic
         // view, which have one fight between them.
@@ -206,6 +250,11 @@ export const useEncounterData = ({
       })
       .catch((e) => {
         if (generation !== loadGeneration.current) return;
+        // Cleared on failure too. A log that cannot be read is not a log still
+        // loading, and a spinner that never stops is the worse of the two lies —
+        // the toast says what happened, and the header's picker is what the user
+        // reaches for next.
+        setBaseLoading(false);
         toast.error(`Failed to fetch encounter state: ${e}`);
       });
   }, [id, filters, paneIndex, setPaneBase]);
@@ -392,20 +441,28 @@ export const useEncounterData = ({
     const needsGroups = wireQueryKey !== null && wireQueryKey !== baseQueryKeyRef.current;
     if (!needsScopedFetch({ ...earlyOutRef.current, needsGroups })) {
       setScoped(null);
+      // Nothing to wait for: the base response IS the answer. Not the same as a
+      // fetch that has landed, but the same thing to anything reading `pending`.
+      setScopeLoading(false);
       return;
     }
 
     const generation = ++scopeGeneration.current;
+    setScopeLoading(true);
     // Captured from the request, not read back off the spec when the response
-    // resolves: by then the user may have regrouped again, and the aggregates
-    // would be stamped with a grouping they do not answer.
-    const sentGroupBy = wireQueryRef.current?.groupBy;
+    // resolves: by then the user may have regrouped — or changed tab — again,
+    // and the aggregates would be stamped with a question they do not answer.
+    const sent = wireQueryRef.current;
+    const sentGroupBy = sent?.groupBy;
+    const sentReading: GroupReading | null =
+      sent === undefined ? null : { metric: sent.metric, hostility: sent.hostility };
     invoke("fetch_encounter_state", {
       id: Number(id),
       options: { ...scopedOptionsRef.current, groupQuery: wireQueryRef.current },
     })
       .then((result) => {
         if (generation !== scopeGeneration.current) return;
+        setScopeLoading(false);
         const response = result as EncounterStateResponse;
         // Normalised here, at the boundary: the Rust binary does not hot-reload,
         // so a frontend ahead of its backend must degrade to "no groups"
@@ -414,9 +471,10 @@ export const useEncounterData = ({
           state: response.encounterState,
           facts: response.selectionFacts ?? [],
           groups: response.groups ?? [],
-          // Stamped with the grouping the request asked for, so nothing
-          // downstream can read these as answering a later one.
+          // Stamped with the question the request asked, so nothing downstream
+          // can read these as answering a later one.
           groupsGroupBy: sentGroupBy ?? null,
+          groupsReading: sentReading,
           // Normalised at the boundary like `groups`: the Rust binary does not
           // hot-reload, so a frontend ahead of its backend degrades to no bands
           // — and therefore to the per-player lines — rather than throwing.
@@ -428,6 +486,7 @@ export const useEncounterData = ({
       })
       .catch((e) => {
         if (generation !== scopeGeneration.current) return;
+        setScopeLoading(false);
         toast.error(`Failed to fetch encounter state: ${e}`);
       });
   }, [id, scopedOptionsKey, wireQueryKey]);
@@ -439,10 +498,19 @@ export const useEncounterData = ({
   // `chartGroupBy` rather than the request, so a regroup holds the previous
   // plot until its own data lands instead of stacking the old aggregates as
   // if they were the new ones (see `answeredGroups`).
-  const { groups, groupBy: chartGroupBy } = answeredGroups(
-    scoped === null ? null : { groups: scoped.groups, groupBy: scoped.groupsGroupBy },
-    { groups: baseGroups, groupBy: baseGroupByRef.current },
-    spec.groupBy
+  const {
+    groups,
+    groupBy: chartGroupBy,
+    settled: groupsSettled,
+  } = answeredGroups(
+    scoped === null ? null : { groups: scoped.groups, groupBy: scoped.groupsGroupBy, reading: scoped.groupsReading },
+    { groups: baseGroups, groupBy: baseGroupByRef.current, reading: baseReadingRef.current },
+    // The reading the SPEC asks for, which is null on every metric with no group
+    // query — those have no aggregates to be right or wrong about.
+    {
+      groupBy: spec.groupBy,
+      reading: spec.fetch === null ? null : { metric: spec.fetch.metric, hostility: spec.fetch.hostility },
+    }
   );
   // No base-load fallback: the base load never asks for bands, so an empty map
   // is the honest answer whenever no scoped response has supplied them.
@@ -462,6 +530,7 @@ export const useEncounterData = ({
   return {
     groups,
     chartGroupBy,
+    groupsSettled,
     scopedAbilitySeries,
     shownEncounter,
     facts,
@@ -469,5 +538,13 @@ export const useEncounterData = ({
     rowKeying,
     pinnedActions,
     groupReference,
+    // Either fetch outstanding. Kept separate from `groupsSettled` rather than
+    // folded together: this one is about the NETWORK (is a request out?), that
+    // one about the DATA (does what is in hand answer the question?), and the
+    // two come apart in both directions — a fetch can be out with the previous
+    // answer still valid for the current reading, and the aggregates can fail to
+    // answer with no fetch out at all, on a metric that never asked for any.
+    // The pane wants both, and says so.
+    pending: baseLoading || scopeLoading,
   };
 };

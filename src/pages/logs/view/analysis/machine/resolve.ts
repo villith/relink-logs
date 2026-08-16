@@ -73,6 +73,21 @@ export const resolveGroupBy = (state: AnalysisState, caps: MetricCapabilities): 
 export const universeOf = (dim: "source" | "target", hostility: Hostility): "player" | "enemySpawn" =>
   (dim === "source") === (hostility === "friendly") ? "player" : "enemySpawn";
 
+/** What an UNPINNED selector offers, named by the UNIVERSE its dimension draws
+ * from rather than by the dimension itself.
+ *
+ * "All friendlies" is only what the source selector offers while the friendly
+ * side is showing: flip the side and that same control offers enemy spawns,
+ * while the target selector — labelled "All enemies" — offers the party. Both
+ * placeholders were fixed strings, so the side toggle appeared to do nothing to
+ * the two controls it actually swaps.
+ *
+ * One author for both selectors, keyed off the same function the group query
+ * resolves its refs through, so the label and the universe behind it cannot
+ * disagree. */
+export const selectorPlaceholderKey = (dim: "source" | "target", hostility: Hostility): string =>
+  universeOf(dim, hostility) === "player" ? "ui.logs.selector-all-friendlies" : "ui.logs.selector-all-enemies";
+
 const actorRef = (dim: "source" | "target", index: number | null, hostility: Hostility): ActorRef | null => {
   if (index === null) return null;
   return universeOf(dim, hostility) === "player" ? { kind: "player", index } : { kind: "enemySpawn", segment: index };

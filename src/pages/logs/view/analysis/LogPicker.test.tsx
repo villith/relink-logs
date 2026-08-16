@@ -279,6 +279,29 @@ describe("LogPicker", () => {
     });
   });
 
+  // The control is the pane's TITLE, so it is where the colour a log wears on
+  // the compare overlay belongs: the column, its line and the rule marking where
+  // its run ended then read as one thing.
+  describe("the log's colour", () => {
+    it("wears it as a gutter, and tints the id with it", () => {
+      renderPicker({ logs: [log({ id: 10 })], value: 10, color: "#FF5630" });
+
+      const control = target();
+      expect(control.style.borderLeftColor).toBe("#FF5630");
+      expect(within(control).getByText("#10").style.color).toBe("rgb(255, 86, 48)");
+    });
+
+    // A lone column has nothing to be told apart from, and a 3px rule declared
+    // unconditionally would indent it against nothing.
+    it("draws neither with one log open", () => {
+      renderPicker({ logs: [log({ id: 10 })], value: 10 });
+
+      const control = target();
+      expect(control.style.borderLeftColor).toBe("");
+      expect(within(control).getByText("#10").style.color).toBe("");
+    });
+  });
+
   describe("filtering", () => {
     const library = [
       log({ id: 1, questId: 2657, p1Type: "Pl1400", p1Name: "Rain" }),

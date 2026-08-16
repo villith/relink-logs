@@ -4,7 +4,7 @@ import type { MetricRow } from "../../metrics/types";
 
 import { autoDrillPin } from "./autoDrill";
 import type { AnalysisState } from "./state";
-import { pinRow } from "./transitions";
+import { pinRow, type PinValue } from "./transitions";
 
 export type AutoDrillInput = {
   /** The rows the body on screen is drawing. */
@@ -21,6 +21,15 @@ export type AutoDrillInput = {
    * see is a pin that appears from nowhere, so the events view — which draws
    * no rows at all — takes none. */
   enabled: boolean;
+  /** How a drilled pin is APPLIED. Absent, it is this pane's own
+   * `setState(pinRow(state, pin))`.
+   *
+   * The compare overlay hands one in: a drill onto a target or an ability has to
+   * reach every pane for the same reason picking one from the selector does, or
+   * one run silently descends a level further than the run it is drawn against.
+   * A drill onto a SOURCE is still that pane's own — which of the two the pin
+   * names is the applier's call, not this hook's. */
+  applyPin?: (pin: PinValue) => void;
 };
 
 /** WCL's drill, carried one step further: a pin that leaves the table with a
@@ -34,7 +43,7 @@ export type AutoDrillInput = {
  * where the user pins, and the walk stops at the first table that offers a real
  * choice.
  */
-export const useAutoDrill = ({ rows, state, setState, settled, enabled }: AutoDrillInput) => {
+export const useAutoDrill = ({ rows, state, setState, settled, enabled, applyPin }: AutoDrillInput) => {
   // A ref, not state: arming happens inside the click that pins, and a render
   // of its own there would be a second one for nothing. The pin's own state
   // change is what brings the effect below round.
@@ -60,8 +69,9 @@ export const useAutoDrill = ({ rows, state, setState, settled, enabled }: AutoDr
     // Still armed: the table this pin produces may be down to one row too, and
     // the walk should continue. It terminates on its own — every step consumes
     // a free dimension, and `autoDrillPin` answers null once none are left.
-    setState(pinRow(state, pin));
-  }, [rows, state, setState, settled, enabled]);
+    if (applyPin) applyPin(pin);
+    else setState(pinRow(state, pin));
+  }, [rows, state, setState, settled, enabled, applyPin]);
 
   return { armDrill };
 };

@@ -2,6 +2,7 @@ import { Box, Text, UnstyledButton } from "@mantine/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { Button } from "@/components/ui/Button";
 import { cn } from "@/components/ui/cn";
 import { EntityIcon } from "@/components/ui/EntityIcon";
 import { Label } from "@/components/ui/Label";
@@ -676,13 +677,9 @@ export const EventsTab = ({ stream, labels, playerData }: EventsTabProps) => {
         {/* One way out of every funnel at once. A reader who narrowed three
             columns should not have to remember which three. */}
         {filteredColumns(columnFilters) > 0 && (
-          <UnstyledButton
-            data-filters-clear-all
-            className="rounded-xs px-1 text-xs text-ink-3 hover:bg-raised hover:text-ink"
-            onClick={() => setColumnFilters({})}
-          >
+          <Button variant="subtle" data-filters-clear-all className="text-xs" onClick={() => setColumnFilters({})}>
             {t("ui.logs.events-filters-clear-all")}
-          </UnstyledButton>
+          </Button>
         )}
       </Box>
 

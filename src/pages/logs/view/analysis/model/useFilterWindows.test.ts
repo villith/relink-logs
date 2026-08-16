@@ -1,6 +1,12 @@
+import { renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { combineMasks, intersectMasks } from "./useFilterWindows";
+import type { StatusInterval } from "@/types";
+
+import { statusPinKey } from "../../statusUptime";
+import { DEFAULT_STATE, type AnalysisState } from "../machine/state";
+
+import { combineMasks, intersectMasks, useFilterChips } from "./useFilterWindows";
 
 describe("combineMasks", () => {
   it("is undefined when neither filter is active", () => {
@@ -82,5 +88,63 @@ describe("intersectMasks", () => {
       { fromMs: 60, upToMs: 70 },
       { fromMs: 80, upToMs: 90 },
     ]);
+  });
+});
+
+describe("useFilterChips — the aura strips", () => {
+  const interval = (over: Partial<StatusInterval>): StatusInterval => ({
+    actorIndex: 1,
+    casterIndex: null,
+    statusId: 4,
+    abilityId: null,
+    statusClass: null,
+    casterActionId: null,
+    startMs: 0,
+    endMs: 5_000,
+    maxStacks: 1,
+    targetSegment: null,
+    applications: 1,
+    ...over,
+  });
+
+  const chips = (state: Partial<AnalysisState>, intervals: StatusInterval[]) => {
+    const { result } = renderHook(() =>
+      useFilterChips({
+        state: { ...DEFAULT_STATE, ...state },
+        hostility: "friendly",
+        supportsAuraFilter: true,
+        windowedIntervals: intervals,
+        fightDurationMs: 10_000,
+        chartWindows: [],
+        statusDisplayLabel: (key) => key,
+        breakEnemyOf: () => null,
+      })
+    );
+    return result.current.sourceAuraChips;
+  };
+
+  const HELD = statusPinKey({ statusId: 4, abilityId: null, statusClass: null });
+  const NEVER = statusPinKey({ statusId: 9, abilityId: null, statusClass: null });
+
+  it("offers what the pinned actor held, with its uptime", () => {
+    const shown = chips({ source: 1 }, [interval({})]);
+    expect(shown.map((chip) => chip.aura)).toEqual([`src:${HELD}`]);
+    expect(shown[0].uptimePercent).toBe(50);
+  });
+
+  // The filter is live either way — an effect this actor never held masks the
+  // fight to nothing — so without the chip the pane empties with nothing on
+  // screen saying why and nothing to click to undo it. Reachable by scrubbing
+  // past the effect, and by a single-chart comparison whose panes pick their
+  // sources independently while sharing one aura filter.
+  it("still shows a SELECTED effect this actor never held, at 0%", () => {
+    const shown = chips({ source: 1, aura: [`src:${NEVER}`] }, [interval({})]);
+    expect(shown.map((chip) => chip.aura)).toEqual([`src:${HELD}`, `src:${NEVER}`]);
+    expect(shown[1]).toMatchObject({ selected: true, uptimePercent: 0 });
+  });
+
+  it("keeps the other strip's selection off this one", () => {
+    const shown = chips({ source: 1, aura: [`tgt:${NEVER}`] }, [interval({})]);
+    expect(shown.map((chip) => chip.aura)).toEqual([`src:${HELD}`]);
   });
 });

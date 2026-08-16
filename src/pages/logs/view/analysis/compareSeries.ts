@@ -1,4 +1,5 @@
-import { PLAYER_COLORS } from "@/utils";
+import type { LogSummary } from "@/types";
+import { COMPARE_COLORS, epochToLocalTime } from "@/utils";
 
 import type { ChartDatapoint, Label } from "../DetailCharts";
 
@@ -9,13 +10,47 @@ import { TOTAL_SERIES_KEY } from "./chartSeries";
  * into one line. */
 export const compareSeriesKey = (paneIndex: number): string => `pane${paneIndex}`;
 
-/** A pane's series colour. */
-export const paneSeriesColor = (paneIndex: number): string => PLAYER_COLORS[paneIndex % PLAYER_COLORS.length];
+/** A pane's series colour — and, through the callers below, the colour the log
+ * wears wherever else it is named: its column's title, its selector in the
+ * shared actor bar, its line, and the rule marking where it ended. ONE author,
+ * so a column and the line it explains can never come to be different colours.
+ *
+ * From the LOG palette, not the player one: a pane colour and a party colour are
+ * on screen together in the split layout, and nothing here is red or amber,
+ * which everywhere else in this app means something is wrong (see
+ * `COMPARE_COLORS`). */
+export const paneSeriesColor = (paneIndex: number): string => COMPARE_COLORS[paneIndex % COMPARE_COLORS.length];
 
-/** A pane's series name as the reader sees it: a log id, not a quest name — two
- * panes may carry one quest, and the id is what the picker beside them writes. */
-export const paneSeriesLabel = (paneLogIds: number[], paneIndex: number): string =>
-  `#${paneLogIds[paneIndex] ?? paneIndex}`;
+/** A pane's series name where the room for it is the PLOT: the id alone.
+ *
+ * The end rules use this — they are SVG text drawn at the rule's own x, and in a
+ * split layout the column is half the page wide. The legend directly above
+ * carries the full name in the same colour, so the rule only has to say which of
+ * the two lines it belongs to. */
+export const paneSeriesShortLabel = (logId: number | undefined): string => `#${logId ?? "?"}`;
+
+/** Each pane's series name as the reader sees it: the log id AND when the run
+ * happened.
+ *
+ * Not the quest name — two panes usually carry ONE quest, which is the whole
+ * point of a comparison, so the quest is the one thing that cannot tell the two
+ * lines apart. What does is when they were run, and the id is what the picker
+ * beside them writes. The stamp is `epochToLocalTime`, the same author the
+ * picker's own rows read a run's date through, so a line and the row it was
+ * chosen from cannot print two different times.
+ *
+ * A log the library has not handed over yet — the load is still in flight, or a
+ * bookmarked URL names a deleted run — keeps the bare id, which still says which
+ * log the line is where an empty label would leave it nameless. */
+export const paneSeriesLabels = (paneLogIds: number[], logs: LogSummary[]): string[] => {
+  const byId = new Map(logs.map((log) => [log.id, log]));
+  return paneLogIds.map((logId) => {
+    const log = byId.get(logId);
+    return log === undefined
+      ? paneSeriesShortLabel(logId)
+      : `${paneSeriesShortLabel(log.id)} · ${epochToLocalTime(log.time)}`;
+  });
+};
 
 /** One pane's plot, flattened to a single number per bucket — what an overlay
  * of two runs compares.

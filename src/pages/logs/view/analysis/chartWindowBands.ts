@@ -32,6 +32,14 @@ export const WINDOW_BAND_COLOR: Record<WindowKind, string> = {
   break: "var(--mantine-color-orange-5)",
 };
 
+/** The window kinds a chart opens with HIDDEN.
+ *
+ * Overdrive holds for most of a boss fight, so shaded by default it tints the
+ * whole plot instead of marking a stretch of it out — and it sits under the
+ * Break shading that a reader is usually there for. The switch is in the
+ * control row for whoever wants it. */
+export const DEFAULT_HIDDEN_WINDOW_KINDS: ReadonlySet<WindowKind> = new Set<WindowKind>(["overdrive"]);
+
 /** Control-row label per window kind (sibling of `MARKER_LABEL_KEY`). */
 export const WINDOW_LABEL_KEY: Record<WindowKind, string> = {
   sba: "ui.logs.chart-window-sba",

@@ -243,7 +243,16 @@ const Section = ({
  * row naming a player next to a card row naming the same player looked like two
  * different kinds of thing for want of the picture. Absent on the window notes,
  * which name a span rather than an actor. */
-export type CardNote = { key: string; color: string; text: string; icon?: string };
+export type CardNote = {
+  key: string;
+  color: string;
+  text: string;
+  icon?: string;
+  /** A short label ahead of the text, in a colour of its own — the compare
+   * overlay's log id, where several fights' spans share one card and the
+   * swatch is already spoken for by the kind. */
+  tag?: { text: string; color: string };
+};
 
 /** A section of notes rather than of figures.
  *
@@ -275,6 +284,11 @@ export const CardNotes = ({ headingKey, notes }: { headingKey: string; notes: Ca
             {/* The same size and inline offset a measured entry's art takes, so
                 a notes section and a breakdown section above it line up. */}
             {note.icon && <EntityIcon size="card" src={note.icon} alt="" className="mr-[5px] align-[-3px]" />}
+            {note.tag && (
+              <span data-card-tag className="mr-[6px] font-medium" style={{ color: note.tag.color }}>
+                {note.tag.text}
+              </span>
+            )}
             {note.text}
           </Text>
         </Box>

@@ -116,6 +116,17 @@ export const regroup = (state: AnalysisState, dim: Dimension, caps: MetricCapabi
 const toggleIn = (values: string[], value: string): string[] =>
   values.includes(value) ? values.filter((held) => held !== value) : [...values, value];
 
+/** Selects or deselects one effect in the Auras Filter, ABSOLUTELY.
+ *
+ * The absolute form is what a write reaching several panes needs: a toggle
+ * applied to two panes that disagree about the effect flips them apart, so the
+ * pane the user clicked in decides what "selected" now means and every pane is
+ * set to it. Returns the state unchanged when it already reads that way. */
+export const setAura = (state: AnalysisState, aura: string, selected: boolean): AnalysisState => {
+  if (state.aura.includes(aura) === selected) return state;
+  return { ...state, aura: selected ? [...state.aura, aura] : state.aura.filter((held) => held !== aura) };
+};
+
 /** Toggles one effect in the Auras Filter. No `by` reset: a filter narrows the
  * data, it does not advance the drill the way a pin does.
  *

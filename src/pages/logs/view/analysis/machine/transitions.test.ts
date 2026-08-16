@@ -11,6 +11,7 @@ import {
   pinValueOf,
   regroup,
   scrubWindow,
+  setAura,
   setHostility,
   setMetric,
   setWindow,
@@ -148,6 +149,33 @@ describe("aura filter housekeeping", () => {
   it("deselecting one leaves the rest standing", () => {
     const s = state({ source: 1, target: 0, aura: [SRC_AURA, TGT_AURA, SRC_AURA_2] });
     expect(toggleAura(s, TGT_AURA).aura).toEqual([SRC_AURA, SRC_AURA_2]);
+  });
+
+  // The form a write reaching several panes needs: one toggle applied to two
+  // panes that disagree about an effect flips them apart, so the strip the user
+  // clicked in decides what "selected" now means and every pane is set to it.
+  it("setAura selects and deselects absolutely, wherever the state started", () => {
+    const off = state({ source: 1 });
+    const on = state({ source: 1, aura: [SRC_AURA] });
+
+    expect(setAura(off, SRC_AURA, true).aura).toEqual([SRC_AURA]);
+    expect(setAura(on, SRC_AURA, true).aura).toEqual([SRC_AURA]);
+    expect(setAura(on, SRC_AURA, false).aura).toEqual([]);
+    expect(setAura(off, SRC_AURA, false).aura).toEqual([]);
+  });
+
+  it("setAura keeps the other picks and the selection order", () => {
+    const s = state({ aura: [SRC_AURA, TGT_AURA] });
+    expect(setAura(s, SRC_AURA_2, true).aura).toEqual([SRC_AURA, TGT_AURA, SRC_AURA_2]);
+    expect(setAura(s, SRC_AURA, false).aura).toEqual([TGT_AURA]);
+  });
+
+  // Identity-stable on a no-op, like `clearAuras` — a fresh state object would
+  // hand every consumer new inputs for a write that changed nothing.
+  it("setAura returns the same state when it already reads that way", () => {
+    const s = state({ aura: [SRC_AURA] });
+    expect(setAura(s, SRC_AURA, true)).toBe(s);
+    expect(setAura(s, TGT_AURA, false)).toBe(s);
   });
 
   it("clearing the anchoring pin drops ONLY the auras anchored to it", () => {

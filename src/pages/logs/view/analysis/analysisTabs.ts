@@ -1,3 +1,5 @@
+import { ChartBarHorizontal, ListBullets, Table } from "@phosphor-icons/react";
+
 import type { MetricTab } from "./MetricTabs";
 import { METRICS } from "./model/useRowModel";
 
@@ -24,11 +26,14 @@ export const TABLE_TAB = "table";
  * groupings and no numeric columns, so there is nothing for
  * `CAPABILITIES`/`resolveViewSpec` to answer for them. Both ride the `tab`
  * param instead of `state.metric`, so the pins survive switching between the
- * three bodies — which is the point of sharing the selector bar. */
+ * three bodies — which is the point of sharing the selector bar.
+ *
+ * The icons are what tells this row apart from the metric tabs a few pixels
+ * away, which deliberately carry none. */
 export const VIEW_TABS: MetricTab[] = [
-  { value: TABLE_TAB, labelKey: "ui.logs.view-table-tab" },
-  { value: TIMELINE_TAB, labelKey: "ui.logs.timeline-tab" },
-  { value: EVENTS_TAB, labelKey: "ui.logs.events-tab" },
+  { value: TABLE_TAB, labelKey: "ui.logs.view-table-tab", icon: Table },
+  { value: TIMELINE_TAB, labelKey: "ui.logs.timeline-tab", icon: ChartBarHorizontal },
+  { value: EVENTS_TAB, labelKey: "ui.logs.events-tab", icon: ListBullets },
 ];
 
 /** The `tab` param resolved to one of the three bodies, with anything

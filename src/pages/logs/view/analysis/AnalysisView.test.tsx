@@ -24,11 +24,13 @@ vi.mock("./AnalysisPane", () => ({
     logId,
     drawsChart,
     paneEnds,
+    linkedWrite,
   }: {
     paneIndex: number;
     logId: number;
     drawsChart: boolean;
     paneEnds: { bucket: number; label: string }[];
+    linkedWrite?: unknown;
   }) => (
     <>
       <div
@@ -36,6 +38,7 @@ vi.mock("./AnalysisPane", () => ({
         data-pane-index={paneIndex}
         data-log-id={logId}
         data-draws-chart={String(drawsChart)}
+        data-linked={String(linkedWrite !== undefined)}
         data-pane-ends={paneEnds.map((end) => `${end.label}@${end.bucket}`).join(",")}
       />
       <div data-testid="pane-section" />
@@ -44,18 +47,57 @@ vi.mock("./AnalysisPane", () => ({
 }));
 vi.mock("./AnalysisTopBar", () => ({ AnalysisTopBar: () => <div data-testid="top-bar" /> }));
 vi.mock("./CompareChart", () => ({
-  CompareChart: ({ perPaneTotals }: { perPaneTotals: number[][] }) => (
-    <div data-testid="compare-chart" data-panes={perPaneTotals.length} />
+  CompareChart: ({
+    perPaneTotals,
+    windowBands,
+    windowTooltips,
+    markers,
+  }: {
+    perPaneTotals: number[][];
+    windowBands?: { kind: string }[];
+    windowTooltips?: { tag?: { text: string; color: string } }[];
+    markers?: { atMs: number; tag?: { text: string; color: string } }[];
+  }) => (
+    <div
+      data-testid="compare-chart"
+      data-panes={perPaneTotals.length}
+      data-window-bands={(windowBands ?? []).map((band) => band.kind).join(",")}
+      data-window-tags={(windowTooltips ?? []).map((entry) => entry.tag?.text ?? "").join(",")}
+      data-window-tag-colors={(windowTooltips ?? []).map((entry) => entry.tag?.color ?? "").join(",")}
+      data-marker-times={(markers ?? []).map((marker) => marker.atMs).join(",")}
+      data-marker-tags={(markers ?? []).map((marker) => marker.tag?.text ?? "").join(",")}
+      data-marker-tag-colors={(markers ?? []).map((marker) => marker.tag?.color ?? "").join(",")}
+    />
   ),
 }));
 
 import { useAnalysisPanesStore, type PaneChart, type PaneSources } from "@/stores/useAnalysisPanesStore";
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
+import { COMPARE_COLORS } from "@/utils";
 
 import { AnalysisView } from "./AnalysisView";
+import { SBA_MARKER_COLOR, type ChartMarker } from "./chartMarkers";
+import { WINDOW_BAND_COLOR, type WindowKind } from "./chartWindowBands";
+import { EMPTY_PANE_WINDOWS, type PaneWindows } from "./compareWindows";
 
 const EMPTY_CHART: PaneChart = { totals: [], format: "amount" };
 const NO_SRC: PaneSources = { options: [], value: null, onChange: () => {} };
+const NO_WINDOWS: PaneWindows = EMPTY_PANE_WINDOWS;
+const NO_MARKERS: ChartMarker[] = [];
+
+const paneMarkers = (atMs: number[]): ChartMarker[] =>
+  atMs.map((at) => ({ kind: "sba", atMs: at, color: SBA_MARKER_COLOR, label: `Skybound Art @${at}` }));
+
+const paneWindows = (kinds: WindowKind[]): PaneWindows => ({
+  bands: kinds.map((kind) => ({ kind, color: WINDOW_BAND_COLOR[kind], band: { startMs: 0, endMs: 1_000, stacks: 1 } })),
+  tooltips: kinds.map((kind) => ({
+    kind,
+    startMs: 0,
+    endMs: 1_000,
+    color: WINDOW_BAND_COLOR[kind],
+    text: `${kind} 0:00–0:01`,
+  })),
+});
 
 // The react-router v6 adapter reads the initial search params from the REAL
 // `location.search`, not from MemoryRouter's in-memory history — so a pre-seeded
@@ -76,7 +118,7 @@ const renderView = (path = "/logs/2657") => {
 };
 
 const paneLogIds = () => screen.getAllByTestId("pane").map((pane) => pane.dataset.logId);
-const removeButtons = () => screen.queryAllByLabelText("ui.logs.compare-remove");
+const removeButtons = () => screen.queryAllByText("ui.logs.compare-remove");
 const search = () => new URLSearchParams(window.location.search);
 
 describe("AnalysisView", () => {
@@ -141,28 +183,30 @@ describe("AnalysisView", () => {
     expect(paneLogIds()).toEqual(["2657"]);
   });
 
-  // One control closes one pane — the LAST — so it can sit where + Compare
-  // does rather than needing a ✕ per column (see `ActorBar`).
-  it("closes the last pane, whatever the compare param holds", async () => {
+  // One control, closing pane 1 — the comparison the + Compare beside it opened.
+  // A third pane is only reachable by hand-editing the URL (the add control is
+  // replaced by this one the moment a second log is open), and closing pane 1
+  // then shifts the rest down rather than closing the end of the list.
+  it("closes pane 1, whatever the compare param holds", async () => {
     renderView("/logs/2657?compare=2661,2664");
 
     fireEvent.click(removeButtons()[0]);
 
-    await waitFor(() => expect(search().get("compare")).toBe("2661"));
-    expect(paneLogIds()).toEqual(["2657", "2661"]);
+    await waitFor(() => expect(search().get("compare")).toBe("2664"));
+    expect(paneLogIds()).toEqual(["2657", "2664"]);
   });
 
-  // The suffixed keys are POSITIONAL, so a closed pane's must be cleared: nuqs
-  // keeps a param nothing reads, and an uncleared `src2` would lie dormant and
-  // revive on whatever log later occupied pane 2. (Which key moves where is
-  // `paneRemovalWrites`'s own concern, and tested there.)
-  it("clears the keys the closed pane leaves behind", async () => {
+  // The suffixed keys are POSITIONAL, so the survivors shift down and the vacated
+  // index must be cleared: nuqs keeps a param nothing reads, and an uncleared
+  // `src2` would lie dormant and revive on whatever log later occupied pane 2.
+  // (Which key moves where is `paneRemovalWrites`'s own concern, tested there.)
+  it("shifts the surviving pane's keys down and clears the vacated ones", async () => {
     renderView("/logs/2657?compare=2661,2664&src1=1&src2=7&aura2=src:status:4:1:unknown");
 
     fireEvent.click(removeButtons()[0]);
 
-    await waitFor(() => expect(search().get("compare")).toBe("2661"));
-    expect(search().get("src1")).toBe("1");
+    await waitFor(() => expect(search().get("compare")).toBe("2664"));
+    expect(search().get("src1")).toBe("7");
     expect(search().has("src2")).toBe(false);
     expect(search().has("aura2")).toBe(false);
   });
@@ -231,6 +275,17 @@ describe("AnalysisView", () => {
     expect(screen.getAllByTestId("pane").map((pane) => pane.dataset.drawsChart)).toEqual(["false", "false"]);
   });
 
+  it("puts the chart-layout switch immediately before the body tabs", () => {
+    useMeterSettingsStore.setState({ compare_chart_mode: "overlay" });
+    renderView("/logs/2657?compare=2661");
+
+    const layout = screen.getByRole("radiogroup", { name: "ui.logs.compare-chart-label" });
+    const tabs = screen.getByRole("tablist", { name: "ui.logs.view-tablist-label" });
+    expect(layout.parentElement).toBe(tabs.parentElement);
+    const row = Array.from(tabs.parentElement?.children ?? []);
+    expect(row.indexOf(layout)).toBeLessThan(row.indexOf(tabs));
+  });
+
   it("leaves every pane its own chart when the comparison is split", () => {
     useMeterSettingsStore.setState({ compare_chart_mode: "split" });
     renderView("/logs/2657?compare=2661");
@@ -247,8 +302,22 @@ describe("AnalysisView", () => {
   it("tells each pane where every log ended", () => {
     useAnalysisPanesStore.setState({
       panes: [
-        { logId: 2657, base: null, chart: { totals: [1, 2, 3, 4], format: "amount" }, sources: NO_SRC },
-        { logId: 2661, base: null, chart: { totals: [1, 2], format: "amount" }, sources: NO_SRC },
+        {
+          logId: 2657,
+          base: null,
+          chart: { totals: [1, 2, 3, 4], format: "amount" },
+          sources: NO_SRC,
+          windows: NO_WINDOWS,
+          markers: NO_MARKERS,
+        },
+        {
+          logId: 2661,
+          base: null,
+          chart: { totals: [1, 2], format: "amount" },
+          sources: NO_SRC,
+          windows: NO_WINDOWS,
+          markers: NO_MARKERS,
+        },
       ],
     });
     renderView("/logs/2657?compare=2661");
@@ -266,25 +335,32 @@ describe("AnalysisView", () => {
   // so nothing is ruled, which is what a single pane has always shown.
   it("gives a single pane only its own end, which its chart drops", () => {
     useAnalysisPanesStore.setState({
-      panes: [{ logId: 2657, base: null, chart: { totals: [1, 2, 3, 4], format: "amount" }, sources: NO_SRC }],
+      panes: [
+        {
+          logId: 2657,
+          base: null,
+          chart: { totals: [1, 2, 3, 4], format: "amount" },
+          sources: NO_SRC,
+          windows: NO_WINDOWS,
+          markers: NO_MARKERS,
+        },
+      ],
     });
     renderView();
     expect(screen.getAllByTestId("pane")[0].dataset.paneEnds).toBe("#2657@3");
   });
 
-  // The source pin is a SHARED row now: one selector per log, drawn by the
-  // frame from what the panes publish, so a comparison picks one source from
-  // each fight.
-  it("draws one source selector per pane, from what the panes published", () => {
+  // The source pin belongs to the pane, under the picker naming its log — the
+  // frame draws none at all.
+  it("draws no source selector of its own", () => {
     useAnalysisPanesStore.setState({
       panes: [
-        { logId: 2657, base: null, chart: EMPTY_CHART, sources: NO_SRC },
-        { logId: 2661, base: null, chart: EMPTY_CHART, sources: NO_SRC },
+        { logId: 2657, base: null, chart: EMPTY_CHART, sources: NO_SRC, windows: NO_WINDOWS, markers: NO_MARKERS },
       ],
     });
-    renderView("/logs/2657?compare=2661");
+    renderView();
 
-    expect(screen.getAllByPlaceholderText("ui.logs.selector-all-friendlies")).toHaveLength(2);
+    expect(screen.queryAllByPlaceholderText("ui.logs.selector-all-friendlies")).toHaveLength(0);
   });
 
   // The side toggle clears both actor pins, in every pane — they name the
@@ -297,5 +373,128 @@ describe("AnalysisView", () => {
     await waitFor(() => expect(search().get("side")).toBe("enemy"));
     expect(search().has("src")).toBe(false);
     expect(search().has("src1")).toBe(false);
+  });
+
+  // One chart means one question, so a target, an ability or an aura picked in
+  // any pane has to select the same thing in the others. WHICH dimensions
+  // travel is `LINKED_DIMS`'s call and has its own test; the frame only decides
+  // whether they travel at all.
+  it("links the panes' pins while the comparison draws one chart", () => {
+    useMeterSettingsStore.setState({ compare_chart_mode: "overlay" });
+    renderView("/logs/2657?compare=2661");
+
+    expect(screen.getAllByTestId("pane").map((pane) => pane.dataset.linked)).toEqual(["true", "true"]);
+  });
+
+  it("leaves a split comparison's panes their own pins", () => {
+    useMeterSettingsStore.setState({ compare_chart_mode: "split" });
+    renderView("/logs/2657?compare=2661");
+
+    expect(screen.getAllByTestId("pane").map((pane) => pane.dataset.linked)).toEqual(["false", "false"]);
+  });
+
+  it("links nothing with a single log open", () => {
+    useMeterSettingsStore.setState({ compare_chart_mode: "overlay" });
+    renderView();
+
+    expect(screen.getAllByTestId("pane")[0].dataset.linked).toBe("false");
+  });
+
+  // The overlay has no fight of its own, so the battle-state shading has to come
+  // from the panes — all of them, so a Break one run had and the other did not
+  // is visible rather than only reachable by switching to Split.
+  it("shades every pane's battle windows on the one chart", () => {
+    useMeterSettingsStore.setState({ compare_chart_mode: "overlay" });
+    useAnalysisPanesStore.setState({
+      panes: [
+        {
+          logId: 2657,
+          base: null,
+          chart: EMPTY_CHART,
+          sources: NO_SRC,
+          windows: paneWindows(["break"]),
+          markers: NO_MARKERS,
+        },
+        {
+          logId: 2661,
+          base: null,
+          chart: EMPTY_CHART,
+          sources: NO_SRC,
+          windows: paneWindows(["sba", "break"]),
+          markers: NO_MARKERS,
+        },
+      ],
+    });
+    renderView("/logs/2657?compare=2661");
+
+    // Kind order, not pane order — the same order a single log's own chart
+    // shades in.
+    expect(screen.getByTestId("compare-chart").dataset.windowBands).toBe("sba,break,break");
+  });
+
+  // The row's swatch is the KIND's colour — the card groups these under one
+  // heading per kind — so the id is the only thing left that can say which run
+  // a span belongs to, and it wears that run's own line colour.
+  it("tags every window line with its log, in that log's line colour", () => {
+    useMeterSettingsStore.setState({ compare_chart_mode: "overlay" });
+    useAnalysisPanesStore.setState({
+      panes: [
+        {
+          logId: 2657,
+          base: null,
+          chart: EMPTY_CHART,
+          sources: NO_SRC,
+          windows: paneWindows(["break"]),
+          markers: NO_MARKERS,
+        },
+        {
+          logId: 2661,
+          base: null,
+          chart: EMPTY_CHART,
+          sources: NO_SRC,
+          windows: paneWindows(["break"]),
+          markers: NO_MARKERS,
+        },
+      ],
+    });
+    renderView("/logs/2657?compare=2661");
+
+    const chart = screen.getByTestId("compare-chart");
+    expect(chart.dataset.windowTags).toBe("#2657,#2661");
+    expect(chart.dataset.windowTagColors).toBe(`${COMPARE_COLORS[0]},${COMPARE_COLORS[1]}`);
+  });
+
+  // The SBA shading merges a chain of casts into one span, so the markers are
+  // the only thing on the overlay saying how many Skybound Arts a run got off —
+  // and each one is tagged with its log for the same reason a window line is.
+  it("draws every pane's SBA casts on the one chart, tagged by log", () => {
+    useMeterSettingsStore.setState({ compare_chart_mode: "overlay" });
+    useAnalysisPanesStore.setState({
+      panes: [
+        {
+          logId: 2657,
+          base: null,
+          chart: EMPTY_CHART,
+          sources: NO_SRC,
+          windows: NO_WINDOWS,
+          markers: paneMarkers([1_000, 9_000]),
+        },
+        {
+          logId: 2661,
+          base: null,
+          chart: EMPTY_CHART,
+          sources: NO_SRC,
+          windows: NO_WINDOWS,
+          markers: paneMarkers([4_000]),
+        },
+      ],
+    });
+    renderView("/logs/2657?compare=2661");
+
+    const chart = screen.getByTestId("compare-chart");
+    // Time order across the panes, not pane order.
+    expect(chart.dataset.markerTimes).toBe("1000,4000,9000");
+    expect(chart.dataset.markerTags).toBe("#2657,#2661,#2657");
+    expect(chart.dataset.markerTagColors).toBe(`${COMPARE_COLORS[0]},${COMPARE_COLORS[1]},${COMPARE_COLORS[0]}`);
   });
 });

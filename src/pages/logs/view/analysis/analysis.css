@@ -44,3 +44,47 @@
 .analysis-pane {
   min-width: 0;
 }
+
+/* The positioning context the loading overlay covers — see PaneLoading. */
+.analysis-pane-body {
+  position: relative;
+}
+
+.analysis-pane-body-empty {
+  min-height: 240px;
+}
+
+.analysis-pane-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: color-mix(in srgb, var(--color-bg) 55%, transparent);
+}
+
+.analysis-pane-held {
+  pointer-events: none;
+}
+
+.analysis-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--color-line-strong);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: analysis-spin 700ms linear infinite;
+}
+
+@keyframes analysis-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .analysis-spinner {
+    animation-duration: 2400ms;
+  }
+}

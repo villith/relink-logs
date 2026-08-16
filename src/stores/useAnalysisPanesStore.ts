@@ -1,6 +1,8 @@
 import { create } from "zustand";
 
 import type { LabelledOption } from "@/pages/logs/view/analysis/PinSelect";
+import type { ChartMarker } from "@/pages/logs/view/analysis/chartMarkers";
+import { EMPTY_PANE_WINDOWS, type PaneWindows } from "@/pages/logs/view/analysis/compareWindows";
 
 import type { EncounterStateResponse } from "./useEncounterStore";
 
@@ -25,6 +27,17 @@ export type PaneSlice = {
    * shared source bar — one selector per log, so a comparison picks one source
    * from each. Empty until the pane's fetch has told it who is in the fight. */
   sources: PaneSources;
+  /** This pane's battle-state windows, published for the FRAME's single-chart
+   * overlay: that plot draws one line per log and has no fight of its own, so
+   * the SBA/Link/Overdrive/Break shading has to come from the panes. Resolved
+   * here for the same reason `chart` is — clipping a window onto the chart
+   * window is the chart model's job, and there is one of those per pane. */
+  windows: PaneWindows;
+  /** This pane's death and SBA-cast markers, published for the overlay for the
+   * same reason `windows` is. An SBA window says a Skybound Art was being
+   * performed; these say who cast each one and when, which is the reading a
+   * chain of four does not survive being merged into one span. */
+  markers: ChartMarker[];
 };
 
 /** One pane's source selector, as the frame draws it.
@@ -55,6 +68,8 @@ export type PaneChart = {
 
 const EMPTY_PANE_CHART: PaneChart = { totals: [], format: "amount" };
 
+const NO_MARKERS: ChartMarker[] = [];
+
 type AnalysisPanesState = {
   /** Ordered: pane 0 is the log in the path, the rest are the comparisons.
    * A LIST, not a fixed pair — the UI ships two, the model permits any number
@@ -68,6 +83,8 @@ type AnalysisPanesState = {
   setPaneBase: (index: number, logId: number, response: EncounterStateResponse) => void;
   setPaneChart: (index: number, chart: PaneChart) => void;
   setPaneSources: (index: number, sources: PaneSources) => void;
+  setPaneWindows: (index: number, windows: PaneWindows) => void;
+  setPaneMarkers: (index: number, markers: ChartMarker[]) => void;
 };
 
 const writeAt = (panes: PaneSlice[], index: number, change: (pane: PaneSlice) => PaneSlice): PaneSlice[] =>
@@ -103,7 +120,14 @@ export const useAnalysisPanesStore = create<AnalysisPanesState>((set) => ({
         const existing = state.panes[index];
         return existing !== undefined && existing.logId === logId
           ? existing
-          : { logId, base: null, chart: EMPTY_PANE_CHART, sources: NO_SOURCES };
+          : {
+              logId,
+              base: null,
+              chart: EMPTY_PANE_CHART,
+              sources: NO_SOURCES,
+              windows: EMPTY_PANE_WINDOWS,
+              markers: NO_MARKERS,
+            };
       }),
     })),
   setPaneBase: (index, logId, response) =>
@@ -117,5 +141,13 @@ export const useAnalysisPanesStore = create<AnalysisPanesState>((set) => ({
   setPaneSources: (index, sources) =>
     set((state) => ({
       panes: writeAt(state.panes, index, (pane) => ({ ...pane, sources })),
+    })),
+  setPaneWindows: (index, windows) =>
+    set((state) => ({
+      panes: writeAt(state.panes, index, (pane) => ({ ...pane, windows })),
+    })),
+  setPaneMarkers: (index, markers) =>
+    set((state) => ({
+      panes: writeAt(state.panes, index, (pane) => ({ ...pane, markers })),
     })),
 }));

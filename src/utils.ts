@@ -1426,6 +1426,26 @@ export const PLAYER_COLORS = ["#FF5630", "#FFAB00", "#36B37E", "#00B8D9", "#9BCF
 /// selectors and the events stream all go through.
 export const ENEMY_COLORS = ["#F06595", "#CC5DE8", "#845EF7", "#5C7CFA", "#A9B1BD", "#D6336C", "#9775FA", "#4DABF7"];
 
+/// The categorical palette for compared LOGS — one colour per pane, worn by that
+/// log's line on the compare overlay, the rule where its run ended, its selector
+/// in the actor bar and its column's title (see `paneSeriesColor`).
+///
+/// A third list rather than reusing PLAYER_COLORS, for two reasons:
+///
+/// * Nothing here is red, orange or amber. A whole column tinted in one of those
+///   reads as an error or a warning about that log, which is what every other
+///   red/amber mark in this app means (the imported badge, a failed fetch, the
+///   legality findings). A log is not in a bad state for being compared.
+/// * A pane colour and a party colour appear TOGETHER in the split layout — the
+///   end rules wear this palette while the bands under them wear the party's —
+///   so drawing both from one list would put a log and a player in one colour.
+///
+/// The first two are what a two-log comparison actually uses, and they are a
+/// blue and a magenta on purpose: that pair keeps its separation under deutan
+/// and protan simulation, where blue-against-green or blue-against-violet does
+/// not. Green is deliberately absent as well — in this app it means "cleared".
+export const COMPARE_COLORS = ["#4DABF7", "#DA77F2", "#22B8CF", "#748FFC", "#E599F7", "#66D9E8", "#B197FC", "#A9B1BD"];
+
 /// Resolves a player row's chart/overlay color. A filled party slot's color belongs
 /// to the row matched to it. A row that doesn't resolve to a slot picks, by its sort
 /// position, from the remaining colors: first the EMPTY slots' colors (so four

@@ -9,10 +9,12 @@ import type { ScopeProbes } from "../../events/eventScope";
 import type { EventLabels } from "../../events/EventsTab";
 import { spawnSegmentAt } from "../../events/eventTargets";
 import { isHarmful } from "../../metrics/statusPolarity";
+import type { Hostility } from "../../metrics/types";
 import { playerRowKey, spawnRowKey } from "../../rowKey";
 import { deriveSelectorOptions, type SelectorPins } from "../../selectorOptions";
 import { isStatusPin } from "../../statusUptime";
 import { labelSourceOptions } from "../legendLabel";
+import { universeOf } from "../machine/resolve";
 import { withStatusOption } from "../statusOption";
 
 import type { ActorIdentity } from "./useActorIdentity";
@@ -43,6 +45,10 @@ export type SelectorModel = {
 export type SelectorModelInput = {
   facts: SelectionFact[];
   pins: SelectorPins;
+  /** The EFFECTIVE side (a metric with no enemy side reads friendly). It decides
+   * which population each of the two actor selectors draws from, and therefore
+   * how each option is named, illustrated and coloured — see `universeOf`. */
+  hostility: Hostility;
   /** A condensed group pin expanded into raw action ids — the same expansion
    * the fetch uses, so a pinned echo filters the stream to the damage its row
    * reports. */
@@ -59,6 +65,7 @@ export type SelectorModelInput = {
 export const useSelectorModel = ({
   facts,
   pins,
+  hostility,
   pinnedActions,
   targetEntries,
   identity,
@@ -71,7 +78,7 @@ export const useSelectorModel = ({
   const { cellOf, resolvers } = cells;
   // Cascading options come from the facts for the CURRENT window but with no
   // pin applied — a selector must keep offering what the other pins allow.
-  const options = useMemo(() => deriveSelectorOptions(facts, pins), [facts, pins]);
+  const options = useMemo(() => deriveSelectorOptions(facts, pins, hostility), [facts, pins, hostility]);
 
   // The Events body's pins, resolved out of the machine's index spaces into the
   // ones a raw event carries (see `filterByPins`). Declared here because the
@@ -157,22 +164,42 @@ export const useSelectorModel = ({
     [playerByIndex]
   );
 
-  const labelledOptions = useMemo(
-    () => ({
+  /** The party, named the way the legend names it: two players a template
+   * renders identically are told apart by character, which the entity ladder
+   * (naming one actor at a time) cannot know about. The art and the colour still
+   * come from the ladder, so they cannot drift from the row this option pins. */
+  const playerOptionsOf = useCallback(
+    (list: typeof options.sources) =>
+      labelSourceOptions(list, labelForSource, characterForSource, playerLabelTemplate).map((option) =>
+        optionOfCell(option.value, { ...cellOf(playerRowKey(Number(option.value))), name: option.label })
+      ),
+    [labelForSource, characterForSource, playerLabelTemplate, cellOf]
+  );
+
+  /** The fight's enemy spawns — one entry per spawn, never per actor id: the
+   * game reissues a dead boss's index to the next one. */
+  const spawnOptionsOf = useCallback(
+    (list: typeof options.targets) =>
+      list.map((option) => optionOfCell(option.value, cellOf(spawnRowKey(Number(option.value))))),
+    [cellOf]
+  );
+
+  const labelledOptions = useMemo(() => {
+    // WHICH population each actor dimension draws from — the same rule the group
+    // query resolves its own refs through, so a dropdown entry and the row it
+    // pins are the same thing in the same index space. Read off `universeOf`
+    // rather than off a second `hostility === "enemy"` here: an option named
+    // through the wrong universe does not throw, it just shows a player's name
+    // and colour on an enemy spawn.
+    const sourcesArePlayers = universeOf("source", hostility) === "player";
+
+    return {
       // Options wear their actor's own colour, the same one the chart band and
       // the table row take — a dropdown is where you pick the thing you are
       // about to look at, so it is the one place the colours must already
       // match. An ability has no actor and stays plain.
-      sources: labelSourceOptions(options.sources, labelForSource, characterForSource, playerLabelTemplate).map(
-        (option) =>
-          // The LABEL keeps the legend's qualifier — two players a template
-          // renders identically are told apart by character, which the entity
-          // ladder (naming one actor at a time) cannot know about. The art and
-          // the colour come from the ladder, so they cannot drift from the row
-          // this option pins.
-          optionOfCell(option.value, { ...cellOf(playerRowKey(Number(option.value))), name: option.label })
-      ),
-      targets: options.targets.map((option) => optionOfCell(option.value, cellOf(spawnRowKey(Number(option.value))))),
+      sources: sourcesArePlayers ? playerOptionsOf(options.sources) : spawnOptionsOf(options.sources),
+      targets: sourcesArePlayers ? spawnOptionsOf(options.targets) : playerOptionsOf(options.targets),
       // Icons AFTER `withStatusOption`, not before: the option it injects for a
       // pinned effect is not in the list it was given, and an icon pass on the
       // input would leave the one option that is definitely selected as the
@@ -182,9 +209,8 @@ export const useSelectorModel = ({
         pins.ability,
         (key) => resolvers.status(key).name
       ).map((option) => ({ ...option, iconUrl: abilityOptionCell(option.value).iconUrl })),
-    }),
-    [options, labelForSource, characterForSource, playerLabelTemplate, pins.ability, abilityOptionCell, resolvers]
-  );
+    };
+  }, [options, hostility, playerOptionsOf, spawnOptionsOf, pins.ability, abilityOptionCell, resolvers]);
 
   return { eventPins, eventLabels, eventProbes, labelledOptions };
 };

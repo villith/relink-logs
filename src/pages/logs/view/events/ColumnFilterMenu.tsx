@@ -3,6 +3,7 @@ import { FunnelSimple } from "@phosphor-icons/react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { Button } from "@/components/ui/Button";
 import { cn } from "@/components/ui/cn";
 import { EntityIcon } from "@/components/ui/EntityIcon";
 import { Figure } from "@/components/ui/Figure";
@@ -139,13 +140,14 @@ export const ColumnFilterMenu = ({ column, name, options, picked, onChange }: Co
         </div>
 
         {picked.size > 0 && (
-          <UnstyledButton
+          <Button
+            variant="subtle"
             data-filter-clear
-            className="mt-1 w-full rounded-xs px-1 py-1 text-left text-md text-ink-3 hover:bg-raised hover:text-ink"
+            className="mt-1 w-full justify-start py-1 text-left text-md"
             onClick={() => onChange(new Set())}
           >
             {t("ui.logs.events-filter-clear")}
-          </UnstyledButton>
+          </Button>
         )}
       </Popover.Dropdown>
     </Popover>

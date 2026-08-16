@@ -14,6 +14,11 @@ export type WindowTooltipEntry = {
   endMs: number;
   color: string;
   text: string;
+  /** Which LOG this span belongs to, where more than one is drawn — the id in
+   * that log's own compare colour, set ahead of the line rather than folded into
+   * `text` so the colour can reach it. Absent with one log open, where every
+   * span on the plot is the same fight's and naming it would say nothing. */
+  tag?: { text: string; color: string };
 };
 
 /** The current tab's metric during `window`: every plotted series summed over

@@ -23,7 +23,7 @@ const pane = (over: Partial<PaneSources> = {}): PaneSources => ({
 const renderIt = (props: Partial<React.ComponentProps<typeof ActorBar>> = {}) =>
   render(
     <MantineProvider>
-      <ActorBar panes={[pane()]} {...props} />
+      <ActorBar panes={[pane()]} hostility="friendly" {...props} />
     </MantineProvider>
   );
 
@@ -54,6 +54,14 @@ describe("ActorBar", () => {
 
   it("renders the trailing slot — the compare control lives there", () => {
     renderIt({ trailing: <button type="button">Compare</button> });
+    expect(screen.getByText("Compare")).toBeTruthy();
+  });
+
+  // While comparing the panes draw their own selectors and this row is handed
+  // none — but it still carries the control that closes the comparison.
+  it("still draws the trailing control with no panes", () => {
+    renderIt({ panes: [], trailing: <button type="button">Compare</button> });
+    expect(screen.queryAllByPlaceholderText("ui.logs.selector-all-friendlies")).toHaveLength(0);
     expect(screen.getByText("Compare")).toBeTruthy();
   });
 
@@ -88,5 +96,15 @@ describe("ActorBar", () => {
 
     expect(second).toHaveBeenCalledWith(3);
     expect(first).not.toHaveBeenCalled();
+  });
+
+  // The side toggle is not a filter over this list — it swaps which population
+  // the SOURCE dimension draws from at all, so what an unpinned control offers
+  // is enemies on the enemy side. Fixed at "All friendlies", the toggle read as
+  // if it did nothing to the two selectors it actually swaps.
+  it("names the source universe the side is showing", () => {
+    renderIt({ hostility: "enemy" });
+    expect(screen.getAllByPlaceholderText("ui.logs.selector-all-enemies")).toHaveLength(1);
+    expect(screen.queryByPlaceholderText("ui.logs.selector-all-friendlies")).toBeNull();
   });
 });

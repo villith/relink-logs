@@ -33,10 +33,9 @@ import { WINDOW_BAND_COLOR, windowBandsFor } from "../chartWindowBands";
 import { admittedBucketsOf } from "../chartWindowFilter";
 import { windowMetricAmount, windowTooltipEntries } from "../chartWindowTooltip";
 import { legendLabelFor } from "../legendLabel";
-import { levelFor, type MetricCapabilities } from "../machine/capabilities";
+import type { MetricCapabilities } from "../machine/capabilities";
 import { groupBandsFor } from "../machine/groupRows";
 import { GROUP_TOP_N, type ViewSpec } from "../machine/resolve";
-import type { MetricKey } from "../machine/state";
 import { buildStatusSeries } from "../statusChart";
 import type { WireWindow } from "../wireWindows";
 
@@ -59,7 +58,6 @@ const iconField = (icon: string | undefined) => (icon === undefined ? {} : { ico
 export type ChartModel = {
   shownChartData: ChartDatapoint[];
   labels: Label;
-  labelKey: string;
   format: "amount" | "percent" | "count";
   stacked: boolean;
   smoothing: number;
@@ -88,7 +86,6 @@ export type ChartModelInput = {
   rateSmoothing: number;
   caps: MetricCapabilities;
   spec: ViewSpec;
-  metricKey: MetricKey;
   hostility: Hostility;
   pins: SelectorPins;
   range: [number, number] | null;
@@ -127,7 +124,6 @@ export const useChartModel = ({
   rateSmoothing,
   caps,
   spec,
-  metricKey,
   hostility,
   pins,
   range,
@@ -168,7 +164,6 @@ export const useChartModel = ({
   } = identity;
   const { cellOf } = cells;
   const groupsPath = caps.dataPath === "groups";
-  const level = levelFor(chartGroupBy);
   /** This model's bucket width bound into the shared clock, for the plotted
    * points' timestamps. */
   const labelBucket = useCallback((bucket: number) => bucketLabel(bucket, bucketMs), [bucketMs]);
@@ -221,7 +216,6 @@ export const useChartModel = ({
             ? sbaChart
             : dpsChart;
     return {
-      labelKey: decl.labelKey,
       source,
       // The SBA gauge is captured on its own cadence, so it carries its own
       // length; everything else rides the shared bucket count.
@@ -377,23 +371,19 @@ export const useChartModel = ({
   // keeps drawing the whole fight beside a table that has halved. Damage only:
   // it is the only metric a target span can narrow honestly (see
   // `build_scoped_player_chart`).
-  // Which series won, what that makes the plot, and how it is titled and
-  // formatted — one pure fold of the series above (see chartPresentation.ts),
-  // so the heading can never disagree with what is on screen.
-  const { overlay, chartSource, withTotal, labelKey, format, stacked, smoothing } = chartPresentation({
+  // Which series won, what that makes the plot, and how it is formatted — one
+  // pure fold of the series above (see chartPresentation.ts).
+  const { overlay, chartSource, withTotal, format, stacked, smoothing } = chartPresentation({
     statusSeries,
     groupOverlay,
     abilitySeries,
     groupPlayerSeries,
     groupsPath,
     // The grouping the plotted aggregates ANSWER, not the one just requested —
-    // so the Total series and the title change with the data rather than a
-    // fetch ahead of it (see `answeredGroups`).
+    // so the Total series changes with the data rather than a fetch ahead of it
+    // (see `answeredGroups`).
     groupBy: chartGroupBy,
     hostility,
-    metricKey,
-    level: level,
-    metricLabelKey: chartMetric.labelKey,
     metricFormat: chartMetric.format,
     rateSmoothing,
   });
@@ -628,7 +618,6 @@ export const useChartModel = ({
   return {
     shownChartData,
     labels,
-    labelKey,
     format,
     stacked,
     smoothing,
