@@ -23,6 +23,7 @@ const render2 = (perPaneTotals: number[][]) =>
       paneLogIds={perPaneTotals.map((_, index) => 2657 + index)}
       format="amount"
       onScope={vi.fn()}
+      endLines={[]}
     />
   );
 

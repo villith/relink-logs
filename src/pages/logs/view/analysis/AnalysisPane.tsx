@@ -1,15 +1,15 @@
 import { Box } from "@mantine/core";
 import { useQueryState } from "nuqs";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import { useAnalysisPanesStore } from "@/stores/useAnalysisPanesStore";
 import { EMPTY_ENCOUNTER_FACTS, encounterFromResponse } from "@/stores/useEncounterStore";
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
-import type { MeterFilters } from "@/types";
-import { formatInPartyOrder, millisecondsToElapsedFormat } from "@/utils";
+import type { LogSummary, MeterFilters } from "@/types";
+import { formatInPartyOrder } from "@/utils";
 
-import { DPS_BUCKET_MS } from "../DetailCharts";
+import { DPS_BUCKET_MS, bucketLabel } from "../DetailCharts";
 import { EventsTab } from "../events/EventsTab";
 import type { ActorSpace } from "../events/eventRows";
 import { spawnSegmentAt } from "../events/eventTargets";
@@ -17,17 +17,19 @@ import type { Hostility } from "../metrics/types";
 import { type SelectorPins } from "../selectorOptions";
 import { TimelineTab } from "../timeline/TimelineTab";
 
-import { ActorBar } from "./ActorBar";
 import { AuraStrip } from "./AuraStrip";
 import { CollapseSupplementaryToggle } from "./CollapseSupplementaryToggle";
 import { DebugBar } from "./DebugBar";
-import { DpsChart } from "./DpsChart";
+import { DpsChart, type EndLine, type StackMode } from "./DpsChart";
+import { LogPicker } from "./LogPicker";
 import { MetricTable } from "./MetricTable";
 import { PinBar } from "./PinBar";
 import { QuestSummary } from "./QuestSummary";
 import { RegroupStrip } from "./RegroupStrip";
 import { WindowStrip } from "./WindowStrip";
 import { EVENTS_TAB, TABLE_TAB, TIMELINE_TAB, bodyFor } from "./analysisTabs";
+import type { MarkerKind } from "./chartMarkers";
+import type { WindowKind } from "./chartWindowBands";
 import { selectedChartWindows, windowFilterScrubRange } from "./chartWindowFilter";
 import { paneTotals } from "./compareSeries";
 import { buildDebugReadout } from "./debugReadout";
@@ -60,8 +62,28 @@ import { useSelectorModel } from "./model/useSelectorModel";
 import { useStatusNaming } from "./model/useStatusNaming";
 import { useUrlQueryString } from "./useUrlQueryString";
 
-/** Bucket index → "M:SS", for the window readout. */
-const bucketLabel = (bucket: number) => millisecondsToElapsedFormat(bucket * DPS_BUCKET_MS);
+/** The chart controls every pane's plot shares, owned by the frame.
+ *
+ * One of each for the whole view: two logs compared under different smoothing
+ * windows, or one stacked against one overlapped, are two different readings
+ * and not a comparison. The frame holds the state and resets it per metric; the
+ * pane reads all of them from HERE — only `rateSmoothing` reaches the chart
+ * model, the rest go straight to `DpsChart`, which is controlled by them. */
+export type ChartControls = {
+  stackMode: StackMode;
+  setStackMode: (mode: StackMode) => void;
+  /** The trailing smoothing window in buckets. */
+  rateSmoothing: number;
+  setRateSmoothing: (buckets: number) => void;
+  /** Which marker and battle-window KINDS are switched off. Shared for the same
+   * reason the two above are: the split layout draws the same fight twice, and
+   * one plot hiding Break windows while the other shows them is not one
+   * reading. */
+  hiddenMarkerKinds: ReadonlySet<MarkerKind>;
+  toggleMarkerKind: (kind: MarkerKind) => void;
+  hiddenWindowKinds: ReadonlySet<WindowKind>;
+  toggleWindowKind: (kind: WindowKind) => void;
+};
 
 export type AnalysisPaneProps = {
   /** Which pane this is, which is also which URL keys its state reads and
@@ -74,6 +96,20 @@ export type AnalysisPaneProps = {
   /** Whether this pane draws its OWN plot. False while the frame overlays every
    * pane on one, where a per-pane chart would be the same data drawn twice. */
   drawsChart: boolean;
+  /** The chart controls every pane's plot shares — one smoothing window and one
+   * stack mode for the whole view, owned by the frame (see `ChartControls`). */
+  chartControls: ChartControls;
+  /** The pickable log library, for this pane's title (see `LogPicker`). Loaded
+   * once by the frame and handed down rather than fetched per pane. */
+  logs: LogSummary[];
+  /** Opens a different log in THIS pane. */
+  onChangeLog: (logId: number) => void;
+  /** Where EVERY pane's fight ended, in buckets, so this plot can mark the runs
+   * that stopped before its own (see `endLines`). This pane's own entry is
+   * included and `visibleEndLines` drops it — its bucket is this chart's last
+   * one by construction — so which rules exist has one author. Empty with one
+   * log open. */
+  paneEnds: EndLine[];
 };
 
 /** ONE log, end to end: its own fetches, its own pins, its own body.
@@ -81,7 +117,16 @@ export type AnalysisPaneProps = {
  * Extracted from `AnalysisView` as a move, not a rewrite — every comment here
  * carries reasoning that was paid for once already. The frame above it holds
  * only what is shared between panes. */
-export const AnalysisPane = ({ paneIndex, logId, filters, drawsChart }: AnalysisPaneProps) => {
+export const AnalysisPane = ({
+  paneIndex,
+  logId,
+  filters,
+  drawsChart,
+  chartControls,
+  logs,
+  onChangeLog,
+  paneEnds,
+}: AnalysisPaneProps) => {
   // The id the fetches and the debug surfaces use. A string because that is what
   // `useParams` handed the view before panes existed, and both consumers parse
   // it back with `Number(...)`.
@@ -114,9 +159,6 @@ export const AnalysisPane = ({ paneIndex, logId, filters, drawsChart }: Analysis
     groupReference: baseGroupReference,
     statusIntervals,
     players: playerData,
-    questId,
-    questTimer,
-    questCompleted,
     roomIndex,
     imported,
   } = loaded;
@@ -427,15 +469,12 @@ export const AnalysisPane = ({ paneIndex, logId, filters, drawsChart }: Analysis
     stacked,
     smoothing,
     chartSource,
-    stackMode,
-    setStackMode,
-    setRateSmoothing,
     chartMarkers,
     maskBands,
     stateWindowBands,
     chartWindowTooltips,
   } = useChartModel({
-    id,
+    rateSmoothing: chartControls.rateSmoothing,
     caps,
     spec,
     metricKey,
@@ -465,6 +504,33 @@ export const AnalysisPane = ({ paneIndex, logId, filters, drawsChart }: Analysis
     cells,
     playerLabelTemplate: player_label_template,
   });
+
+  // This pane's source universe, its pin and the handler that moves it,
+  // published for the FRAME's shared actor bar — one selector per log, so a
+  // comparison picks one source from each (see `PaneSources`).
+  //
+  // The HANDLER travels rather than the frame writing the pin itself: pinning a
+  // source is `pinRow` plus arming the auto-drill, and a frame that spelled that
+  // out again would be a second author of the rule a row click already follows.
+  // Wrapped through a ref so the published function's identity never changes —
+  // publishing a fresh closure on every render would write the store on every
+  // render, re-render the frame, and re-render this pane.
+  const sourceChangeRef = useRef(handlePinsChange);
+  sourceChangeRef.current = handlePinsChange;
+  const pinsRef = useRef(pins);
+  pinsRef.current = pins;
+  const onSourceChange = useCallback((next: number | null) => {
+    sourceChangeRef.current({ ...pinsRef.current, source: next });
+  }, []);
+
+  const setPaneSources = useAnalysisPanesStore((panes) => panes.setPaneSources);
+  const paneSources = useMemo(
+    () => ({ options: labelledOptions.sources, value: pins.source, onChange: onSourceChange }),
+    [labelledOptions.sources, pins.source, onSourceChange]
+  );
+  useEffect(() => {
+    setPaneSources(paneIndex, paneSources);
+  }, [paneIndex, paneSources, setPaneSources]);
 
   // What this pane's plot comes to per bucket, published for the frame's
   // compare overlay. Resolved HERE because deciding what a plot totals is the
@@ -570,32 +636,33 @@ export const AnalysisPane = ({ paneIndex, logId, filters, drawsChart }: Analysis
     ...(isStatusMetric && statusIntervals.length > 0 ? {} : { emptyKey: spec.table.emptyKey }),
   };
 
-  if (!shownEncounter) return null;
+  /** The pane's TITLE is its log picker: the thing that names which log this
+   * column is about is the same thing that changes it, so there is no separate
+   * header naming a log you then go elsewhere to swap. The quest name, the
+   * party, the date, the two clocks and the id all live inside the control (see
+   * `LogPicker`), which is why the summary beside it carries only what the
+   * picker does not. */
+  const header = (
+    <QuestSummary
+      roomIndex={roomIndex}
+      imported={imported}
+      title={<LogPicker logs={logs} value={Number.isFinite(logId) ? logId : null} onChange={onChangeLog} />}
+    />
+  );
+
+  // Nothing loaded yet — or a log whose fetch failed. The HEADER still draws:
+  // as the whole page this returning null read as "loading", but as one column
+  // of a comparison a bare 1fr track has no title, no picker and no way back,
+  // so a pane pointed at a deleted or unreadable log could only be closed. The
+  // picker is also what the user reaches for to try another log.
+  if (!shownEncounter) return header;
 
   const windowLabel = range === null ? null : `${bucketLabel(range[0])} – ${bucketLabel(range[1])}`;
   const fullLabel = bucketLabel(Math.max(0, chartLen - 1));
 
   return (
     <>
-      <QuestSummary
-        encounter={shownEncounter}
-        questId={questId}
-        roomIndex={roomIndex}
-        questCompleted={questCompleted}
-        questTimer={questTimer}
-        imported={imported}
-        logId={Number.isFinite(logId) ? logId : null}
-      />
-
-      {/* WHO this pane is about. It outranks everything below: the actor pin is
-          the one selection the Events view and the table view read the same
-          way, so it sits above the pin bar rather than beside it. Per PANE,
-          because comparing two logs is comparing two selections. */}
-      <ActorBar
-        options={labelledOptions.sources}
-        value={pins.source}
-        onChange={(source) => handlePinsChange({ ...pins, source })}
-      />
+      {header}
 
       {/* The other two pins narrow whatever is below them. Below the metric tabs
           rather than above: the enemies and abilities they offer are the ones
@@ -633,6 +700,17 @@ export const AnalysisPane = ({ paneIndex, logId, filters, drawsChart }: Analysis
           stacked={stacked}
           onScope={handleScope}
           markers={chartMarkers}
+          // The marker and window switches are the VIEW's, not this plot's, so
+          // two split charts of one comparison cannot end up hiding different
+          // kinds (see `ChartControls`).
+          hiddenMarkerKinds={chartControls.hiddenMarkerKinds}
+          onToggleMarkerKind={chartControls.toggleMarkerKind}
+          hiddenWindowKinds={chartControls.hiddenWindowKinds}
+          onToggleWindowKind={chartControls.toggleWindowKind}
+          // Where the log in the OTHER pane ran out. Split, the two plots share
+          // no axis, so without this the shorter run just stops and reads as a
+          // fight that went quiet.
+          endLines={paneEnds}
           bands={maskBands}
           windowBands={stateWindowBands}
           windowTooltips={chartWindowTooltips}
@@ -640,9 +718,9 @@ export const AnalysisPane = ({ paneIndex, logId, filters, drawsChart }: Analysis
           // Offered on RATE charts only. On a level (the undrilled SBA gauge,
           // the aura stacks) `chartPresentation` pins smoothing to 1 whatever is
           // chosen, so a control there would be a knob that does nothing.
-          onSmoothingChange={format === "amount" ? setRateSmoothing : undefined}
-          stackMode={chartSource === "stacks" ? stackMode : undefined}
-          onStackModeChange={chartSource === "stacks" ? setStackMode : undefined}
+          onSmoothingChange={format === "amount" ? chartControls.setRateSmoothing : undefined}
+          stackMode={chartSource === "stacks" ? chartControls.stackMode : undefined}
+          onStackModeChange={chartSource === "stacks" ? chartControls.setStackMode : undefined}
           // In the chart's own control strip, beside the smoothing window: it
           // belongs with the other knobs that change how the fight READS, not
           // with the side switch, which changes WHOSE fight is being read. It

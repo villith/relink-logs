@@ -13,9 +13,33 @@ vi.mock("react-i18next", () => ({
 // The pane is the whole view — charts, fetches, Tauri IPC. The frame's job is
 // to decide WHICH panes exist, what they are given, and what the controls they
 // share write, so stub the pane and assert the decisions.
+//
+// A FRAGMENT of sections, like the real pane: it draws a header, a selector bar,
+// a chart and a body as siblings, and a stub that returned one element would
+// hide whether the frame gives a pane a column or lets its sections loose in the
+// grid (see "one column per pane" below).
 vi.mock("./AnalysisPane", () => ({
-  AnalysisPane: ({ paneIndex, logId, drawsChart }: { paneIndex: number; logId: number; drawsChart: boolean }) => (
-    <div data-testid="pane" data-pane-index={paneIndex} data-log-id={logId} data-draws-chart={String(drawsChart)} />
+  AnalysisPane: ({
+    paneIndex,
+    logId,
+    drawsChart,
+    paneEnds,
+  }: {
+    paneIndex: number;
+    logId: number;
+    drawsChart: boolean;
+    paneEnds: { bucket: number; label: string }[];
+  }) => (
+    <>
+      <div
+        data-testid="pane"
+        data-pane-index={paneIndex}
+        data-log-id={logId}
+        data-draws-chart={String(drawsChart)}
+        data-pane-ends={paneEnds.map((end) => `${end.label}@${end.bucket}`).join(",")}
+      />
+      <div data-testid="pane-section" />
+    </>
   ),
 }));
 vi.mock("./AnalysisTopBar", () => ({ AnalysisTopBar: () => <div data-testid="top-bar" /> }));
@@ -25,9 +49,13 @@ vi.mock("./CompareChart", () => ({
   ),
 }));
 
+import { useAnalysisPanesStore, type PaneChart, type PaneSources } from "@/stores/useAnalysisPanesStore";
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 
 import { AnalysisView } from "./AnalysisView";
+
+const EMPTY_CHART: PaneChart = { totals: [], format: "amount" };
+const NO_SRC: PaneSources = { options: [], value: null, onChange: () => {} };
 
 // The react-router v6 adapter reads the initial search params from the REAL
 // `location.search`, not from MemoryRouter's in-memory history — so a pre-seeded
@@ -72,6 +100,23 @@ describe("AnalysisView", () => {
     expect(paneLogIds()).toEqual(["2657", "2661", "2664"]);
   });
 
+  // A pane draws a STACK of sections, and the frame lays the panes out as grid
+  // columns. The frame therefore has to give each pane a cell of its own: loose
+  // sections auto-flow into the grid one item each, which fills the columns
+  // row by row and interleaves the two logs down the page — pane 0's header
+  // beside pane 0's actor bar, pane 0's table beside pane 1's header.
+  it("gives each pane one column, however many sections it draws", () => {
+    const { container } = renderView("/logs/2657?compare=2661");
+
+    const grid = container.querySelector(".analysis-panes");
+    expect(grid?.children).toHaveLength(2);
+    // Each cell holds ONE pane and all of its sections, rather than one section.
+    for (const cell of Array.from(grid?.children ?? [])) {
+      expect(cell.querySelectorAll("[data-testid='pane']")).toHaveLength(1);
+      expect(cell.querySelectorAll("[data-testid='pane-section']")).toHaveLength(1);
+    }
+  });
+
   it("ignores a compare entry that cannot name a log", () => {
     renderView("/logs/2657?compare=banana");
 
@@ -96,19 +141,44 @@ describe("AnalysisView", () => {
     expect(paneLogIds()).toEqual(["2657"]);
   });
 
-  // The suffixed keys are POSITIONAL: closing the middle pane has to move the
-  // pane above it down onto the vacated keys, and clear what it left behind.
-  // nuqs keeps a param nothing reads, so an uncleared `src2` would lie dormant
-  // and revive on whatever log later occupied pane 2.
-  it("shifts the panes above a closed one down, and clears the vacated keys", async () => {
+  // One control closes one pane — the LAST — so it can sit where + Compare
+  // does rather than needing a ✕ per column (see `ActorBar`).
+  it("closes the last pane, whatever the compare param holds", async () => {
+    renderView("/logs/2657?compare=2661,2664");
+
+    fireEvent.click(removeButtons()[0]);
+
+    await waitFor(() => expect(search().get("compare")).toBe("2661"));
+    expect(paneLogIds()).toEqual(["2657", "2661"]);
+  });
+
+  // The suffixed keys are POSITIONAL, so a closed pane's must be cleared: nuqs
+  // keeps a param nothing reads, and an uncleared `src2` would lie dormant and
+  // revive on whatever log later occupied pane 2. (Which key moves where is
+  // `paneRemovalWrites`'s own concern, and tested there.)
+  it("clears the keys the closed pane leaves behind", async () => {
     renderView("/logs/2657?compare=2661,2664&src1=1&src2=7&aura2=src:status:4:1:unknown");
 
     fireEvent.click(removeButtons()[0]);
 
-    await waitFor(() => expect(search().get("compare")).toBe("2664"));
-    expect(search().get("src1")).toBe("7");
+    await waitFor(() => expect(search().get("compare")).toBe("2661"));
+    expect(search().get("src1")).toBe("1");
     expect(search().has("src2")).toBe(false);
     expect(search().has("aura2")).toBe(false);
+  });
+
+  // Only while comparing: with one log open there is nothing to close, and the
+  // control that row carries is + Compare instead.
+  it("offers no close control with a single log open", () => {
+    renderView();
+    expect(removeButtons()).toHaveLength(0);
+    expect(screen.getByText("ui.logs.compare-add")).toBeTruthy();
+  });
+
+  it("offers exactly one close control while comparing, and no + Compare", () => {
+    renderView("/logs/2657?compare=2661");
+    expect(removeButtons()).toHaveLength(1);
+    expect(screen.queryByText("ui.logs.compare-add")).toBeNull();
   });
 
   it("leaves pane 0's own pins alone when a comparison closes", async () => {
@@ -167,6 +237,54 @@ describe("AnalysisView", () => {
 
     expect(screen.queryByTestId("compare-chart")).toBeNull();
     expect(screen.getAllByTestId("pane").map((pane) => pane.dataset.drawsChart)).toEqual(["true", "true"]);
+  });
+
+  // Split, the two plots share no axis, so a shorter run just stops and reads as
+  // a fight that went quiet. Each pane is told where EVERY log ended so it can
+  // rule a line there. Its own entry rides along and `visibleEndLines` drops it
+  // — its bucket is that chart's own last one — so which rules exist has one
+  // author rather than a filter here and a rule there.
+  it("tells each pane where every log ended", () => {
+    useAnalysisPanesStore.setState({
+      panes: [
+        { logId: 2657, base: null, chart: { totals: [1, 2, 3, 4], format: "amount" }, sources: NO_SRC },
+        { logId: 2661, base: null, chart: { totals: [1, 2], format: "amount" }, sources: NO_SRC },
+      ],
+    });
+    renderView("/logs/2657?compare=2661");
+
+    // Both panes hear both ends, in pane order: #2657 at bucket 3, #2661 at 1.
+    // Pane 0 draws only #2661's, pane 1 only #2657's — `visibleEndLines` is
+    // what makes that call, and it has its own test.
+    expect(screen.getAllByTestId("pane").map((pane) => pane.dataset.paneEnds)).toEqual([
+      "#2657@3,#2661@1",
+      "#2657@3,#2661@1",
+    ]);
+  });
+
+  // One log open: its own end is the only entry, and its own chart drops it —
+  // so nothing is ruled, which is what a single pane has always shown.
+  it("gives a single pane only its own end, which its chart drops", () => {
+    useAnalysisPanesStore.setState({
+      panes: [{ logId: 2657, base: null, chart: { totals: [1, 2, 3, 4], format: "amount" }, sources: NO_SRC }],
+    });
+    renderView();
+    expect(screen.getAllByTestId("pane")[0].dataset.paneEnds).toBe("#2657@3");
+  });
+
+  // The source pin is a SHARED row now: one selector per log, drawn by the
+  // frame from what the panes publish, so a comparison picks one source from
+  // each fight.
+  it("draws one source selector per pane, from what the panes published", () => {
+    useAnalysisPanesStore.setState({
+      panes: [
+        { logId: 2657, base: null, chart: EMPTY_CHART, sources: NO_SRC },
+        { logId: 2661, base: null, chart: EMPTY_CHART, sources: NO_SRC },
+      ],
+    });
+    renderView("/logs/2657?compare=2661");
+
+    expect(screen.getAllByPlaceholderText("ui.logs.selector-all-friendlies")).toHaveLength(2);
   });
 
   // The side toggle clears both actor pins, in every pane — they name the

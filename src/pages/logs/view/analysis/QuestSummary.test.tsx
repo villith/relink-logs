@@ -2,84 +2,64 @@ import { MantineProvider } from "@mantine/core";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { EncounterState } from "@/types";
-
 import { QuestSummary } from "./QuestSummary";
 
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 
-// translateQuestId and friends reach i18next resources that are not loaded in
-// jsdom; stub the two this component calls.
-vi.mock("@/utils", async () => {
-  const actual = await vi.importActual<typeof import("@/utils")>("@/utils");
-  return {
-    ...actual,
-    translateQuestId: (id: number) => `quest-${id}`,
-  };
-});
-
-const ENCOUNTER = {
-  startTime: 1_700_000_000_000,
-  endTime: 1_700_000_252_000,
-  totalDamage: 48_200_000,
-} as EncounterState;
-
 const renderIt = (props: Partial<React.ComponentProps<typeof QuestSummary>> = {}) =>
   render(
     <MantineProvider>
-      <QuestSummary
-        encounter={ENCOUNTER}
-        questId={123}
-        roomIndex={null}
-        questCompleted
-        questTimer={null}
-        imported={false}
-        logId={1786}
-        {...props}
-      />
+      <QuestSummary title={<button type="button">picker</button>} roomIndex={null} imported={false} {...props} />
     </MantineProvider>
   );
 
 describe("QuestSummary", () => {
-  it("names the quest", () => {
+  // The pane's title IS its log picker: the thing that names the log is the
+  // thing that changes it.
+  it("draws the title it is given", () => {
     renderIt();
-    expect(screen.getByText("quest-123")).toBeTruthy();
+    expect(screen.getByText("picker")).toBeTruthy();
   });
 
-  it("shows the log id so a specific log can be referred to", () => {
+  // The picker already states the quest, the party, the date, the in-game time
+  // and the id. Restating any of them here is how the two come to disagree.
+  it("leaves the date and the id to the title", () => {
     renderIt();
-    expect(screen.getByText(/· #1786$/)).toBeTruthy();
+    expect(screen.queryByText(/#\d+/)).toBeNull();
   });
 
-  it("shows no id fragment without one", () => {
-    renderIt({ logId: null });
-    expect(screen.queryByText(/#\d+$/)).toBeNull();
-  });
-
-  it("states the duration between the first and last hit", () => {
+  // The picker states how long the run took, on the row's second line. Two
+  // durations side by side in one strip is one figure too many, and the moment
+  // either is reformatted they read as disagreeing.
+  it("leaves the duration to the title", () => {
     renderIt();
-    // Duration shares its element with the wall-clock time, so match the
-    // leading figure rather than the whole line.
-    expect(screen.getByText(/^04:12 · /)).toBeTruthy();
+    expect(screen.queryByText("04:12")).toBeNull();
   });
 
-  it("humanises the total", () => {
+  // The total is the first figure of the table below, and the plot above is
+  // made of it — a headline repeating it earned none of the room it took.
+  it("does not state the total", () => {
     renderIt();
-    expect(screen.getByText("48.2m")).toBeTruthy();
+    expect(screen.queryByText("48.2m")).toBeNull();
+    expect(screen.queryByText("ui.logs.total-damage")).toBeNull();
   });
 
-  it("says cleared or not cleared", () => {
+  it("says nothing about whether the quest was cleared", () => {
     renderIt();
-    expect(screen.getByText("ui.logs.quest-cleared")).toBeTruthy();
-
-    renderIt({ questCompleted: false });
-    expect(screen.getByText("ui.logs.quest-failed")).toBeTruthy();
+    expect(screen.queryByText("ui.logs.quest-cleared")).toBeNull();
+    expect(screen.queryByText("ui.logs.quest-failed")).toBeNull();
   });
 
-  it("names a Conflux room instead of a quest when there is one", () => {
+  // A Conflux run carries no quest id the picker can name, so the room is the
+  // one piece of naming this row still owns.
+  it("names a Conflux room, which the picker cannot", () => {
     renderIt({ roomIndex: 2 });
-    expect(screen.getByText("ui.logs.conflux-room #3")).toBeTruthy();
-    expect(screen.queryByText("quest-123")).toBeNull();
+    expect(screen.getByText(/ui\.logs\.conflux-room\s*#3/)).toBeTruthy();
+  });
+
+  it("names no room on an ordinary quest", () => {
+    renderIt();
+    expect(screen.queryByText(/ui\.logs\.conflux-room/)).toBeNull();
   });
 
   it("shows the imported warning only for an imported log", () => {
@@ -88,6 +68,14 @@ describe("QuestSummary", () => {
 
     renderIt({ imported: true });
     expect(screen.getByLabelText("ui.imported-badge")).toBeTruthy();
+  });
+
+  // Closing a comparison happens where opening one did — the actor bar's right
+  // edge, where + Compare stands (see `AnalysisView`) — rather than once per
+  // pane down here.
+  it("carries no close control", () => {
+    renderIt();
+    expect(screen.queryByLabelText("ui.logs.compare-remove")).toBeNull();
   });
 
   /** The beta caveat is NOT here. It belongs to the view rather than to the

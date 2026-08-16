@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
@@ -12,7 +12,7 @@ import type {
 } from "@/types";
 import { PLAYER_COLORS, humanizeNumber, millisecondsToElapsedFormat, translateCharacterType } from "@/utils";
 
-import { DPS_SMOOTHING_WINDOW, type ChartDatapoint, type Label } from "../../DetailCharts";
+import { DPS_SMOOTHING_WINDOW, bucketLabel, type ChartDatapoint, type Label } from "../../DetailCharts";
 import type { RowKeying } from "../../abilitySkills";
 import { keyColor } from "../../actorColor";
 import { enemyHolderKey, heldByRoster, narrowedByPins, slotsOf } from "../../metrics/buffs";
@@ -20,7 +20,7 @@ import type { Hostility } from "../../metrics/types";
 import { playerRowKey } from "../../rowKey";
 import type { SelectorPins } from "../../selectorOptions";
 import type { Band } from "../../statusBands";
-import type { StackMode } from "../DpsChart";
+
 import { abilityBands } from "../abilityBands";
 import { auraExcludedBands } from "../auraWindows";
 import { bandColorAt, paletteOrderOf, referenceBandOrder } from "../bandPalette";
@@ -64,9 +64,6 @@ export type ChartModel = {
   stacked: boolean;
   smoothing: number;
   chartSource: "base" | "scoped" | "stacks" | "drill" | "ability";
-  stackMode: StackMode;
-  setStackMode: (mode: StackMode) => void;
-  setRateSmoothing: (buckets: number) => void;
   chartMarkers: ChartMarker[];
   maskBands: { color: string; band: Band }[] | undefined;
   stateWindowBands: ReturnType<typeof windowBandsFor>;
@@ -74,9 +71,21 @@ export type ChartModel = {
 };
 
 export type ChartModelInput = {
-  /** The log being viewed — the stack mode resets per log as well as per
-   * metric, because a mode chosen for one fight says nothing about the next. */
-  id: string | undefined;
+  /** The trailing smoothing window in buckets — the ONE chart control this
+   * model reads. It comes in from the FRAME rather than being held here:
+   * `useChartModel` runs once per pane, so pane-local state gave two compared
+   * plots two independent control strips, and two runs drawn under different
+   * smoothing are not a comparison (see `ChartControls`).
+   *
+   * It feeds `chartPresentation` rather than overriding its result, so the
+   * rate-vs-level rule still decides: a LEVEL chart stays unsmoothed whatever is
+   * chosen here.
+   *
+   * The rest of the shared controls — the stack mode, the marker and window
+   * kinds — are the frame's and go straight to `DpsChart`; passing the whole
+   * bundle through here only made the pane read three of them back out of a hook
+   * that never touched them. */
+  rateSmoothing: number;
   caps: MetricCapabilities;
   spec: ViewSpec;
   metricKey: MetricKey;
@@ -115,7 +124,7 @@ export type ChartModelInput = {
 };
 
 export const useChartModel = ({
-  id,
+  rateSmoothing,
   caps,
   spec,
   metricKey,
@@ -160,18 +169,9 @@ export const useChartModel = ({
   const { cellOf } = cells;
   const groupsPath = caps.dataPath === "groups";
   const level = levelFor(chartGroupBy);
-  /** Bucket index → "M:SS", for the plotted points' timestamps. */
-  const bucketLabel = useCallback((bucket: number) => millisecondsToElapsedFormat(bucket * bucketMs), [bucketMs]);
-  // Normal | Stacked for the stacks chart. Component-local: a way of reading
-  // the plot, not what the page is about. Reset per metric/log because a mode
-  // chosen for one chart says nothing about the next one.
-  const [stackMode, setStackMode] = useState<StackMode>("normal");
-  // The chart's smoothing window, in buckets. Feeds `chartPresentation` as
-  // `rateSmoothing` rather than overriding its result, so the rate-vs-level rule
-  // still decides: a LEVEL chart stays unsmoothed whatever is chosen here.
-  const [rateSmoothing, setRateSmoothing] = useState<number>(DPS_SMOOTHING_WINDOW);
-  useEffect(() => setStackMode("normal"), [metricKey, id]);
-
+  /** This model's bucket width bound into the shared clock, for the plotted
+   * points' timestamps. */
+  const labelBucket = useCallback((bucket: number) => bucketLabel(bucket, bucketMs), [bucketMs]);
   // Death and SBA markers, rebased onto the same window the chart shows and
   // resolved to display form here — the extractor stays pure of names and
   // colours. Deaths wear the dead player's party colour; SBA lines wear
@@ -443,7 +443,7 @@ export const useChartModel = ({
     // are baked into the data, so hiding a player later cannot lower the Total.
     return (withTotal ? withTotalSeries(points, chartInputs.keys) : points).map((point, bucket) => ({
       ...point,
-      timestamp: bucketLabel(bucket),
+      timestamp: labelBucket(bucket),
     })) as ChartDatapoint[];
   }, [chartInputs, smoothing, withTotal, format, maskWindows]);
 
@@ -633,9 +633,6 @@ export const useChartModel = ({
     stacked,
     smoothing,
     chartSource,
-    stackMode,
-    setStackMode,
-    setRateSmoothing,
     chartMarkers,
     maskBands,
     stateWindowBands,

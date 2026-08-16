@@ -1,12 +1,10 @@
 import { useMemo } from "react";
 
-import { PLAYER_COLORS, millisecondsToElapsedFormat } from "@/utils";
-
 import type { Label } from "../DetailCharts";
-import { DPS_BUCKET_MS } from "../DetailCharts";
+import { bucketLabel } from "../DetailCharts";
 
 import { DpsChart, type DpsChartProps } from "./DpsChart";
-import { compareChartData, compareSeriesKey } from "./compareSeries";
+import { compareChartData, compareSeriesKey, paneSeriesColor, paneSeriesLabel } from "./compareSeries";
 
 export type CompareChartProps = {
   /** One totals array per pane, in pane order. */
@@ -15,6 +13,19 @@ export type CompareChartProps = {
   paneLogIds: number[];
   format: DpsChartProps["format"];
   onScope: DpsChartProps["onScope"];
+  /** Where each pane's fight ran out. The longest run's own entry draws
+   * nothing — `DpsChart` drops a rule at or past the last bucket — so this is
+   * every pane's end and not "the short ones'". */
+  endLines: DpsChartProps["endLines"];
+  /** The fight-clock bucket the first plotted point stands on — the committed
+   * zoom's start, or 0 unzoomed. The panes publish totals already cropped to
+   * the window, so without it the axis would restart at 0:00 and print a
+   * different clock for the same points than each pane's own chart does. */
+  startBucket?: number;
+  smoothing?: DpsChartProps["smoothing"];
+  onSmoothingChange?: DpsChartProps["onSmoothingChange"];
+  /** The chart controls that fold more than this plot — see `DpsChart`. */
+  controls?: DpsChartProps["controls"];
 };
 
 /** The shared plot while more than one log is open: one line per pane, on one
@@ -27,22 +38,30 @@ export type CompareChartProps = {
  * The per-pane bands the single-log chart draws are deliberately not here: two
  * logs' worth of stacked players is sixteen bands nobody can read. Each log's
  * full chart is one click away — that is what the split layout is for. */
-export const CompareChart = ({ perPaneTotals, paneLogIds, format, onScope }: CompareChartProps) => {
+export const CompareChart = ({
+  perPaneTotals,
+  paneLogIds,
+  format,
+  onScope,
+  endLines,
+  startBucket = 0,
+  smoothing,
+  onSmoothingChange,
+  controls,
+}: CompareChartProps) => {
   const data = useMemo(
-    () => compareChartData(perPaneTotals, (bucket) => millisecondsToElapsedFormat(bucket * DPS_BUCKET_MS)),
-    [perPaneTotals]
+    () => compareChartData(perPaneTotals, (bucket) => bucketLabel(startBucket + bucket)),
+    [perPaneTotals, startBucket]
   );
 
   const labels: Label = useMemo(
     () =>
       perPaneTotals.map((_, paneIndex) => ({
         name: compareSeriesKey(paneIndex),
-        // A log id, not a quest name: two panes may carry one quest, and the id
-        // is what the picker beside them already writes.
-        label: `#${paneLogIds[paneIndex] ?? paneIndex}`,
+        label: paneSeriesLabel(paneLogIds, paneIndex),
         // No party slot — a whole log is not a party member.
         partySlotIndex: -1,
-        color: PLAYER_COLORS[paneIndex % PLAYER_COLORS.length],
+        color: paneSeriesColor(paneIndex),
       })),
     [perPaneTotals, paneLogIds]
   );
@@ -56,6 +75,10 @@ export const CompareChart = ({ perPaneTotals, paneLogIds, format, onScope }: Com
       format={format}
       stacked={false}
       onScope={onScope}
+      endLines={endLines}
+      smoothing={smoothing}
+      onSmoothingChange={onSmoothingChange}
+      controls={controls}
     />
   );
 };

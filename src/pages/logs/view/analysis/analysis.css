@@ -37,3 +37,10 @@
   gap: 12px;
   align-items: start;
 }
+
+/* One pane's column. `min-width: 0` because a grid item's min-width is auto:
+   without it a wide table or a long boss name overflows the track its
+   `minmax(0, 1fr)` sized. */
+.analysis-pane {
+  min-width: 0;
+}

@@ -1,97 +1,57 @@
 import { Text, Tooltip } from "@mantine/core";
 import { WarningCircle } from "@phosphor-icons/react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Figure } from "@/components/ui/Figure";
-import { Label } from "@/components/ui/Label";
 import { Strip } from "@/components/ui/Strip";
-import type { EncounterState } from "@/types";
-import {
-  epochToLocalTime,
-  hasQuestElapsedTime,
-  humanizeNumbers,
-  millisecondsToElapsedFormat,
-  translateQuestId,
-} from "@/utils";
 
 import "./analysis.css";
 
 export type QuestSummaryProps = {
-  encounter: EncounterState;
-  questId: number | null;
-  /** 0-based Conflux room index, or null for an ordinary quest. */
+  /** The pane's title — its `LogPicker`. A node rather than a name, because
+   * what names this log is the control that also changes it. */
+  title: ReactNode;
+  /** 0-based Conflux room index, or null for an ordinary quest. The picker
+   * names the quest from `questId`, which a Conflux run does not carry a
+   * meaningful one for, so the room is stated here instead. */
   roomIndex: number | null;
-  questCompleted: boolean;
-  /** The game's own quest timer in seconds, when it reported one. */
-  questTimer: number | null;
   /** Copied in from another installation's logs.db. */
   imported: boolean;
-  /** The log's database id, shown so a specific log can be referred to (bug
-   * reports, the diag examples' `--id`). Null when the route id is not a
-   * number, which never happens off a real logs link. */
-  logId: number | null;
 };
 
-/** What a log is, on one line: which quest, cleared or not, how long, when, how
- * much.
+/** The pane's header: which log it is reading, and the little the picker does
+ * not already state.
+ *
+ * The picker carries the party, the quest name, the date, how long the run
+ * took, the in-game time and the id (see `LogPicker`), so this row deliberately
+ * repeats none of them. What is left is the Conflux room (no quest id for the
+ * picker to name) and the imported badge — two marks ABOUT the log rather than
+ * figures out of it. Restating a figure here is the change to resist: the two
+ * would then disagree the moment either is reformatted, and the fight's own
+ * total is already the first row of the table and the whole of the plot.
+ *
+ * Closing a comparison is NOT here either: it happens where opening one does,
+ * at the actor bar's right edge (see `AnalysisView`).
  *
  * Analysis-only. `QuestHeader.tsx` is the same facts as a stacked label-value
  * list and is what Classic still draws — this does not replace it. */
-export const QuestSummary = ({
-  encounter,
-  questId,
-  roomIndex,
-  questCompleted,
-  questTimer,
-  imported,
-  logId,
-}: QuestSummaryProps) => {
+export const QuestSummary = ({ title, roomIndex, imported }: QuestSummaryProps) => {
   const { t } = useTranslation();
-  const [total, totalSuffix] = humanizeNumbers(encounter.totalDamage);
-
-  // Duration is wall-clock between the first and last hit, which is what DPS is
-  // measured over. The quest timer is the result screen's clear time and also
-  // covers the run up to the boss, so the two are stated separately.
-  const duration = millisecondsToElapsedFormat(encounter.endTime - encounter.startTime);
-  const timer = hasQuestElapsedTime(questTimer)
-    ? ` · ${t("ui.logs.quest-elapsed-time")} ${millisecondsToElapsedFormat(questTimer * 1000)}`
-    : "";
-
-  const name =
-    roomIndex !== null
-      ? `${t("ui.logs.conflux-room", "Conflux Room")} #${roomIndex + 1}`
-      : questId
-        ? translateQuestId(questId)
-        : "";
 
   return (
-    <Strip align="baseline" className="gap-[11px] pb-2.5 pt-[11px]">
-      {/* The quest name truncates so the metadata beside it never has to wrap:
-          at a 620px viewport the block grew 48px -> 71px and "Total Damage"
-          broke onto two lines. */}
-      <Text className="min-w-0 truncate text-xl font-bold tracking-[-0.015em]">{name}</Text>
-      {roomIndex === null && !!questId && (
-        <Text className="text-xs" c={questCompleted ? "teal.4" : "red.5"}>
-          {questCompleted ? t("ui.logs.quest-cleared") : t("ui.logs.quest-failed")}
+    <Strip className="gap-2.5 py-1.5">
+      {title}
+      {roomIndex !== null && (
+        <Text className="whitespace-nowrap text-lg font-semibold">
+          {/* eslint-disable-next-line i18next/no-literal-string -- "#" plus a room number is notation */}
+          {t("ui.logs.conflux-room", "Conflux Room")} #{roomIndex + 1}
         </Text>
       )}
-      <Figure size="sm" tone="dim" className="whitespace-nowrap">
-        {duration}
-        {timer} · {epochToLocalTime(encounter.startTime)}
-        {/* eslint-disable-next-line i18next/no-literal-string -- a "#" plus a
-            database id is notation, not prose */}
-        {logId !== null && ` · #${logId}`}
-      </Figure>
       {imported && (
         <Tooltip label={t("ui.logs.imported-tooltip")} multiline w={280}>
           <WarningCircle size={18} color="var(--mantine-color-yellow-6)" aria-label={t("ui.imported-badge")} />
         </Tooltip>
       )}
-      <Label className="ml-auto whitespace-nowrap">{t("ui.logs.total-damage")}</Label>
-      <Figure size="2xl" className="font-bold">
-        {total}
-        {totalSuffix}
-      </Figure>
     </Strip>
   );
 };
