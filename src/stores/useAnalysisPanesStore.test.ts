@@ -16,7 +16,7 @@ describe("useAnalysisPanesStore", () => {
   it("keeps a pane's fetched data when an unrelated pane changes log", () => {
     const { setPaneLogs, setPaneBase } = useAnalysisPanesStore.getState();
     setPaneLogs([2657, 2661]);
-    setPaneBase(0, { chartLen: 42 } as never);
+    setPaneBase(0, 2657, { chartLen: 42 } as never);
     useAnalysisPanesStore.getState().setPaneLogs([2657, 2664]);
     expect(useAnalysisPanesStore.getState().panes[0].base).toEqual({ chartLen: 42 });
   });
@@ -24,7 +24,7 @@ describe("useAnalysisPanesStore", () => {
   it("drops the fetched data of a pane whose log changed, so no pane draws another log", () => {
     const { setPaneLogs, setPaneBase } = useAnalysisPanesStore.getState();
     setPaneLogs([2657]);
-    setPaneBase(0, { chartLen: 42 } as never);
+    setPaneBase(0, 2657, { chartLen: 42 } as never);
     useAnalysisPanesStore.getState().setPaneLogs([2661]);
     expect(useAnalysisPanesStore.getState().panes[0].base).toBeNull();
   });
@@ -34,20 +34,10 @@ describe("useAnalysisPanesStore", () => {
   it("gives two panes on the same log separate slices", () => {
     const { setPaneLogs, setPaneBase } = useAnalysisPanesStore.getState();
     setPaneLogs([2657, 2657]);
-    setPaneBase(0, { chartLen: 42 } as never);
+    setPaneBase(0, 2657, { chartLen: 42 } as never);
     const panes = useAnalysisPanesStore.getState().panes;
     expect(panes[1].base).toBeNull();
     expect(panes[0].base).toEqual({ chartLen: 42 });
-  });
-
-  // A base load answers the whole fight, so it retires whatever the previous
-  // pins had scoped — the reset the single-log view performs today.
-  it("retires the scoped response when a fresh base lands", () => {
-    const { setPaneLogs, setPaneBase, setPaneScoped } = useAnalysisPanesStore.getState();
-    setPaneLogs([2657]);
-    setPaneScoped(0, { chartLen: 7 } as never);
-    setPaneBase(0, { chartLen: 42 } as never);
-    expect(useAnalysisPanesStore.getState().panes[0].scoped).toBeNull();
   });
 
   // The frame overlays one line per pane from these, so a pane still carrying
@@ -71,8 +61,19 @@ describe("useAnalysisPanesStore", () => {
   it("ignores a write aimed at a pane that no longer exists", () => {
     const { setPaneLogs, setPaneBase } = useAnalysisPanesStore.getState();
     setPaneLogs([2657]);
-    setPaneBase(3, { chartLen: 1 } as never);
+    setPaneBase(3, 2657, { chartLen: 1 } as never);
     expect(useAnalysisPanesStore.getState().panes).toHaveLength(1);
+  });
+
+  // Pane indexes are POSITIONAL and get reused: closing a comparison whose
+  // fetch is in flight and opening another puts a live pane back at that index.
+  // The `useEncounterData` instance whose generation ref would have vetoed the
+  // late response unmounted with the pane, so the slice has to do it.
+  it("ignores a landed fetch for a log the pane is no longer showing", () => {
+    const { setPaneLogs, setPaneBase } = useAnalysisPanesStore.getState();
+    setPaneLogs([2657, 2661]);
+    setPaneBase(1, 2664, { chartLen: 1 } as never);
+    expect(useAnalysisPanesStore.getState().panes[1].base).toBeNull();
   });
 
   it("drops the slices of panes that were closed", () => {

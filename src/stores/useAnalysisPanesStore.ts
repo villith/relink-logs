@@ -1,25 +1,48 @@
 import { create } from "zustand";
 
+import type { LabelledOption } from "@/pages/logs/view/analysis/PinSelect";
+
 import type { EncounterStateResponse } from "./useEncounterStore";
 
 /** What one pane has in hand for its log.
  *
  * `base` is the unpinned load — charts, party, target entries, status
- * intervals, quest metadata; nothing a pin changes. `scoped` is everything the
- * pins, window, grouping and masks re-derive. Both are null until their fetch
- * lands, and both are dropped the moment the pane's log changes: a pane drawing
- * the previous log's charts under the new log's name is the one failure this
- * store exists to prevent. */
+ * intervals, quest metadata; nothing a pin changes. It is null until its fetch
+ * lands, and is dropped the moment the pane's log changes: a pane drawing the
+ * previous log's charts under the new log's name is the one failure this store
+ * exists to prevent. What the pins, window, grouping and masks re-derive stays
+ * in the pane's own `useEncounterData` — the frame reads `chart` and `sources`,
+ * which the pane publishes already resolved. */
 export type PaneSlice = {
   logId: number;
   base: EncounterStateResponse | null;
-  scoped: EncounterStateResponse | null;
   /** What this pane's plot comes to per bucket, published for the FRAME to
    * overlay one line per log. The pane resolves it, because deciding what a
    * plot totals is the chart model's job and there is one of those per pane.
    * Empty until the pane has drawn something. */
   chart: PaneChart;
+  /** This pane's source universe and its current pin, published for the FRAME's
+   * shared source bar — one selector per log, so a comparison picks one source
+   * from each. Empty until the pane's fetch has told it who is in the fight. */
+  sources: PaneSources;
 };
+
+/** One pane's source selector, as the frame draws it.
+ *
+ * `onChange` is the PANE's own handler, published rather than reimplemented in
+ * the frame: pinning a source is a machine transition that also drops the
+ * grouping override and arms the auto-drill, and a second spelling of that in
+ * the frame is exactly how the bar and a row click would come to mean two
+ * different things. It is identity-STABLE (a ref-backed wrapper, see
+ * `AnalysisPane`), so publishing it cannot loop the frame. */
+export type PaneSources = {
+  options: LabelledOption[];
+  /** The pinned actor index, or null for the whole party. */
+  value: number | null;
+  onChange: (index: number | null) => void;
+};
+
+const NO_SOURCES: PaneSources = { options: [], value: null, onChange: () => {} };
 
 /** One pane's plot, flattened for the compare overlay: the per-bucket totals
  * and the axis format they are read in. The format rides along because every
@@ -40,9 +63,11 @@ type AnalysisPanesState = {
   /** Reconcile the pane list against the URL. Panes keep their data when their
    * log is unchanged and lose it when it is not. */
   setPaneLogs: (logIds: number[]) => void;
-  setPaneBase: (index: number, response: EncounterStateResponse) => void;
-  setPaneScoped: (index: number, response: EncounterStateResponse | null) => void;
+  /** A landed fetch. `logId` is the log it ASKED for, and the write is dropped
+   * unless the pane at `index` is still showing it — see `writeAt`. */
+  setPaneBase: (index: number, logId: number, response: EncounterStateResponse) => void;
   setPaneChart: (index: number, chart: PaneChart) => void;
+  setPaneSources: (index: number, sources: PaneSources) => void;
 };
 
 const writeAt = (panes: PaneSlice[], index: number, change: (pane: PaneSlice) => PaneSlice): PaneSlice[] =>
@@ -50,6 +75,22 @@ const writeAt = (panes: PaneSlice[], index: number, change: (pane: PaneSlice) =>
   // comparison while its fetch is in flight. Dropping the write is correct;
   // growing the list to fit it would resurrect a closed pane.
   index < 0 || index >= panes.length ? panes : panes.map((pane, at) => (at === index ? change(pane) : pane));
+
+/** `writeAt`, but only when the slice is still showing the log the write
+ * answers for.
+ *
+ * The range check alone is not enough for FETCHED data: the indexes are
+ * positional and get reused, so closing a comparison whose fetch is in flight
+ * and then opening another puts a live pane back at that index — and the dead
+ * pane's response then lands on it, because the `useEncounterData` instance
+ * holding the generation ref that would have vetoed it unmounted with the pane.
+ * The slice itself carries what the response has to match. */
+const writeAtLog = (
+  panes: PaneSlice[],
+  index: number,
+  logId: number,
+  change: (pane: PaneSlice) => PaneSlice
+): PaneSlice[] => writeAt(panes, index, (pane) => (pane.logId === logId ? change(pane) : pane));
 
 export const useAnalysisPanesStore = create<AnalysisPanesState>((set) => ({
   panes: [],
@@ -62,22 +103,19 @@ export const useAnalysisPanesStore = create<AnalysisPanesState>((set) => ({
         const existing = state.panes[index];
         return existing !== undefined && existing.logId === logId
           ? existing
-          : { logId, base: null, scoped: null, chart: EMPTY_PANE_CHART };
+          : { logId, base: null, chart: EMPTY_PANE_CHART, sources: NO_SOURCES };
       }),
     })),
-  setPaneBase: (index, response) =>
+  setPaneBase: (index, logId, response) =>
     set((state) => ({
-      // A landing base load answers the whole fight, so it also retires
-      // whatever the previous pins had scoped — the same reset the single-log
-      // view does today when its base load resolves.
-      panes: writeAt(state.panes, index, (pane) => ({ ...pane, base: response, scoped: null })),
-    })),
-  setPaneScoped: (index, response) =>
-    set((state) => ({
-      panes: writeAt(state.panes, index, (pane) => ({ ...pane, scoped: response })),
+      panes: writeAtLog(state.panes, index, logId, (pane) => ({ ...pane, base: response })),
     })),
   setPaneChart: (index, chart) =>
     set((state) => ({
       panes: writeAt(state.panes, index, (pane) => ({ ...pane, chart })),
+    })),
+  setPaneSources: (index, sources) =>
+    set((state) => ({
+      panes: writeAt(state.panes, index, (pane) => ({ ...pane, sources })),
     })),
 }));

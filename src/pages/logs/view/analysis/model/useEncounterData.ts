@@ -127,7 +127,6 @@ export const useEncounterData = ({
   // prop so the effects below keep a stable dependency — zustand actions are
   // referentially stable for the life of the store.
   const setPaneBase = useAnalysisPanesStore((state) => state.setPaneBase);
-  const setPaneScoped = useAnalysisPanesStore((state) => state.setPaneScoped);
 
   // Meter state, facts and group aggregates re-derived under the current
   // pins, window and grouping. Null means "the base load already says it".
@@ -148,6 +147,24 @@ export const useEncounterData = ({
      * colours. */
     groupReference: GroupReference[];
   } | null>(null);
+
+  // Dropped the moment the pane's LOG changes, in the render that observes it.
+  //
+  // A pane keeps its component instance across a log swap — the frame keys
+  // panes by index, so reindexing is what remounts, not repointing — and
+  // `scoped` OUTRANKS the store's `base` for the encounter, the facts and the
+  // aggregates (`scoped?.state ?? encounter` below). So the slice being reset
+  // to `base: null` is not enough on its own: with anything pinned, the pane
+  // would keep drawing the previous fight's rows, party and totals under the
+  // new log's title for the whole round trip — and forever if the new fetch
+  // fails, since the only other reset lives in its `.then`. The store's own
+  // doc names that as the failure it exists to prevent; this is the half of it
+  // that lives here.
+  const scopedId = useRef(id);
+  if (scopedId.current !== id) {
+    scopedId.current = id;
+    if (scoped !== null) setScoped(null);
+  }
 
   // Responses are not ordered with respect to their requests (the command is
   // `#[tauri::command(async)]`), so each one drops itself once superseded.
@@ -180,7 +197,11 @@ export const useEncounterData = ({
         // Into THIS pane's slice — the only holder of a compared log's fight.
         // The single encounter store is left to the live meter and the Classic
         // view, which have one fight between them.
-        setPaneBase(paneIndex, result as EncounterStateResponse);
+        //
+        // Stamped with the log it asked for: pane indexes are positional and
+        // get reused, so the generation ref above cannot veto a response whose
+        // pane has already unmounted (see `writeAtLog`).
+        setPaneBase(paneIndex, Number(id), result as EncounterStateResponse);
         setScoped(null);
       })
       .catch((e) => {
@@ -371,7 +392,6 @@ export const useEncounterData = ({
     const needsGroups = wireQueryKey !== null && wireQueryKey !== baseQueryKeyRef.current;
     if (!needsScopedFetch({ ...earlyOutRef.current, needsGroups })) {
       setScoped(null);
-      setPaneScoped(paneIndex, null);
       return;
     }
 
@@ -405,16 +425,12 @@ export const useEncounterData = ({
           // backend degrades to ranking bands by the aggregates it was sent.
           groupReference: response.groupReference ?? [],
         });
-        // The chart is drawn by the FRAME from every pane's slice, so the
-        // scoped response has to reach the store as well as this hook's local
-        // state. Same object, two readers — not a second fetch.
-        setPaneScoped(paneIndex, response);
       })
       .catch((e) => {
         if (generation !== scopeGeneration.current) return;
         toast.error(`Failed to fetch encounter state: ${e}`);
       });
-  }, [id, scopedOptionsKey, wireQueryKey, paneIndex, setPaneScoped]);
+  }, [id, scopedOptionsKey, wireQueryKey]);
 
   // Which aggregates the groups path renders — the scoped fetch's when one is
   // in hand, else the base load's — AND which grouping they answer, which is
