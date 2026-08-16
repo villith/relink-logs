@@ -50,14 +50,28 @@ describe("useLogLibraryStore", () => {
     vi.mocked(invoke).mockRejectedValue("no such command");
     await useLogLibraryStore.getState().load();
     expect(useLogLibraryStore.getState().logs).toEqual([]);
-    expect(useLogLibraryStore.getState().loaded).toBe(true);
   });
 
-  // A failed load that left `loading` true would wedge the picker empty for the
-  // rest of the session, with no way to ask again.
-  it("does not stay wedged in loading after a failure", async () => {
+  // A failed load that left EITHER flag set would wedge the picker empty for
+  // the rest of the session, with no way to ask again: `loading` blocks the
+  // guard directly, and `loaded` blocks it by claiming the library is already
+  // in hand. Both have to come back down.
+  it("does not stay wedged after a failure", async () => {
     vi.mocked(invoke).mockRejectedValue("no such command");
     await useLogLibraryStore.getState().load();
     expect(useLogLibraryStore.getState().loading).toBe(false);
+    expect(useLogLibraryStore.getState().loaded).toBe(false);
+  });
+
+  // Which is the point of not latching: the next picker to mount retries, and a
+  // transient failure costs one empty dropdown rather than the session.
+  it("retries after a failure, and keeps what the retry found", async () => {
+    vi.mocked(invoke)
+      .mockRejectedValueOnce("locked")
+      .mockResolvedValueOnce([row(1)]);
+    await useLogLibraryStore.getState().load();
+    await useLogLibraryStore.getState().load();
+    expect(invoke).toHaveBeenCalledTimes(2);
+    expect(useLogLibraryStore.getState().logs).toHaveLength(1);
   });
 });

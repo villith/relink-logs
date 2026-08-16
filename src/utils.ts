@@ -1630,9 +1630,23 @@ export const mergeSupplementaryRows = <T extends SkillState>(rows: T[]): T[] => 
   });
 };
 
+/** The quest a training-dummy run is filed under. Mirrors
+ * `parser::constants::TRAINING_DUMMY_QUEST_ID`, which is what the backend puts
+ * on every log whose enemy is Sir Barrold — training is not a quest and carries
+ * no id of its own.
+ *
+ * Named here rather than in the `quests` bundle because that bundle is
+ * generated from the game's own quest table, and this id is the app's. */
+export const TRAINING_DUMMY_QUEST_ID = 0xa379ac65;
+
 /// Translates the quest ID to a human-readable string.
 export const translateQuestId = (id: number | null): string => {
   if (id === null) return "";
+  // `ui.logs.…`, not `logs.…`: the `ui` NAMESPACE is the whole of `ui.json`,
+  // whose root holds a `ui` object beside `quest`/`characters`/… — so the app's
+  // own strings are two segments deep and a key that drops the first renders as
+  // itself. (`quest.unknown` below is a root sibling, which is why it does not.)
+  if (id === TRAINING_DUMMY_QUEST_ID) return t("ui.logs.quest-training-dummy");
   const hash = id.toString(16);
   return t([`quests:${hash}.text`, "quest.unknown"], { id: hash });
 };

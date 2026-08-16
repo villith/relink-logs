@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api";
+import { t } from "i18next";
 import toast from "react-hot-toast";
 import { create } from "zustand";
 
@@ -32,11 +33,15 @@ export const useLogLibraryStore = create<LogLibraryState>((set, get) => ({
     } catch (e) {
       // A backend older than the command (dev HMR skew) leaves the picker
       // empty rather than throwing the page away — the same degrade-at-the-
-      // boundary rule `groups` and `legality` already follow. `loading` has to
-      // come back down here as well, or the failure wedges the picker empty
-      // with nothing able to ask again.
-      toast.error(`Failed to load the log list: ${e}`);
-      set({ logs: [], loaded: true, loading: false });
+      // boundary rule `groups` and `legality` already follow.
+      //
+      // `loaded` stays FALSE, which is the whole of what makes the degrade
+      // temporary: the guard above reads it as "already fetched", so latching
+      // it on a failure wedges every pane's picker empty for the rest of the
+      // session with nothing able to ask again. Left false, the next mount —
+      // another pane, a navigation back to a log — retries.
+      toast.error(t("ui.logs.picker-load-failed", { error: String(e) }));
+      set({ logs: [], loaded: false, loading: false });
     }
   },
 }));

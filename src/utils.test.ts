@@ -24,6 +24,7 @@ import {
   OVERMASTERY_EFFECT_IDS,
   SKILLBOARD_CATEGORIES,
   SUMMON_ATTACK_ACTION_ID,
+  TRAINING_DUMMY_QUEST_ID,
   barWidth,
   checklistLevel,
   checklistStatus,
@@ -64,6 +65,7 @@ import {
   translateCharacterType,
   translateItemId,
   translateOvermasteryId,
+  translateQuestId,
   translateSigilId,
   translateSummonBonusId,
   translateSummonId,
@@ -1335,7 +1337,17 @@ describe("hashed-id translators", () => {
       defaultNS: "ui",
       resources: {
         en: {
-          ui: { "unknown-id": "Unknown ({{id}})", characters: { Pl2000: "Id (Transformation)" } },
+          ui: {
+            "unknown-id": "Unknown ({{id}})",
+            characters: { Pl2000: "Id (Transformation)" },
+            quest: { unknown: "{{id}}" },
+            // Nested as the real bundle nests it: the `ui` NAMESPACE is the
+            // whole of `ui.json`, and the app's own strings live under a `ui`
+            // key inside it — so `t("ui.logs.…")` is two segments deep. Spelt
+            // flat here, this fixture answered a key production never asks for
+            // and the missing prefix passed.
+            ui: { logs: { "quest-training-dummy": "Training Dummy" } },
+          },
           characters: { Pl1900: "Id" },
           ...namespaces,
         },
@@ -1356,6 +1368,23 @@ describe("hashed-id translators", () => {
 
   it.each(translators)("%s: reads its own bundle, padded to eight digits", (namespace, translate) => {
     expect(translate(NAMED)).toBe(`${namespace}/${NAMED_HASH}`);
+  });
+
+  describe("translateQuestId", () => {
+    // Training is not a quest and carries no id of its own, so the backend
+    // files a dummy run under the dummy (`TRAINING_DUMMY_QUEST_ID`). It is
+    // named here rather than in the quest bundle because that bundle is
+    // generated from the game's own quest table, and this id is the app's.
+    it("names the training dummy's runs", () => {
+      expect(translateQuestId(TRAINING_DUMMY_QUEST_ID)).toBe("Training Dummy");
+    });
+
+    // The id an unnamed quest falls back to is its bare hex, which is what put
+    // "5f65b940" in the quest filter's list — worth pinning, since the dummy
+    // rule above is what keeps it off the common ones.
+    it("falls back to the raw id it cannot name", () => {
+      expect(translateQuestId(0x5f65b940)).toBe("5f65b940");
+    });
   });
 
   describe("translateCharacterType", () => {
