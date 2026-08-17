@@ -135,6 +135,7 @@ import {
   HP_SERIES_COLORS,
   OverviewChart,
   brushShade,
+  bucketLabel,
   type ChartDatapoint,
   type HpDatapoint,
   type Label,
@@ -716,7 +717,7 @@ export const ClassicView = () => {
     const rows: ChartDatapoint[] = [];
     for (let i = 0; i < chartLen + 1; i++) {
       const datapoint: ChartDatapoint = {};
-      datapoint["timestamp"] = millisecondsToElapsedFormat(i * DPS_BUCKET_MS);
+      datapoint["timestamp"] = bucketLabel(i);
       datapoint["party"] = 0;
       rows.push(datapoint);
     }
@@ -860,7 +861,7 @@ export const ClassicView = () => {
     const rows: ({ timestamp?: string } & { [key: string]: number })[] = [];
     for (let i = 0; i < sbaChartLen; i++) {
       const sbaDatapoint: { timestamp?: string } & { [key: string]: number } = {};
-      sbaDatapoint["timestamp"] = millisecondsToElapsedFormat(i * DPS_BUCKET_MS);
+      sbaDatapoint["timestamp"] = bucketLabel(i);
 
       for (const playerIndex in sbaChart) {
         sbaDatapoint[seriesNames.get(playerIndex) as string] = sbaChart[playerIndex][i] / 10.0;
@@ -939,10 +940,10 @@ export const ClassicView = () => {
   }
 
   const windowActive = isWindowed || pendingRange !== null;
-  const windowStart = millisecondsToElapsedFormat(shownRange[0] * DPS_BUCKET_MS);
-  const windowEnd = millisecondsToElapsedFormat(shownRange[1] * DPS_BUCKET_MS);
-  const windowDuration = millisecondsToElapsedFormat((shownRange[1] - shownRange[0]) * DPS_BUCKET_MS);
-  const fullDuration = millisecondsToElapsedFormat(maxIndex * DPS_BUCKET_MS);
+  const windowStart = bucketLabel(shownRange[0]);
+  const windowEnd = bucketLabel(shownRange[1]);
+  const windowDuration = bucketLabel(shownRange[1] - shownRange[0]);
+  const fullDuration = bucketLabel(maxIndex);
 
   return (
     <Box>
@@ -1091,7 +1092,7 @@ export const ClassicView = () => {
                       value={shownRange}
                       onChange={setPendingRange}
                       onChangeEnd={handleRangeCommit}
-                      label={(value) => millisecondsToElapsedFormat(value * DPS_BUCKET_MS)}
+                      label={(value) => bucketLabel(value)}
                       style={{ marginLeft: CHART_MARGIN + CHART_Y_AXIS_WIDTH, marginRight: CHART_MARGIN }}
                     />
                   </Box>
