@@ -1,5 +1,5 @@
 import attackMap from "../src-tauri/assets/enemy-attack-map.json";
-import enemies from "../src-tauri/lang/en/enemies.json";
+import { emKeyOf } from "./emKey";
 import type { ActionType, EnemyType } from "./types";
 
 /**
@@ -20,13 +20,6 @@ import type { ActionType, EnemyType } from "./types";
  * honest thing to show.
  */
 type AttackMap = Record<string, Record<string, number>>;
-
-const EM_KEYS = enemies as Record<string, { key?: string }>;
-
-/** Wire `EnemyType` -> em id key ("EM7000"), the same hash→key edge
- * `enemyIcon.ts` resolves through. */
-export const emKeyOf = (type: EnemyType): string | null =>
-  typeof type === "string" ? type : EM_KEYS[type.Unknown.toString(16).padStart(8, "0")]?.key ?? null;
 
 /** The `TXT_BT` callout ordinal for one (enemy, attack), or null where the map
  * has no edge — most attacks: only signature moves are named at all, and only

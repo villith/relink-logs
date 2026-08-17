@@ -1513,16 +1513,20 @@ export const translateEnemyType = (type: EnemyType | null): string => {
   if (type === null) return "";
 
   if (typeof type == "object" && Object.hasOwn(type, "Unknown")) {
-    const hash = type.Unknown.toString(16).padStart(8, "0");
-
-    return t([`enemies:${hash}.text`, `enemies.unknown.${hash}`, "enemies.unknown-type"], { id: hash });
+    return translateEnemyTypeId(type.Unknown);
   } else {
     return t([`enemies.${type}`, "enemies.unknown-type"]);
   }
 };
 
+/** One author for the enemy-name fallback chain. The tagged-union form delegates
+ * here, so a rung added to the chain cannot reach only one of the two — which is
+ * how `enemies.unknown.<hash>` came to be read by one and not the other.
+ *
+ * The pad is written out rather than taken from `toHashString`, which answers
+ * `""` for 0: a type hash keeps all eight digits. */
 export const translateEnemyTypeId = (id: number): string => {
-  const hash = toHashString(id);
+  const hash = id.toString(16).padStart(8, "0");
   return t([`enemies:${hash}.text`, `enemies.unknown.${hash}`, "enemies.unknown-type"], { id: hash });
 };
 
