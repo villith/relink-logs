@@ -41,7 +41,6 @@ import { LINKED_DIMS, applyPinChange, pinChangesOf, splitPinChanges } from "./ma
 import { resolveViewSpec } from "./machine/resolve";
 import type { AnalysisState } from "./machine/state";
 import {
-  toggleAura as auraTransition,
   clearWindowFilters,
   pinRow,
   pinValueOf,
@@ -355,11 +354,11 @@ export const AnalysisPane = ({
   // the strip the user clicked in decides what selected now means.
   const handleAura = useCallback(
     (aura: string) => {
+      const selected = !state.aura.includes(aura);
       if (linkedWrite === undefined) {
-        setState(auraTransition(state, aura));
+        setState(setAura(state, aura, selected));
         return;
       }
-      const selected = !state.aura.includes(aura);
       linkedWrite((draft) => setAura(draft, aura, selected));
     },
     [state, setState, linkedWrite]

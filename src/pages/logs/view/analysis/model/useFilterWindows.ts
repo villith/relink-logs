@@ -5,8 +5,9 @@ import { statusIconUrl } from "@/statusIcon";
 import type { ChartWindow, StatusInterval } from "@/types";
 import { millisecondsToElapsedFormat } from "@/utils";
 
+import { groupBy } from "../../groupBy";
 import type { Hostility } from "../../metrics/types";
-import { clipToWindow, uptimeMs } from "../../statusUptime";
+import { clipToWindow, statusPinKey, uptimeMs } from "../../statusUptime";
 import type { AuraChip } from "../AuraStrip";
 import { auraHolderFor, auraHolderIntervals, heldBy } from "../auraWindows";
 import { WINDOW_LABEL_KEY } from "../chartWindowBands";
@@ -15,8 +16,6 @@ import { auraAnchorOf, auraPinKey, type AnalysisState } from "../machine/state";
 import { statusIdOfKey } from "../statusLabel";
 import { windowChips, type WindowChipGroup } from "../windowChips";
 import { wireWindowsFrom, type WireWindow } from "../wireWindows";
-
-import { groupByPinKey } from "./useStatusNaming";
 
 /** The aura filter and the battle-window filter, combined into the ONE mask
  * every consumer reads — the group query, the derived reparse, the uptime
@@ -252,9 +251,9 @@ export const useFilterChips = ({
           ...(iconUrl === undefined ? {} : { iconUrl }),
         };
       };
-      // The same one-pass grouping the row labels use (see `groupByPinKey`),
-      // over this holder's windowed subset rather than the whole fight.
-      const chips = [...groupByPinKey(held).entries()]
+      // The same one-pass grouping the row labels use, over this holder's
+      // windowed subset rather than the whole fight.
+      const chips = [...groupBy(held, statusPinKey).entries()]
         .map(([key, group]) =>
           chipFor(key, fightDurationMs === 0 ? 0 : Math.min(100, Math.round((uptimeMs(group) / fightDurationMs) * 100)))
         )

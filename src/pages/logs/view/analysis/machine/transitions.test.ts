@@ -15,7 +15,6 @@ import {
   setHostility,
   setMetric,
   setWindow,
-  toggleAura,
   toggleWindowFilter,
   toggleWindowKind,
 } from "./transitions";
@@ -125,30 +124,34 @@ const TGT_AURA = "tgt:status:4:1:unknown";
 const SRC_AURA_2 = "src:status:9:1:unknown";
 
 describe("aura filter housekeeping", () => {
-  it("toggleAura selects and deselects without touching pins or by", () => {
+  // How an unlinked strip click reaches `setAura`: the pane reads the effect's
+  // current membership and sets the opposite, absolutely.
+  const flip = (current: AnalysisState, aura: string) => setAura(current, aura, !current.aura.includes(aura));
+
+  it("selects and deselects without touching pins or by", () => {
     const pinned = state({ source: 1, by: "source" });
-    const withAura = toggleAura(pinned, SRC_AURA);
+    const withAura = flip(pinned, SRC_AURA);
     expect(withAura.aura).toEqual([SRC_AURA]);
     expect(withAura.source).toBe(1);
     expect(withAura.by).toBe("source");
-    expect(toggleAura(withAura, SRC_AURA).aura).toEqual([]);
+    expect(flip(withAura, SRC_AURA).aura).toEqual([]);
   });
 
   it("selects several at once, in selection order", () => {
-    let next = toggleAura(state({ source: 1, target: 0 }), SRC_AURA);
-    next = toggleAura(next, TGT_AURA);
-    next = toggleAura(next, SRC_AURA_2);
+    let next = flip(state({ source: 1, target: 0 }), SRC_AURA);
+    next = flip(next, TGT_AURA);
+    next = flip(next, SRC_AURA_2);
     expect(next.aura).toEqual([SRC_AURA, TGT_AURA, SRC_AURA_2]);
   });
 
   it("a target aura no longer replaces a source one — the strips share one list", () => {
-    const next = toggleAura(toggleAura(state({ source: 1, target: 0 }), SRC_AURA), TGT_AURA);
+    const next = flip(flip(state({ source: 1, target: 0 }), SRC_AURA), TGT_AURA);
     expect(next.aura).toEqual([SRC_AURA, TGT_AURA]);
   });
 
   it("deselecting one leaves the rest standing", () => {
     const s = state({ source: 1, target: 0, aura: [SRC_AURA, TGT_AURA, SRC_AURA_2] });
-    expect(toggleAura(s, TGT_AURA).aura).toEqual([SRC_AURA, SRC_AURA_2]);
+    expect(flip(s, TGT_AURA).aura).toEqual([SRC_AURA, SRC_AURA_2]);
   });
 
   // The form a write reaching several panes needs: one toggle applied to two

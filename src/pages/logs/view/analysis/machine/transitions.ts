@@ -121,23 +121,17 @@ const toggleIn = (values: string[], value: string): string[] =>
  * The absolute form is what a write reaching several panes needs: a toggle
  * applied to two panes that disagree about the effect flips them apart, so the
  * pane the user clicked in decides what "selected" now means and every pane is
- * set to it. Returns the state unchanged when it already reads that way. */
+ * set to it. Returns the state unchanged when it already reads that way.
+ *
+ * No `by` reset: a filter narrows the data, it does not advance the drill the
+ * way a pin does. Source and target auras share ONE list and all apply
+ * together — selecting on either strip does not replace the other's picks,
+ * because two strips whose selections silently erase each other is the
+ * behaviour that made the filter read as broken. */
 export const setAura = (state: AnalysisState, aura: string, selected: boolean): AnalysisState => {
   if (state.aura.includes(aura) === selected) return state;
   return { ...state, aura: selected ? [...state.aura, aura] : state.aura.filter((held) => held !== aura) };
 };
-
-/** Toggles one effect in the Auras Filter. No `by` reset: a filter narrows the
- * data, it does not advance the drill the way a pin does.
- *
- * Source and target auras share ONE list and all apply together — selecting on
- * either strip no longer replaces the other's picks, because two strips whose
- * selections silently erase each other is the behaviour that made the filter
- * read as broken. */
-export const toggleAura = (state: AnalysisState, aura: string): AnalysisState => ({
-  ...state,
-  aura: toggleIn(state.aura, aura),
-});
 
 /** Clears every aura at once — the strips' shared ✕. */
 export const clearAuras = (state: AnalysisState): AnalysisState =>

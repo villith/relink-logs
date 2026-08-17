@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import { cn } from "@/components/ui/cn";
 
-import { entryRows, formatReport, type ActionEntry, type ReportLine } from "./machine/actionLog";
+import { actionStamp, entryRows, formatReport, type ActionEntry, type ReportLine } from "./machine/actionLog";
 import type { ActionLog } from "./machine/useActionLog";
 
 /** Monospace, wrapping and selectable: the whole purpose of a readout line is to
@@ -81,7 +81,7 @@ const ReadoutRow = ({ label, value }: ReportLine) => (
 const ActionRow = ({ entry }: { entry: ActionEntry }) => (
   <div className="flex gap-2 font-mono text-xs leading-[1.6] text-ink-3">
     <span className="w-6 flex-none select-text text-right text-ink-2">{entry.seq}</span>
-    <span className="w-12 flex-none select-text">{`+${(entry.atMs / 1000).toFixed(1)}s`}</span>
+    <span className="w-12 flex-none select-text">{actionStamp(entry.atMs)}</span>
     <div className="min-w-0 flex-1 select-text [overflow-wrap:anywhere]">
       {entryRows(entry).map((row, index) => (
         <div key={index}>
