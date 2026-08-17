@@ -105,17 +105,19 @@ export const useLogIndexStore = create<LogIndexState>((set, get) => ({
     }
   },
   deleteAllLogs: async () => {
-    const { setSearchResult } = get();
+    const { fetchLogs } = get();
 
     try {
       await invoke("delete_all_logs");
       set({ currentPage: 1, selectedLogIds: [], searchResult: DEFAULT_SEARCH_RESULT });
       toast.success("Logs deleted successfully.");
-      const result = await invoke("fetch_logs");
-      setSearchResult(result as SearchResult);
     } catch (e) {
       toast.error(`Failed to delete logs: ${e}`);
+      return;
     }
+    // The sibling deletes' refetch, so the filter and flagged-build rules that
+    // decide what the list may show are stated in one place.
+    await fetchLogs();
   },
   deleteImportedLogs: async () => {
     const { fetchLogs } = get();
