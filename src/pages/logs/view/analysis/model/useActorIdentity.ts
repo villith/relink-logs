@@ -2,7 +2,8 @@ import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { characterIconUrl } from "@/characterIcon";
-import { emKeyOf, enemyAttackOrdinal } from "@/enemyAttackNames";
+import { emKeyOf } from "@/emKey";
+import { enemyAttackOrdinal } from "@/enemyAttackNames";
 import { enemyIconUrl } from "@/enemyIcon";
 import type {
   ActionType,
