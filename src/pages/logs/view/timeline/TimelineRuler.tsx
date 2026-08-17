@@ -1,5 +1,13 @@
 import { millisecondsToElapsedFormat } from "@/utils";
 
+/** A CSS percentage across the track, at the precision a sub-pixel position
+ * needs and no more — `toFixed` keeps the DOM stable across renders where a raw
+ * float would not.
+ *
+ * One author, because the ruler's ticks and the lanes' marks draw into the same
+ * scroll container and have to agree pixel-for-pixel about where a moment sits. */
+export const percent = (value: number, of: number): string => (of === 0 ? "0%" : `${((value / of) * 100).toFixed(4)}%`);
+
 /** Tick offsets across the domain, in milliseconds from its start.
  *
  * Never past the end: a tick beyond the track renders outside it and widens
@@ -36,7 +44,7 @@ export const TimelineRuler = ({ domainMs, startMs, stepMs }: TimelineRulerProps)
           key={at}
           data-ruler-tick
           className="absolute inset-y-0 whitespace-nowrap border-l border-line pl-[3px] text-label leading-[var(--spacing-head)] text-[var(--mantine-color-dimmed)]"
-          style={{ left: domainMs === 0 ? "0%" : `${((at / domainMs) * 100).toFixed(4)}%` }}
+          style={{ left: percent(at, domainMs) }}
         >
           {millisecondsToElapsedFormat(startMs + at)}
         </span>
