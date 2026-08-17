@@ -23,6 +23,7 @@ import {
   type CapExclusion,
   type CapLoadout,
 } from "./capSources";
+import { round } from "./round";
 
 /**
  * The damage-cap derivation with its working shown — every input, every
@@ -166,11 +167,6 @@ const HASH_BY_CHARACTER: Map<string, string> = new Map(
  * constant, which is private to it; kept here only to NAME the key in the
  * panel, never to look one up. */
 const SUMMON_CURVE_KEY = "58f4dbd4";
-
-const round = (value: number, places: number): number => {
-  const scale = 10 ** places;
-  return Math.round(value * scale) / scale;
-};
 
 const percent = (fraction: number): ExplainValue => ({ kind: "percent", value: round(fraction * 100, 2) });
 const count = (value: number): ExplainValue => ({ kind: "count", value });

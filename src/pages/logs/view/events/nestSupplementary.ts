@@ -1,4 +1,5 @@
 import type { EventRow } from "./eventRows";
+import { round } from "./round";
 
 /** A row that may hang under another, or be drawn only to hold one up. */
 export type NestedEventRow = EventRow & {
@@ -20,8 +21,6 @@ export type NestedEventRow = EventRow & {
   context?: true;
 };
 
-const round1 = (value: number) => Math.round(value * 10) / 10;
-
 /** The echo, restated as an offset from the hit that caused it. */
 const asChild = (echo: EventRow, trigger: EventRow): NestedEventRow => ({
   ...echo,
@@ -30,7 +29,7 @@ const asChild = (echo: EventRow, trigger: EventRow): NestedEventRow => ({
     // A trigger with no amount is not a trigger anybody can read a share
     // against — 0 rather than the NaN or Infinity the division would give,
     // which would render as a number that means nothing.
-    sharePercent: trigger.amount ? round1(((echo.amount ?? 0) / trigger.amount) * 100) : 0,
+    sharePercent: trigger.amount ? round(((echo.amount ?? 0) / trigger.amount) * 100, 1) : 0,
   },
 });
 

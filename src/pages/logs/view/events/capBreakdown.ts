@@ -1,4 +1,5 @@
 import { parseAbilityKey } from "../abilityKey";
+import { round } from "./round";
 
 /** What a cap-card row renders as. The card formats by kind rather than
  * pre-formatting here, so the projection stays a pure numeric fact and the
@@ -101,11 +102,6 @@ export const selectCapUp = (capUp: PlayerCapUp | undefined, classFlags: number |
   if (classFlags & 0x40000) return capUp.sba;
   if (classFlags & 0x10000) return capUp.skill;
   return capUp.normal;
-};
-
-const round = (value: number, places: number): number => {
-  const scale = 10 ** places;
-  return Math.round(value * scale) / scale;
 };
 
 /** A fraction as a percentage row, e.g. 13.13 -> 1313. */
