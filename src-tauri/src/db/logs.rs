@@ -298,7 +298,16 @@ fn apply_log_filters(query: &mut SelectStatement, filters: &LogFilters) {
         .conditions(
             cleared.is_some(),
             |q| {
-                q.and_where(Expr::col(Logs::QuestCompleted).eq(cleared.unwrap()));
+                // A dummy run never fires quest-complete, so the stored column
+                // is always false there — excluded the same way the quest_id
+                // branch above excludes it, or "Failed" would match every
+                // dummy run despite its own row drawing no cleared mark at all.
+                q.and_where(Expr::col(Logs::QuestCompleted).eq(cleared.unwrap()))
+                    .and_where(
+                        Expr::col(Logs::PrimaryTarget)
+                            .ne(SIR_BARROLD)
+                            .or(Expr::col(Logs::PrimaryTarget).is_null()),
+                    );
             },
             |_| {},
         )
@@ -1201,6 +1210,86 @@ mod tests {
             .expect("stamp the flag");
 
         assert_eq!(fetch(&conn, false)[0].quest_completed, None);
+    }
+
+    /// The "Cleared" filter narrows on the RAW stored `quest_completed`
+    /// column, which is always false for a dummy run — it never fires
+    /// quest-complete. Left unguarded that would flood a "Failed" filter
+    /// with dummy runs whose own row draws no cleared mark at all, so a
+    /// dummy run must be excluded from BOTH "Completed" and "Failed", the
+    /// same way the quest_id branch above excludes it from a quest filter.
+    /// A real failed and a real completed run confirm the filter still
+    /// works normally alongside the exclusion, and the counts stay in step
+    /// with the lists they size.
+    #[test]
+    fn the_cleared_filter_excludes_dummy_runs_from_both_options() {
+        let conn = db_with_run(Some(SIR_BARROLD), None);
+        conn.execute("UPDATE logs SET quest_completed = 0 WHERE id = 1", [])
+            .expect("stamp the dummy run");
+        conn.execute(
+            "INSERT INTO logs (id, name, time, duration, data, version, primary_target, quest_id, quest_completed)
+             VALUES (2, '', 2, 1, x'00', 1, ?, ?, 0)",
+            params![0x0014_a1b8u32, 0x0021_0421u32],
+        )
+        .expect("insert failed real run");
+        conn.execute(
+            "INSERT INTO logs (id, name, time, duration, data, version, primary_target, quest_id, quest_completed)
+             VALUES (3, '', 3, 1, x'00', 1, ?, ?, 1)",
+            params![0x0014_a1b8u32, 0x0021_0421u32],
+        )
+        .expect("insert completed real run");
+
+        let failed = get_logs(
+            &conn,
+            &LogFilters {
+                cleared: Some(false),
+                ..filters(false)
+            },
+            10,
+            0,
+            &SortType::Time,
+            &SortDirection::Ascending,
+        )
+        .expect("query");
+        let completed = get_logs(
+            &conn,
+            &LogFilters {
+                cleared: Some(true),
+                ..filters(false)
+            },
+            10,
+            0,
+            &SortType::Time,
+            &SortDirection::Ascending,
+        )
+        .expect("query");
+
+        assert_eq!(ids(&failed), vec![2]);
+        assert_eq!(ids(&completed), vec![3]);
+        assert_eq!(
+            get_counts(
+                &conn,
+                &LogFilters {
+                    cleared: Some(false),
+                    ..filters(false)
+                }
+            )
+            .expect("count")
+            .logs,
+            1
+        );
+        assert_eq!(
+            get_counts(
+                &conn,
+                &LogFilters {
+                    cleared: Some(true),
+                    ..filters(false)
+                }
+            )
+            .expect("count")
+            .logs,
+            1
+        );
     }
 
     /// The mirror direction: narrowing to a REAL quest must not hand back the
