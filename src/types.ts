@@ -181,13 +181,14 @@ export type StatusInterval = {
 
 /** A span of fight time a battle state held — mirrors the Rust `ChartWindow`
  * (parser/v1/windows.rs). `sba` is a Skybound Art performance (chains merged),
- * `link` is Link Time, `break` is one enemy sitting in Break. Milliseconds
- * from the fight's start, the same clock `StatusInterval` reports on. */
+ * `link` is Link Time, `overdrive` is one enemy sitting in Overdrive, `break`
+ * is one enemy sitting in Break. Milliseconds from the fight's start, the same
+ * clock `StatusInterval` reports on. */
 export type ChartWindow = {
-  kind: "sba" | "link" | "break";
+  kind: "sba" | "link" | "overdrive" | "break";
   startMs: number;
   endMs: number;
-  /** The breaking enemy's actor index for `break` windows; null for the
+  /** The enemy's actor index for `overdrive`/`break` windows; null for the
    * party-wide kinds. */
   actorIndex: number | null;
 };
@@ -435,16 +436,52 @@ export type WireGroupQuery = {
   windows?: { fromMs: number; upToMs: number }[];
 };
 
-/** One row's totals in a `GroupAggregate` (mirrors the Rust `GroupMeasure`). */
-export type GroupMeasure = { amount: number; hits: number; min: number | null; max: number | null };
+type GroupMeasureTotals = { amount: number; hits: number; min: number | null; max: number | null };
+
+/** Five-way per-fact tally (mirrors the Rust `FactTally`). `unknown` sits
+ * OUTSIDE rate denominators — the inferred share of a fact is
+ * `inferredYes / (measuredYes + measuredNo + inferredYes + inferredNo)`. */
+export type FactTally = {
+  measuredYes: number;
+  measuredNo: number;
+  inferredYes: number;
+  inferredNo: number;
+  unknown: number;
+};
+
+/** The per-group damage-fact block (mirrors the Rust `GroupFacts`). Tallied
+ * from DIRECT hits only — a supplementary echo's instance belongs to the hit
+ * that triggered it, so an echo tallies nothing and its damage stays out of
+ * `overdriveDamage`/`breakDamage` too (the split answers "where did damage
+ * go", the tallies answer "how sure are we" — both cover the same direct
+ * hits). `overdriveDamage`/`breakDamage` count damage where the fact
+ * resolved measured-yes OR inferred-yes; the tallies above carry the
+ * provenance split that number doesn't. */
+export type GroupFacts = {
+  crit: FactTally;
+  weakPoint: FactTally;
+  backAttack: FactTally;
+  debuffed: FactTally;
+  overdrive: FactTally;
+  break: FactTally;
+  overdriveDamage: number;
+  breakDamage: number;
+};
+
+/** One row's totals in a `GroupAggregate` (mirrors the Rust `GroupMeasure`).
+ * `facts` is present only on `damage`-metric rows once at least one direct
+ * hit tallied — absent (not zeroed) on `taken` rows and on the top-N
+ * `other` rollup, which sums the tail's damage only. */
+export type GroupMeasure = GroupMeasureTotals & { facts?: GroupFacts };
 
 /** The same row under the LANDING model, where an echo is part of the hit that
  * caused it rather than a hit of its own (mirrors the Rust `MergedMeasure`).
  *
  * For a direct action, `hits` counts landings and the amounts include their
  * echoes. For an echo action, this describes its UNCLAIMED residue only —
- * a claimed echo's damage already sits on its trigger. */
-export type MergedMeasure = GroupMeasure & { supplementary: number };
+ * a claimed echo's damage already sits on its trigger. Never carries `facts`
+ * — the tallies live on the raw measure only. */
+export type MergedMeasure = GroupMeasureTotals & { supplementary: number };
 
 /** One (filters × groupBy) row/band pair from `aggregate_groups` (mirrors the
  * Rust `GroupAggregate`): the table (`key` + `measure`) and the chart
@@ -839,6 +876,32 @@ export type Log = {
   repeatGroup?: number | null;
 };
 
+/** One row of the log picker's list — the narrow shape `fetch_log_summaries`
+ * returns. Mirrors `db::logs::LogSummary` (camelCase via serde).
+ *
+ * Narrower than [`Log`] on purpose: the picker holds the WHOLE library at once
+ * so its search can be instant, and the fields it never draws are the ones that
+ * would make that payload big. */
+export type LogSummary = {
+  id: number;
+  time: number;
+  duration: number;
+  questId: number | null;
+  questElapsedTime: number | null;
+  /** Who was in the party, paired slot by slot: the character played, and the
+   * display name of whoever played it — null for an AI companion, and for an
+   * imported log whose names were never recorded. The picker filters on both. */
+  p1Name: string | null;
+  p1Type: string | null;
+  p2Name: string | null;
+  p2Type: string | null;
+  p3Name: string | null;
+  p3Type: string | null;
+  p4Name: string | null;
+  p4Type: string | null;
+  repeatGroup: number | null;
+};
+
 /** Result of merging another installation's logs.db into ours
  * (`import_logs_from_file`). */
 export type ImportSummary = {
@@ -943,6 +1006,11 @@ export type DeathEvent = [number, { OnDeathEvent: { actor_index: number; death_c
 export type SourceStatus = {
   status_id: number;
   stacks: number;
+  /** Candidate cached per-status term, as raw f32 bits (`status+0x8`). Proven
+   * live for cap buffs; a PROBE for every other status class. `null` when the
+   * read is unavailable or the bits are not a finite f32. Mirrors
+   * `protocol::SourceStatus::term_bits`. */
+  term_bits: number | null;
 };
 
 /** One actor as a damage event reports it. `parent_index` is what an attribution
@@ -1005,6 +1073,29 @@ export type LogEventPayload =
          * nothing". A conditional cap source may only be reported as inactive
          * on the second — on the first it is unresolved. */
         source_statuses: SourceStatus[] | null;
+        /** Raw DamageInstance window `0xC0..0x340` (640 bytes), captured
+         * post-build — carries the seven gate bytes (crit, weak point, back
+         * attack, vuln action, debuffed, Overdrive, Break) at `+0x15D..
+         * +0x163`. `null` on old logs and on hits the hook could not
+         * capture. Mirrors `protocol::DamageEvent::instance_snapshot`; see
+         * `src/pages/logs/view/events/damageSnapshot.ts` for the offset map
+         * and the builder-populated (measured vs. unpopulated) distinction. */
+        instance_snapshot: number[] | null;
+        /** Raw SOURCE-actor-instance window `0x2480..0x24A0` (32 bytes),
+         * captured pre-call, for attackers whose own record carries a party
+         * slot. `null` otherwise. Mirrors
+         * `protocol::DamageEvent::source_snapshot`. */
+        source_snapshot: number[] | null;
+        /** Raw player-record window `record+0x18..0x28` (16 bytes), captured
+         * pre-call alongside `source_snapshot` — same player-family gate.
+         * Known residents: `+0x1C` SBA class dmg%, `+0x24` Skill class dmg%
+         * (both `f32`, applied by the game as `1 + v * 0.01` — the float
+         * itself IS the percent number, not an integer reinterpreted).
+         * `null` on old logs, on non-player attackers, and when the pointer
+         * chain or read fails. Mirrors `protocol::DamageEvent::record_snapshot`;
+         * see `src/pages/logs/view/events/recordSnapshot.ts` for the offset
+         * map — there is no Rust-side interpreter for this window yet. */
+        record_snapshot: number[] | null;
       };
     }
   | { OnDeathEvent: { actor_index: number; death_counter: number } }

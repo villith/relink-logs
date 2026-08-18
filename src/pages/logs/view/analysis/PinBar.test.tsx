@@ -28,6 +28,7 @@ const renderIt = (props: Partial<React.ComponentProps<typeof PinBar>> = {}) =>
         options={OPTIONS}
         pins={NO_PINS}
         onChange={() => {}}
+        hostility="friendly"
         windowLabel={null}
         fullLabel="04:12"
         onClearWindow={() => {}}
@@ -48,6 +49,15 @@ describe("PinBar", () => {
   it("does not carry the actor pin", () => {
     renderIt();
     expect(screen.queryByPlaceholderText("ui.logs.selector-all-friendlies")).toBeNull();
+  });
+
+  // The enemy side's targets are the PARTY — the side swaps which population
+  // each actor dimension draws from, so the placeholder swaps with it. Fixed at
+  // "All enemies", this control named the wrong population on half the tabs.
+  it("names the target universe the side is showing", () => {
+    renderIt({ hostility: "enemy" });
+    expect(screen.getByPlaceholderText("ui.logs.selector-all-friendlies")).toBeTruthy();
+    expect(screen.queryByPlaceholderText("ui.logs.selector-all-enemies")).toBeNull();
   });
 
   it("does not label the selectors — the placeholder already names them", () => {

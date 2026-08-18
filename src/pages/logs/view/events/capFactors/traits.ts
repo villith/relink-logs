@@ -2,6 +2,7 @@ import { computeCombinedTraits, deriveTranscendence, toHashString } from "@/util
 
 import type { CapClass, CapLoadout } from "../capSources";
 import {
+  SLOT,
   conditionalTraitTable,
   traitInput,
   traitRow,
@@ -33,8 +34,11 @@ import {
  */
 
 /** The plain DMG Cap trait. The one unconditional cap trait the game does NOT
- * fuse into the per-player record — the builder reads it through a second
- * lookup keyed by this hash, so it attributes as its own term. */
+ * fuse into the per-player record: the builder reads it through a second
+ * lookup keyed by this very hash (`0xDC584F60`), so it attributes as its own
+ * term. Confirmed 2026-08-09 by reconciling four players' oracle captures —
+ * the multiplier content missing from the record equals this trait's table
+ * value, and only this trait's. */
 export const DMG_CAP_TRAIT = 0xdc584f60;
 
 /** "DMG Cap +15% per active pet". The 15 is literal in the game's own text, not
@@ -222,7 +226,7 @@ const MAGNITUDE_IN_TEXT: Record<number, number> = { 0x7351d602: PHANTASM_PER_PET
 const unconditionalFactor = (id: number, level: number, capClass: CapClass): CapFactorResult => {
   const row = traitRow(traitTable, id, level);
   if (row === null) return notApplicableResult("not-a-cap-source");
-  const percent = row[{ normal: 0, skill: 1, sba: 2 }[capClass]];
+  const percent = row[SLOT[capClass]];
   if (percent !== 0) return activeResult(percent);
   // A zero means one of two different things and the reader needs to know
   // which: a cap trait for another class, or one that has not scaled in yet.

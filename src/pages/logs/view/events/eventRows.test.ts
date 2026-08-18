@@ -24,6 +24,9 @@ const noCap = {
   source_current_hp: null,
   source_max_hp: null,
   source_statuses: null,
+  instance_snapshot: null,
+  record_snapshot: null,
+  source_snapshot: null,
 };
 
 const damage: LogEvent = [
@@ -121,7 +124,7 @@ describe("toEventRow", () => {
           attack_rate: 2.5,
           source_current_hp: 45_000,
           source_max_hp: 90_000,
-          source_statuses: [{ status_id: 56, stacks: 2 }],
+          source_statuses: [{ status_id: 56, stacks: 2, term_bits: null }],
         },
       },
     ];

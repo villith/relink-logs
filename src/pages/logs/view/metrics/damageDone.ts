@@ -1,4 +1,4 @@
-import type { ComputedPlayerState, EnemyType, MergedSkillMeasure, SkillState } from "@/types";
+import type { ComputedPlayerState, EnemyType, FactTally, GroupFacts, MergedSkillMeasure, SkillState } from "@/types";
 import { humanizeNumber, isSupplementaryAction, ratePerSecond, share } from "@/utils";
 
 import {
@@ -40,6 +40,81 @@ export const damageColumns = (damage: number, hits: number, min: string, max: st
   format(hits === 0 ? 0 : Math.round(damage / hits)),
   share(damage, total),
 ];
+
+/** How many of a `FactTally`'s hits COUNTED toward its rate — `unknown` sits
+ * outside every denominator below (see the Rust `FactTally` doc). */
+const countedHits = (tally: FactTally): number =>
+  tally.measuredYes + tally.measuredNo + tally.inferredYes + tally.inferredNo;
+
+/** One fact's rate over its counted hits, e.g. "63%" — or a dash where
+ * nothing was counted (every hit landed `unknown`, or logged before facts
+ * existed at all).
+ *
+ * Rounded to a whole percent, deliberately: the underlying quantity is a hit
+ * COUNT (yes-hits over counted-hits), not a continuous measurement, so a
+ * decimal place would suggest a precision the tally does not carry — and
+ * these cells sit in `w-cell`-width columns, where every extra character
+ * competes with the `~` provenance marker for room. Do not "fix" this to
+ * match `share`'s one decimal place. */
+export const factRate = (tally: FactTally): string => {
+  const counted = countedHits(tally);
+  if (counted === 0) return NOT_RECORDED;
+  return `${Math.round(((tally.measuredYes + tally.inferredYes) / counted) * 100)}%`;
+};
+
+/** The share of a fact's counted hits that came from inference rather than a
+ * direct measurement, as a fraction — 0 where nothing was counted (so a
+ * caller need not special-case that alongside `factRate`'s dash). */
+export const inferredShare = (tally: FactTally): number => {
+  const counted = countedHits(tally);
+  return counted === 0 ? 0 : (tally.inferredYes + tally.inferredNo) / counted;
+};
+
+/** One fact's table cell: the rate, with a trailing `~` where the rate leans
+ * on inference (`inferredShare > 0`) — the provenance marker the hover card's
+ * "Damage facts" section explains. Absent tally (a row with nothing to tally,
+ * or the descriptors' SkillState-based fold, which carries no facts at all)
+ * reads the same dash as an all-`unknown` one. */
+export const factCell = (tally?: FactTally): string => {
+  if (tally === undefined) return NOT_RECORDED;
+  const rate = factRate(tally);
+  return rate === NOT_RECORDED || inferredShare(tally) === 0 ? rate : `${rate}~`;
+};
+
+/** The headers the WP%/BA% cells sit under. Declared beside the cells that fill
+ * them because the two must agree exactly: a header list and a cell list that
+ * disagree render the trailing columns under the wrong names, or under none. */
+export const FACT_COLUMN_KEYS = ["ui.skill-columns.weak-point", "ui.skill-columns.back-attack"];
+
+/** The WP%/BA% cells appended after every damage row's own columns — see
+ * `columnKeys`. `~` is an intentional glyph, not prose: `factCell` is the
+ * one place it is written, so no JSX ever spells it out literally.
+ *
+ * Empty unless `show`, which is the `show_damage_facts` setting: the columns
+ * are off by default (see the store), and `columnKeys` withholds
+ * `FACT_COLUMN_KEYS` on the same flag so the header row and the cells can only
+ * appear together.
+ *
+ * Crit% is tallied like the other two but has no column in either state — it is
+ * read in the row's hover card (`FACT_ROWS`), because the damage row already
+ * spends six columns before these and a crit rate is wanted when a row is being
+ * explained rather than when the table is being scanned. */
+export const factColumns = (facts?: GroupFacts, show: boolean = false): string[] =>
+  show ? [factCell(facts?.weakPoint), factCell(facts?.backAttack)] : [];
+
+/** What the hover card's "Damage facts" section captions a fact row with, or
+ * null where the rate alone says enough (fully measured). Kept beside
+ * `factCell` rather than inline in the card component so the two can never
+ * disagree about when a rate needs explaining. */
+export type FactCaption =
+  | { key: "ui.logs.hover-fact-no-data" }
+  | { key: "ui.logs.hover-fact-inferred"; params: { pct: number } };
+
+export const factCaption = (tally: FactTally): FactCaption | null => {
+  if (countedHits(tally) === 0) return { key: "ui.logs.hover-fact-no-data" };
+  const inferred = inferredShare(tally);
+  return inferred > 0 ? { key: "ui.logs.hover-fact-inferred", params: { pct: Math.round(inferred * 100) } } : null;
+};
 
 /** The landing views behind a set of breakdown rows, skipping any row that
  * carries none — a backend older than the field sends nothing, and a missing
@@ -114,24 +189,31 @@ const damageCells = (
       // skills finds nothing and a row with a real echo share would draw one
       // flat bar.
       ...supplementarySubValue(supplementary, damage),
-      columns: damageColumns(
-        damage,
-        hits,
-        // Verbatim from the backend, never re-derived: under the landing model
-        // an extreme IS a whole landing, echo included, and only the parser
-        // still holds the per-hit identity that would take to compute. Over the
-        // same set the hits come from — a residue is a fragment of a landing,
-        // not one of its own, and the two columns describe one population.
-        extreme(
-          landed.map((measure) => measure.min),
-          (values) => Math.min(...values)
+      // Three trailing dashes: SkillState carries no fact tallies at all — only
+      // the groups-path `GroupMeasure.facts` does — so every row this
+      // (dead-at-runtime, still directly tested) fold produces is honestly
+      // "no data" against the header `columnKeys` now promises.
+      columns: [
+        ...damageColumns(
+          damage,
+          hits,
+          // Verbatim from the backend, never re-derived: under the landing model
+          // an extreme IS a whole landing, echo included, and only the parser
+          // still holds the per-hit identity that would take to compute. Over the
+          // same set the hits come from — a residue is a fragment of a landing,
+          // not one of its own, and the two columns describe one population.
+          extreme(
+            landed.map((measure) => measure.min),
+            (values) => Math.min(...values)
+          ),
+          extreme(
+            landed.map((measure) => measure.max),
+            (values) => Math.max(...values)
+          ),
+          total
         ),
-        extreme(
-          landed.map((measure) => measure.max),
-          (values) => Math.max(...values)
-        ),
-        total
-      ),
+        ...factColumns(),
+      ],
     };
   }
 
@@ -141,29 +223,33 @@ const damageCells = (
   return {
     value: rawDamage,
     ...(supplementary > 0 ? { subValue: supplementary } : {}),
-    columns: damageColumns(
-      rawDamage,
-      rawHits,
-      // Across every skill behind the row. On the collapse-OFF path that is
-      // the same set the old direct half was: an echo keys to the echo row, so
-      // no bucket is mixed.
-      //
-      // This branch also serves the absent-`merged` FALLBACK, where the
-      // collapse is on and the bucket is mixed, so these extremes do span both
-      // halves — a row there can report an echo tick as its minimum (200 → 90
-      // on the fixture below). Accepted: the fallback is a degraded skew path,
-      // and the narrowing that would prevent it is the very rule the landing
-      // model replaces. Pinned by "falls back to the raw figures…".
-      extreme(
-        skills.map((skill) => skill.minDamage),
-        (values) => Math.min(...values)
+    // See the merged branch above: SkillState has no facts to report.
+    columns: [
+      ...damageColumns(
+        rawDamage,
+        rawHits,
+        // Across every skill behind the row. On the collapse-OFF path that is
+        // the same set the old direct half was: an echo keys to the echo row, so
+        // no bucket is mixed.
+        //
+        // This branch also serves the absent-`merged` FALLBACK, where the
+        // collapse is on and the bucket is mixed, so these extremes do span both
+        // halves — a row there can report an echo tick as its minimum (200 → 90
+        // on the fixture below). Accepted: the fallback is a degraded skew path,
+        // and the narrowing that would prevent it is the very rule the landing
+        // model replaces. Pinned by "falls back to the raw figures…".
+        extreme(
+          skills.map((skill) => skill.minDamage),
+          (values) => Math.min(...values)
+        ),
+        extreme(
+          skills.map((skill) => skill.maxDamage),
+          (values) => Math.max(...values)
+        ),
+        total
       ),
-      extreme(
-        skills.map((skill) => skill.maxDamage),
-        (values) => Math.max(...values)
-      ),
-      total
-    ),
+      ...factColumns(),
+    ],
   };
 };
 
@@ -244,7 +330,8 @@ const enemyRows = (skills: SkillState[], total: number): MetricRow[] => {
       label: key,
       kind: "enemy" as const,
       value: damage,
-      columns: damageColumns(damage, hits, NOT_RECORDED, NOT_RECORDED, total),
+      // Per-enemy breakdown rows never carry facts either — see `columnKeys`.
+      columns: [...damageColumns(damage, hits, NOT_RECORDED, NOT_RECORDED, total), ...factColumns()],
       pinOnClick: null,
       colorSlot: -1,
     }))
@@ -292,10 +379,14 @@ const enemyDealtRows = (players: ComputedPlayerState[], level: RowLevel, fightDu
       label: key,
       kind: "enemy" as const,
       value: damage,
-      columns:
-        level === "players"
+      // Incoming damage never carries facts — DamageTakenState is a different
+      // record from the direct-hit tallying `GroupFacts` reads.
+      columns: [
+        ...(level === "players"
           ? playersColumns(damage, total, fightDurationMs)
-          : damageColumns(damage, hits, NOT_RECORDED, format(maxDamage), total),
+          : damageColumns(damage, hits, NOT_RECORDED, format(maxDamage), total)),
+        ...factColumns(),
+      ],
       // The pin model has no enemy-type pin; the hover card decomposes instead.
       pinOnClick: null,
       colorSlot: -1,
@@ -316,8 +407,13 @@ export const damageDone: MetricDescriptor = {
   // advance whether it will decompose into member skills, enemies or players,
   // and the columns line up under it either way — a shape with no extremes to
   // report leaves those two cells blank rather than moving the ones after them.
-  columnKeys: (level) =>
-    level === "players"
+  //
+  // `showFacts` is the `show_damage_facts` setting, and it appends the SAME
+  // `FACT_COLUMN_KEYS` the cells come from (see `factColumns`, which is off by
+  // the same default). Both lists gate on one flag, so the WP%/BA% headers and
+  // the cells under them can only ever appear together.
+  columnKeys: (level, showFacts = false) => [
+    ...(level === "players"
       ? ["ui.meter-columns.damage", "ui.meter-columns.dps", "ui.logs.column-share"]
       : [
           "ui.skill-columns.total",
@@ -326,7 +422,9 @@ export const damageDone: MetricDescriptor = {
           "ui.skill-columns.max",
           "ui.skill-columns.average",
           "ui.logs.column-share",
-        ],
+        ]),
+    ...(showFacts ? FACT_COLUMN_KEYS : []),
+  ],
 
   labelKind: (level) => (level === "players" ? "player" : "ability"),
 
@@ -353,7 +451,7 @@ export const damageDone: MetricDescriptor = {
           key: playerRowKey(p.index),
           label: String(p.index),
           value: p.totalDamage,
-          columns: [format(p.totalDamage), format(p.dps), share(p.totalDamage, total)],
+          columns: [format(p.totalDamage), format(p.dps), share(p.totalDamage, total), ...factColumns()],
           pinOnClick: { source: p.index },
           colorSlot: p.partyIndex,
         }));

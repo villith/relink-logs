@@ -93,6 +93,33 @@ describe("AmountCell", () => {
     expect(card.querySelector('[data-cap-row="basecap"]')?.textContent).toContain("70,771");
   });
 
+  // A failed grid check refined by the actor's own observed states: a K
+  // strictly inside their bracket renders the ease, and the remainder is the
+  // easing gap rather than an unaccounted term.
+  it.skipIf(!SHOWS_CAP_CARD)("renders a mid-ease hit as a state transition", async () => {
+    const { gameLadderBase, ladderCurveFor } = await import("./capLadder");
+    const base = gameLadderBase(ladderCurveFor("Pl1900", 0)!, 0.5);
+    renderCell({
+      amount: 1_500_000,
+      capHit: { ...capHit, damage_cap: Math.trunc(base * 24.115), attack_rate: 0.5, class_flags: 0 },
+      characterType: "Pl1900",
+      gridStates: new Map([
+        [
+          "normal",
+          new Map([
+            [2401, 2],
+            [2426, 1],
+          ]),
+        ],
+      ]),
+      width: 78,
+    });
+    hover("1,500,000");
+    const card = screen.getByTestId("cap-card");
+    expect(card.querySelector('[data-cap-row="verdict"]')?.textContent).toContain("ui.logs.cap-verdict-transition");
+    expect(card.querySelector('[data-cap-row="unaccounted"]')?.textContent).toContain("ui.logs.cap-easing-gap");
+  });
+
   // Selection is by the hit's OWN class. A Skybound Art must not be explained
   // with the Normal total, which is a different number entirely.
   it.skipIf(!SHOWS_CAP_CARD)("picks the cap-up matching the hit's attack class", () => {
@@ -188,6 +215,38 @@ describe("AmountCell", () => {
     expect(card.querySelector('[data-cap-row="unaccounted"]')?.textContent).toContain("1,400.99%");
   });
 
+  // Bug: capClassOf never tests the summon flag (0x80) and falls through to
+  // "normal", so a summon hit's cap-up was explained with the owning PLAYER's
+  // own (large) normal-class record and DMG Cap trait — never what a summon
+  // actually draws on, which is none of it.
+  it.skipIf(!SHOWS_CAP_CARD)("treats a measured summon hit as having no attributable player record", () => {
+    // Ground truth: log 2654's summon hits at rate f32(98.883) log cap
+    // 1,186,595 — exactly the SO0000 curve base (see the predicted-card test
+    // below), so the game's own cap-up total for this hit is 0%.
+    renderCell({
+      amount: 1_186_595,
+      capHit: {
+        damage: 1_186_595,
+        damage_cap: 1_186_595,
+        base_damage: 2_000_000,
+        attack_rate: 98.883003234863281,
+        class_flags: 0x81,
+      },
+      playerCapUp: { normal: 6.84, skill: 0, sba: 0 },
+      loadout: sigilLoadout(0xdc584f60, 65),
+      width: 78,
+    });
+    hover("1,186,595");
+    const card = screen.getByTestId("cap-card");
+    expect(card.querySelector('[data-cap-row="basecap"]')?.textContent).toContain("1,186,595");
+    // Never the owning player's own (large) normal-class record or trait.
+    expect(card.querySelector('[data-cap-row="capup"]')).toBeNull();
+    expect(card.querySelector('[data-cap-row="dmgcap"]')).toBeNull();
+    // cap == base exactly, so nothing should be unaccounted either.
+    expect(card.querySelector('[data-cap-row="gamecapup"]')?.textContent).toContain("0%");
+    expect(card.querySelector('[data-cap-row="unaccounted"]')?.textContent).toContain("0%");
+  });
+
   // A damage row from a log recorded before the cap capture carries the shape
   // with null members. `capCardRows` returns its lone `damage` row for that, and
   // a one-row card would only restate the number already in the cell.
@@ -196,5 +255,105 @@ describe("AmountCell", () => {
     renderCell({ amount: 12, capHit: old, width: 78 });
     hover("12");
     expect(screen.queryByTestId("cap-card")).toBeNull();
+  });
+
+  // ---- the predicted card (remote rows: cap fields absent, inputs captured) ----
+
+  const remoteHit = { damage: 80_000, damage_cap: null, base_damage: null, attack_rate: 0.54, class_flags: 0x1 };
+  const remoteProps = {
+    amount: 80_000,
+    capHit: remoteHit,
+    predictable: true,
+    playerCapUp: { normal: 13.13, skill: 15.18, sba: 12.16 },
+    loadout: { ...sigilLoadout(0xdc584f60, 65), characterType: "Pl0300" },
+    characterType: "Pl0300" as const,
+    conditions: {},
+    width: 78,
+  };
+
+  it.skipIf(!SHOWS_CAP_CARD)("predicts a capless hit from the store, the ladder and the loadout", () => {
+    renderCell(remoteProps);
+    hover("80,000");
+    const card = screen.getByTestId("cap-card");
+    // Title + ≈: unmistakably a prediction, on the same surface.
+    expect(card.textContent).toContain("ui.logs.cap-predicted-title");
+    // 5,399 × (1 + 13.13 + 2.50) = 5,399 × 16.63 = 89,785.37 → ≈ 89,785
+    expect(card.querySelector('[data-cap-row="predicted"]')?.textContent).toContain("≈ 89,785");
+    expect(card.querySelector('[data-cap-row="basecap"]')?.textContent).toContain("5,399");
+    expect(card.querySelector('[data-cap-row="capup"]')?.textContent).toContain("1,313%");
+    expect(card.querySelector('[data-cap-row="dmgcap"]')?.textContent).toContain("250%");
+    // No ground truth → none of the measured-only rows.
+    expect(card.querySelector('[data-cap-row="cap"]')).toBeNull();
+    expect(card.querySelector('[data-cap-row="verdict"]')).toBeNull();
+    expect(card.querySelector('[data-cap-row="overcap"]')).toBeNull();
+  });
+
+  it.skipIf(!SHOWS_CAP_CARD)("credits active channel terms into the predicted figure", () => {
+    renderCell({
+      ...remoteProps,
+      loadout: { ...sigilLoadout(0xdc584f60, 65), characterType: "Pl0300", skillboard: [0x0c] },
+    });
+    hover("80,000");
+    const card = screen.getByTestId("cap-card");
+    // 5,399 × (16.63 + 0.15) = 5,399 × 16.78 = 90,595.22 → ≈ 90,595
+    expect(card.querySelector('[data-cap-row="predicted"]')?.textContent).toContain("≈ 90,595");
+    expect(card.querySelector('[data-cap-row="channel"]')?.textContent).toContain("15%");
+  });
+
+  it.skipIf(!SHOWS_CAP_CARD)("predicts a summon-class capless hit as the bare ladder base", () => {
+    // Ground truth: log 2654's 52 summon hits at rate f32(98.883) log cap
+    // 1,186,595 — exactly the SO0000 curve base, no player multiplier.
+    renderCell({ ...remoteProps, capHit: { ...remoteHit, attack_rate: 98.883003234863281, class_flags: 0x81 } });
+    hover("80,000");
+    const card = screen.getByTestId("cap-card");
+    expect(card.querySelector('[data-cap-row="predicted"]')?.textContent).toContain("≈ 1,186,595");
+    expect(card.querySelector('[data-cap-row="capup"]')).toBeNull();
+    expect(card.querySelector('[data-cap-row="dmgcap"]')).toBeNull();
+  });
+
+  // Bug: the gate checked `record === null || loadout === undefined` before
+  // isSummonClass, even though predictedCapRows proves the summon branch never
+  // reads either — over-suppressing the card for a summon hit whose owning
+  // player has no captured per-class record.
+  it.skipIf(!SHOWS_CAP_CARD)("predicts a summon-class hit even without the player's own record or loadout", () => {
+    renderCell({
+      ...remoteProps,
+      playerCapUp: undefined,
+      loadout: undefined,
+      capHit: { ...remoteHit, attack_rate: 98.883003234863281, class_flags: 0x81 },
+    });
+    hover("80,000");
+    const card = screen.getByTestId("cap-card");
+    expect(card.querySelector('[data-cap-row="predicted"]')?.textContent).toContain("≈ 1,186,595");
+  });
+
+  it("shows no predicted card without the captured store", () => {
+    renderCell({ ...remoteProps, playerCapUp: undefined });
+    hover("80,000");
+    expect(screen.queryByTestId("cap-card")).toBeNull();
+  });
+
+  it("shows no predicted card for a kind that never carries a cap", () => {
+    renderCell({ ...remoteProps, predictable: false });
+    hover("80,000");
+    expect(screen.queryByTestId("cap-card")).toBeNull();
+  });
+
+  it("withholds the prediction for a denylisted character", () => {
+    renderCell({
+      ...remoteProps,
+      characterType: "Pl0600" as const,
+      loadout: { ...remoteProps.loadout, characterType: "Pl0600" },
+    });
+    hover("80,000");
+    expect(screen.queryByTestId("cap-card")).toBeNull();
+  });
+
+  it.skipIf(!SHOWS_CAP_CARD)("keeps the measured card measured even when the row is predictable", () => {
+    renderCell({ amount: 1_500_000, capHit, predictable: true, width: 78 });
+    hover("1,500,000");
+    const card = screen.getByTestId("cap-card");
+    expect(card.querySelector('[data-cap-row="cap"]')).not.toBeNull();
+    expect(card.textContent).not.toContain("ui.logs.cap-predicted-title");
   });
 });

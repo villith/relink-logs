@@ -39,7 +39,7 @@ const maskText = (mask: WireWindow[] | undefined): string => {
 /** How many battle windows of each kind the fight offers, in the strip's own
  * order. Zero-count kinds drop out; nothing at all says so. */
 const windowsText = (windows: ChartWindow[]): string => {
-  const kinds: ChartWindow["kind"][] = ["sba", "link", "break"];
+  const kinds: ChartWindow["kind"][] = ["sba", "link", "overdrive", "break"];
   const counted = kinds
     .map((kind) => ({ kind, count: windows.filter((window) => window.kind === kind).length }))
     .filter(({ count }) => count > 0);

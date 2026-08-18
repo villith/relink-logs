@@ -3,22 +3,28 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { abilityLabelFor } from "@/pages/logs/view/analysis/abilityLabel";
+import { capPredictableKey } from "@/pages/logs/view/events/capBreakdown";
 import { explainCapHit } from "@/pages/logs/view/events/capExplain";
 import { conditionsForHit } from "@/pages/logs/view/events/capFactors/conditions";
+import { buildGridStates } from "@/pages/logs/view/events/capGridStates";
+import { explainDamageHit } from "@/pages/logs/view/events/damageExplain";
 import { getSkillName, millisecondsToPreciseElapsedFormat, translateCharacterType } from "@/utils";
 
 import { CapDetailPanel } from "./CapDetailPanel";
+import { HitPipeline } from "./HitPipeline";
 import { hitLabel, type CapDebugHit } from "./capHits";
+import { modeInferenceForHit } from "./modeInference";
 import { useCapDebugLog, usePlayersByActor, useRecentLogs } from "./useCapDebugLog";
 
-/** The hit list's height. A constant rather than a measurement, the same choice
- * the Events tab makes for the same reason. */
-const LIST_HEIGHT = 560;
 /** The hit list's width. Sized so a timestamp, a full ability key and a
  * seven-figure damage number sit on one line — at anything narrower the ability
  * column, which is the only one that says WHICH hit this is, is the one that
  * ellipsises. */
 const LIST_WIDTH = 380;
+
+/** A flex column whose children may scroll: `minHeight: 0` is what lets a
+ * scroller inside shrink to the column's height instead of overflowing it. */
+const FLEX_COLUMN = { display: "flex", flexDirection: "column", minHeight: 0 } as const;
 
 /** One row in the per-character hit list. */
 const HitRow = ({
@@ -80,7 +86,8 @@ export const CapTab = () => {
   const [actorIndex, setActorIndex] = useState<number | null>(null);
   const [eventIndex, setEventIndex] = useState<number | null>(null);
 
-  const { hits, players, skillsByActor, capUp, truncated, loading, error } = useCapDebugLog(logId);
+  const { hits, players, skillsByActor, capUp, amplifyStatusIds, chartWindows, truncated, loading, error } =
+    useCapDebugLog(logId);
   const playersByActor = usePlayersByActor(players);
 
   // Named through the ANALYSIS view's own resolver, not a second spelling here:
@@ -119,22 +126,57 @@ export const CapTab = () => {
 
   const selected = useMemo(() => shown.find((hit) => hit.eventIndex === eventIndex) ?? null, [shown, eventIndex]);
 
-  const sections = useMemo(() => {
+  // The party's observed on-grid K sets, from every hit in the log — what
+  // refines a failed grid check into the transition/settling naming.
+  const gridStates = useMemo(
+    () =>
+      buildGridStates(
+        hits.map((hit) => ({ sourceIndex: hit.sourceIndex, capHit: hit.hit })),
+        (actor) => playersByActor.get(actor)?.characterType
+      ),
+    [hits, playersByActor]
+  );
+
+  // One source of truth for the loadout + conditions both panels explain —
+  // computed once and fed to `explainCapHit` and `explainDamageHit` alike, so
+  // the two columns can never drift into narrating the same hit against
+  // different condition snapshots.
+  const hitPanels = useMemo(() => {
     if (selected === null) return null;
     const player = playersByActor.get(selected.sourceIndex);
-    return explainCapHit({
-      hit: selected.hit,
-      capUp: capUp[String(selected.sourceIndex)],
-      loadout: player,
-      characterType: player?.characterType,
-      // The attacker's own state at the moment of the hit, plus the stored stat
-      // block the banded traits ramp across, plus the hit's own action id for
-      // the move-scoped board nodes. A hit recorded before that capture
-      // existed supplies neither, and the factors that need them say so rather
-      // than reading as inactive.
-      conditions: conditionsForHit(selected.attacker, player?.playerStats ?? null, selected.actionId),
-    });
-  }, [selected, playersByActor, capUp]);
+    // The attacker's own state at the moment of the hit, plus the stored stat
+    // block the banded traits ramp across, plus the hit's own action id for
+    // the move-scoped board nodes. A hit recorded before that capture existed
+    // supplies neither, and the factors that need them say so rather than
+    // reading as inactive.
+    const conditions = conditionsForHit(selected.attacker, player?.playerStats ?? null, selected.actionId);
+    // The fallback for a hit whose own snapshot cannot say: this target,
+    // joined against the fight's Overdrive/Break windows at this hit's own
+    // moment. `targetParentIndex`, not `targetIndex` — chart windows name an
+    // enemy by its own actor index, not the folded instance pointer.
+    const modeInference = modeInferenceForHit(chartWindows, selected.targetParentIndex, selected.timeMs);
+    return {
+      sections: explainCapHit({
+        hit: selected.hit,
+        capUp: capUp[String(selected.sourceIndex)],
+        loadout: player,
+        characterType: player?.characterType,
+        gridStates: gridStates.get(selected.sourceIndex),
+        // The same gate the events-view card uses: a capless hit of a kind
+        // the builder locally always stamps (a remote hit) derives a
+        // predicted cap instead of stopping at "no cap".
+        predictable: capPredictableKey(selected.abilityKey),
+        conditions,
+      }),
+      damageSections: explainDamageHit({
+        hit: selected.hit,
+        loadout: player,
+        conditions,
+        amplifyStatusIds,
+        modeInference,
+      }),
+    };
+  }, [selected, playersByActor, capUp, gridStates, amplifyStatusIds, chartWindows]);
 
   const logOptions = recent.map((log) => ({
     value: String(log.id),
@@ -142,7 +184,9 @@ export const CapTab = () => {
   }));
 
   return (
-    <Stack gap="sm">
+    // The page (Debug.tsx) is bounded to the viewport; this fills it, so the
+    // hit list and the derivation columns take all the height the window has.
+    <Stack gap="sm" h="100%" style={{ minHeight: 0 }}>
       <Group gap="sm" align="flex-end">
         <Select
           label={t("ui.debug.cap-log")}
@@ -208,14 +252,13 @@ export const CapTab = () => {
         </Text>
       )}
 
-      <Group align="flex-start" gap="md" wrap="nowrap">
-        <Box style={{ width: LIST_WIDTH, flexShrink: 0 }}>
+      <Group align="stretch" gap="md" wrap="nowrap" style={{ flexGrow: 1, minHeight: 0 }}>
+        <Box style={{ width: LIST_WIDTH, flexShrink: 0, ...FLEX_COLUMN }}>
           <Text size="xs" c="dimmed" mb={4}>
             {t("ui.debug.cap-hit-count", { count: shown.length })}
           </Text>
           <ScrollArea
-            h={LIST_HEIGHT}
-            style={{ border: "1px solid var(--color-line)", borderRadius: 4 }}
+            style={{ flexGrow: 1, minHeight: 0, border: "1px solid var(--color-line)", borderRadius: 4 }}
             aria-label={t("ui.debug.cap-hit-list")}
           >
             <Stack gap={0} p={2}>
@@ -232,8 +275,8 @@ export const CapTab = () => {
           </ScrollArea>
         </Box>
 
-        <Box style={{ flex: 1, minWidth: 0 }}>
-          {selected === null || sections === null ? (
+        <Box style={{ flex: 1, minWidth: 0, ...FLEX_COLUMN }}>
+          {selected === null || hitPanels === null ? (
             <Text size="xs" c="dimmed">
               {t("ui.debug.cap-pick-a-hit")}
             </Text>
@@ -243,13 +286,39 @@ export const CapTab = () => {
                 {hitLabel(selected, nameOf(selected))}
               </Text>
               {/* The wire key alongside the name: this is a debug panel, and
-                  the raw action id is what a finding gets quoted by. */}
+                  the raw action id is what a finding gets quoted by. The damage
+                  itself is not repeated here — it is the pipeline's Final cell. */}
               <Text size="xs" c="dimmed" mb="sm">
-                {`${millisecondsToPreciseElapsedFormat(selected.timeMs)} · ${selected.abilityKey} · ${selected.hit.damage.toLocaleString(i18n.language)}`}
+                {`${millisecondsToPreciseElapsedFormat(selected.timeMs)} · ${selected.abilityKey}`}
               </Text>
-              <ScrollArea h={LIST_HEIGHT} offsetScrollbars>
-                <CapDetailPanel sections={sections} />
-              </ScrollArea>
+              {/* What happened to this hit, before either column's working:
+                  pre-cap -> cap -> post-cap -> final, with the clamp drawn. */}
+              <HitPipeline hit={selected.hit} />
+              {/* Both columns split the detail area evenly and compress with
+                  it — the panel rows floor at MIN_ROW_WIDTH, below which each
+                  column's own ScrollArea scrolls, so the page never grows a
+                  horizontal scrollbar of its own. */}
+              <Group align="stretch" gap="md" wrap="nowrap" style={{ flexGrow: 1, minHeight: 0 }}>
+                <Box style={{ flex: 1, minWidth: 0, ...FLEX_COLUMN }}>
+                  {/* One notch bigger and undimmed vs. CapDetailPanel's own
+                      section headings, so "DAMAGE CALCULATION" reads as the
+                      column's title rather than as its first section. */}
+                  <Text size="sm" fw={700} tt="uppercase" mb={4}>
+                    {t("ui.debug.cap-col-cap")}
+                  </Text>
+                  <ScrollArea offsetScrollbars style={{ flexGrow: 1, minHeight: 0 }}>
+                    <CapDetailPanel sections={hitPanels.sections} />
+                  </ScrollArea>
+                </Box>
+                <Box style={{ flex: 1, minWidth: 0, ...FLEX_COLUMN }}>
+                  <Text size="sm" fw={700} tt="uppercase" mb={4}>
+                    {t("ui.debug.cap-col-damage")}
+                  </Text>
+                  <ScrollArea offsetScrollbars style={{ flexGrow: 1, minHeight: 0 }}>
+                    <CapDetailPanel sections={hitPanels.damageSections} />
+                  </ScrollArea>
+                </Box>
+              </Group>
             </>
           )}
         </Box>

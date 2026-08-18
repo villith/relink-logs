@@ -30,7 +30,6 @@ export type CardKind = "skill" | "taken" | "enemyDealt" | "enemyReceived" | "sba
  * the user's chosen window (DpsChart's control) and only a RATE may use it — a
  * level averaged over a trailing window reads as something it never was. */
 export type ChartDecl = {
-  labelKey: string;
   series: "dps" | "stun" | "taken" | "sba";
   smoothing: "rate" | "none";
   /** Multiplier onto the stored values. SBA is stored in tenths of a percent. */
@@ -60,8 +59,11 @@ export type MetricCapabilities = {
    * supported entry; all pinned → the last entry (one-row table). */
   dimensionOrder: Dimension[];
   dimensions: Record<Dimension, DimensionDecl>;
-  /** Header keys for the numeric columns when grouped by `dim`. */
-  columnKeys: (dim: Dimension) => string[];
+  /** Header keys for the numeric columns when grouped by `dim`.
+   *
+   * `showFacts` is the `show_damage_facts` setting — see `MetricDescriptor`.
+   * Only Damage Done has columns behind it. */
+  columnKeys: (dim: Dimension, showFacts?: boolean) => string[];
   /** Which hover card explains a row under this grouping and side. */
   cardKind: (dim: Dimension, hostility: Hostility) => CardKind;
   /** Whether the chart stacks the fetched groups' series. False = the metric's
@@ -93,8 +95,7 @@ export type MetricCapabilities = {
 /** The three rate metrics share one shape: their own series, smoothed like DPS
  * because all three are per-second rates off the same buckets. Spelled once
  * rather than three times, so a change to the shared reading is one edit. */
-const RATE_CHART = (labelKey: string, series: ChartDecl["series"]): ChartDecl => ({
-  labelKey,
+const RATE_CHART = (series: ChartDecl["series"]): ChartDecl => ({
   series,
   smoothing: "rate",
   scale: 1,
@@ -133,7 +134,7 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
       ability: SUPPORTED("ui.logs.groupby-damage-ability", "ui.logs.groupby-damage-ability"),
       target: SUPPORTED("ui.logs.groupby-damage-target", "ui.logs.groupby-damage-target-enemy"),
     },
-    columnKeys: (dim) => damageDone.columnKeys(levelFor(dim)),
+    columnKeys: (dim, showFacts) => damageDone.columnKeys(levelFor(dim), showFacts),
     // Friendly rows decompose at every grouping — a target row still leaves
     // ability and source free (see targetCardSectionsFor). The enemy side
     // has a builder only for its attacker rows.
@@ -141,7 +142,7 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
     chartFromGroups: true,
     // The same trailing moving average the classic view smooths with, so the
     // same fight draws the same line in both.
-    chart: RATE_CHART("ui.logs.chart-dps-label", "dps"),
+    chart: RATE_CHART("dps"),
     recordsSupplementary: true,
   },
 
@@ -164,7 +165,7 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
       hostility === "enemy" ? (dim === "source" ? "enemyReceived" : "none") : dim === "target" ? "none" : "taken",
     chartFromGroups: true,
     // Incoming damage per second, off the same buckets as DPS.
-    chart: RATE_CHART("ui.logs.chart-taken-label", "taken"),
+    chart: RATE_CHART("taken"),
     recordsSupplementary: false,
   },
 
@@ -181,7 +182,7 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
     columnKeys: (dim) => stun.columnKeys(levelFor(dim)),
     cardKind: (dim) => (dim === "target" ? "none" : "skill"),
     chartFromGroups: false,
-    chart: RATE_CHART("ui.logs.chart-stun-label", "stun"),
+    chart: RATE_CHART("stun"),
     recordsSupplementary: false,
   },
 
@@ -211,7 +212,7 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
     chartFromGroups: false,
     // A gauge LEVEL, not a rate: smoothing would round off the discharge that
     // IS the reading. Stored in tenths of a percent.
-    chart: { labelKey: "ui.logs.chart-sba-label", series: "sba", smoothing: "none", scale: 0.1, format: "percent" },
+    chart: { series: "sba", smoothing: "none", scale: 0.1, format: "percent" },
     // A suppressed player's deduced bands fold back into the unattributed
     // remainder, mirroring the table (see `suppressedSbaBands`).
     filterAbilitySeries: suppressedSbaBands,
@@ -236,7 +237,7 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
     // context the effects are read against — Warcraft Logs keeps its own
     // damage chart above the Buffs timeline for the same reason. Only a
     // PINNED effect overlays it, with that effect's per-holder stack depths.
-    chart: RATE_CHART("ui.logs.chart-dps-label", "dps"),
+    chart: RATE_CHART("dps"),
     recordsSupplementary: false,
   },
 
@@ -255,7 +256,7 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
     chartFromGroups: false,
     // As buffs: the damage plot at rest, overlaid by stack depths once an
     // effect is pinned.
-    chart: RATE_CHART("ui.logs.chart-dps-label", "dps"),
+    chart: RATE_CHART("dps"),
     recordsSupplementary: false,
   },
 };

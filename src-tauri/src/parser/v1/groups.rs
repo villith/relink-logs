@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::parser::constants::{CharacterType, EnemyType};
 
+use super::damage_facts::{self, Fact};
 use super::supp_pairing::{self, SuppPairing};
 use super::{
     bucket_for, is_damage_taken_event, player_state, remap_dragon_form, survives_shared_gates,
@@ -177,6 +178,67 @@ pub enum GroupKey {
     Other,
 }
 
+/// Five-way per-fact tally. Serialized camelCase for the frontend mirror.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FactTally {
+    pub measured_yes: u32,
+    pub measured_no: u32,
+    pub inferred_yes: u32,
+    pub inferred_no: u32,
+    pub unknown: u32,
+}
+
+impl FactTally {
+    fn add(&mut self, fact: Fact) {
+        use Fact::*;
+        match fact {
+            MeasuredYes => self.measured_yes += 1,
+            MeasuredNo => self.measured_no += 1,
+            InferredYes => self.inferred_yes += 1,
+            InferredNo => self.inferred_no += 1,
+            Unknown => self.unknown += 1,
+        }
+    }
+}
+
+/// The per-group damage-fact block. Lives only on [`GroupMeasure`], and only
+/// for the FRIENDLY-side dealt-stream damage row this round — `(metric:
+/// Damage, hostility: Friendly)`, `aggregate_groups`'s own `dealt_stream`
+/// true and `query.metric == GroupMetric::Damage` both. Every other
+/// (metric, hostility) combination shares this walk's loop but the tally is
+/// never touched for it, so `facts` stays `None` there regardless of what
+/// the events carried — in particular `(Damage, Enemy)` walks the TAKEN
+/// stream (enemy→player hits): overdrive/break would describe the victim
+/// (a player, who has no modes), crit/WP/BA describe an enemy attack the
+/// analysis columns don't model, and mode inference keyed on a player
+/// `parent_index` would rarely resolve — semantically wrong-side facts, not
+/// a smaller version of the right ones.
+///
+/// `None` on the measure itself (rather than an all-`Unknown` `GroupFacts`
+/// always being present) so old frontends and the mirror read absence, not
+/// zeros, when a row's metric doesn't tally at all. Once a row DOES tally
+/// (any direct damage event landed in it), this block is always `Some` —
+/// including when every fact resolved to `Unknown`, because "N hits, no
+/// provenance" is itself real information the frontend renders (Task 8's
+/// dash + explanation), not something to hide behind `None`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GroupFacts {
+    pub crit: FactTally,
+    pub weak_point: FactTally,
+    pub back_attack: FactTally,
+    pub debuffed: FactTally,
+    pub overdrive: FactTally,
+    #[serde(rename = "break")]
+    pub break_mode: FactTally,
+    /// Damage dealt while the target sat in Overdrive / Break — measured OR
+    /// inferred yes both count (the split is a where-did-damage-go answer,
+    /// not a provenance exhibit; the tallies above carry provenance).
+    pub overdrive_damage: i64,
+    pub break_damage: i64,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GroupMeasure {
@@ -184,6 +246,13 @@ pub struct GroupMeasure {
     pub hits: u32,
     pub min: Option<i64>,
     pub max: Option<i64>,
+    /// Fact tallies for this row — `Damage`-metric rows only, direct hits
+    /// only (an echo's instance belongs to the hit that triggered it; see
+    /// the wiring comment in `aggregate_groups`). Boxed: `GroupAggregate` is
+    /// cloned per row for the top-N `Other` rollup, and this block is cold
+    /// data most callers never read.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub facts: Option<Box<GroupFacts>>,
 }
 
 /// One row's totals under the LANDING model, where an echo is part of the hit
@@ -267,9 +336,12 @@ pub struct GroupReference {
 ///
 /// It reads only `amount`, so the [`MergedMeasure`] the inner call folds is paid
 /// for and thrown away — a second [`SuppPairing`] over the whole log on every
-/// scrub. Left alone deliberately: the fixes are a tenth parameter on an already
-/// nine-argument function or a restructuring of this path, and that call wants a
-/// measurement rather than a guess. Start here if profiling points at scrubbing.
+/// scrub, and (for a friendly damage query) a second [`damage_facts::assemble_hit_facts`]
+/// (including its crit-cluster sorts) plus the full [`GroupFacts`] tally it
+/// feeds, discarded the same way. Left alone deliberately: the fixes are a
+/// tenth parameter on an already nine-argument function or a restructuring of
+/// this path, and that call wants a measurement rather than a guess. Start
+/// here if profiling points at scrubbing.
 pub fn aggregate_group_reference(
     events: &[(i64, Message)],
     player_data: &[Option<PlayerData>; 4],
@@ -621,6 +693,19 @@ pub fn aggregate_groups(
     // The echo/trigger links, learned from the WHOLE log so a scrub window
     // cannot change which hit an echo belongs to.
     let pairing = SuppPairing::learned_from(events);
+    // Assembled ONCE per query, aligned by POSITION with `events` — never
+    // rebuilt inside the walk below. See `damage_facts`'s module doc for the
+    // measured/inferred resolution order this indexes into. A full-log walk
+    // plus crit-cluster sorts, so it's gated to the one metric that ever
+    // reads it below (`GroupMetric::Damage`) — stun/SBA/taken queries get an
+    // empty `Vec` instead of paying for an index they never touch; the tally
+    // site's `.get(position)` treats a missing entry exactly like a
+    // not-yet-measured one, so an empty vec is safe, not just cheap.
+    let facts_index = if query.metric == GroupMetric::Damage {
+        damage_facts::assemble_hit_facts(events)
+    } else {
+        Vec::new()
+    };
     let mut walked: Vec<Walked> = Vec::new();
     let mut aggregates: Vec<GroupAggregate> = Vec::new();
     // One `BreakdownKeying` per (remapped) source index, fed that source's
@@ -818,6 +903,7 @@ pub fn aggregate_groups(
                 aggregates.len() - 1
             }
         };
+        let is_echo = matches!(damage_event.action_id, ActionType::SupplementaryDamage(_));
         let entry = &mut aggregates[aggregate_index];
 
         entry.measure.amount += damage;
@@ -826,11 +912,43 @@ pub fn aggregate_groups(
         entry.measure.max = Some(entry.measure.max.map_or(damage, |max| max.max(damage)));
         entry.series[bucket] += damage;
 
+        // Fact tallies: the FRIENDLY-side dealt-stream damage row only —
+        // `query.metric == GroupMetric::Damage` narrows the metric,
+        // `dealt_stream` (this function's own stream discriminator, set
+        // above from `(query.metric, query.hostility)`) narrows out
+        // `(Damage, Enemy)`, which walks the TAKEN stream and would tally
+        // wrong-side facts (see `GroupFacts`'s doc comment) — and direct
+        // hits only. An echo's instance belongs to the hit that triggered
+        // it — tallying it too would double-count the trigger's own facts,
+        // and letting its damage into the OD/Break sums below would
+        // double-count there too (the split covers direct hits, matching
+        // the provenance tallies it sits beside). `facts_index` is `None`
+        // at a position that wasn't a `DamageEvent` at all; every survivor
+        // of the gates above IS one, so this is defensive completeness, not
+        // a real gap.
+        if query.metric == GroupMetric::Damage && dealt_stream && !is_echo {
+            if let Some(hit_facts) = facts_index.get(position).copied().flatten() {
+                let facts = entry.measure.facts.get_or_insert_with(Default::default);
+                facts.crit.add(hit_facts.crit);
+                facts.weak_point.add(hit_facts.weak_point);
+                facts.back_attack.add(hit_facts.back_attack);
+                facts.debuffed.add(hit_facts.debuffed);
+                facts.overdrive.add(hit_facts.overdrive);
+                facts.break_mode.add(hit_facts.break_mode);
+                if matches!(hit_facts.overdrive, Fact::MeasuredYes | Fact::InferredYes) {
+                    facts.overdrive_damage += damage;
+                }
+                if matches!(hit_facts.break_mode, Fact::MeasuredYes | Fact::InferredYes) {
+                    facts.break_damage += damage;
+                }
+            }
+        }
+
         walked.push(Walked {
             position,
             aggregate_index,
             damage,
-            is_echo: matches!(damage_event.action_id, ActionType::SupplementaryDamage(_)),
+            is_echo,
         });
     }
 
@@ -850,6 +968,14 @@ pub fn aggregate_groups(
     // the table (unsliced) reports.
     if let Some(top_n) = query.top_n {
         if aggregates.len() > top_n {
+            // `other_measure.facts` stays `None` — this round the `Other`
+            // rollup sums the tail's damage only, never its fact tallies.
+            // Summing five-way tallies across rows the frontend never
+            // resolves to one key is a different aggregation than the
+            // per-row one `GroupFacts` documents (its rates are meant to
+            // describe ONE ability/target/player, not a mixed tail), so
+            // folding it in here would be answering a question nobody asked
+            // rather than a straightforward extension of the pattern below.
             let mut other_measure = GroupMeasure::default();
             // The landing view rolls up by the same rule: a table reading the
             // merged view still shows this row for the tail, and leaving it at
@@ -965,6 +1091,7 @@ mod tests {
                 hits: 2,
                 min: None,
                 max: None,
+                facts: None,
             },
             merged: MergedMeasure {
                 amount: 10,
@@ -1131,6 +1258,9 @@ mod tests {
             source_current_hp: None,
             source_max_hp: None,
             source_statuses: None,
+            instance_snapshot: None,
+            source_snapshot: None,
+            record_snapshot: None,
         }
     }
 
@@ -1180,6 +1310,9 @@ mod tests {
             source_current_hp: None,
             source_max_hp: None,
             source_statuses: None,
+            instance_snapshot: None,
+            source_snapshot: None,
+            record_snapshot: None,
         }
     }
 
@@ -1330,6 +1463,259 @@ mod tests {
         assert_eq!(aggregates[1].series, vec![0, 500, 0]);
 
         assert_invariants(&aggregates, 1_800);
+    }
+
+    /// Builds a well-formed `SNAPSHOT_LEN` instance snapshot with the given
+    /// `(game offset, bytes)` entries set, everything else zero — the same
+    /// shape `damage_facts`'s own tests build, replicated here since that
+    /// helper is private to that module.
+    fn snapshot_blob(entries: &[(usize, &[u8])]) -> Vec<u8> {
+        let mut blob = vec![0u8; damage_facts::SNAPSHOT_LEN];
+        for (game_offset, bytes) in entries {
+            let at = game_offset - damage_facts::SNAPSHOT_BASE;
+            blob[at..at + bytes.len()].copy_from_slice(bytes);
+        }
+        blob
+    }
+
+    /// [`player_hit`] with an instance snapshot attached.
+    fn player_hit_with_snapshot(
+        player_index: u32,
+        target_index: u32,
+        action: u32,
+        damage: i32,
+        snapshot: Vec<u8>,
+    ) -> DamageEvent {
+        DamageEvent {
+            instance_snapshot: Some(snapshot),
+            ..player_hit(player_index, target_index, action, damage)
+        }
+    }
+
+    /// Fact tallies ride the damage measure per GROUP: a populated-snapshot
+    /// crit hit lands in measured_yes, an unpopulated one in unknown, and the
+    /// mode-event join fills inferred counts and the damage splits.
+    #[test]
+    fn group_measures_carry_fact_tallies() {
+        // Player A: two hits with POPULATED snapshots onto an enemy neither
+        // seen in a mode event — the measured path never consults mode, so
+        // this is deliberately unambiguous: A's overdrive gate is measured
+        // clear on both hits, never Unknown, never inferred.
+        let a_crit = snapshot_blob(&[
+            (0x15D, &[1]),                      // crit: measured yes
+            (0x162, &[0]),                      // overdrive: measured no
+            (0x2D4, &1_000.0f32.to_le_bytes()), // builder ran (precap stamped)
+        ]);
+        let a_no_crit = snapshot_blob(&[
+            (0x15D, &[0]),
+            (0x162, &[0]),
+            (0x2D4, &1_000.0f32.to_le_bytes()),
+        ]);
+        // Player B: two hits with UNPOPULATED (all-zero) snapshots — falls
+        // back to inference — onto an enemy a prior `EnemyMode` put in
+        // Overdrive.
+        let unpopulated = || vec![0u8; damage_facts::SNAPSHOT_LEN];
+
+        let events = vec![
+            (
+                900,
+                Message::EnemyMode(protocol::EnemyModeEvent {
+                    actor_index: 30,
+                    mode: protocol::EnemyModeEvent::MODE_OVERDRIVE,
+                }),
+            ),
+            (
+                1_000,
+                Message::DamageEvent(player_hit_with_snapshot(0, 20, 100, 500, a_crit)),
+            ),
+            (
+                1_100,
+                Message::DamageEvent(player_hit_with_snapshot(0, 20, 100, 600, a_no_crit)),
+            ),
+            (
+                1_200,
+                Message::DamageEvent(player_hit_with_snapshot(1, 30, 200, 400, unpopulated())),
+            ),
+            (
+                1_300,
+                Message::DamageEvent(player_hit_with_snapshot(1, 30, 200, 600, unpopulated())),
+            ),
+        ];
+        let query = friendly_damage_query(Dimension::Source);
+
+        let aggregates = aggregate_groups(
+            &events,
+            &Default::default(),
+            &[],
+            &[],
+            &query,
+            1_000,
+            1_000,
+            1,
+            MeterFilters::default(),
+        )
+        .expect("friendly damage grouped by source is supported");
+
+        let a = aggregates
+            .iter()
+            .find(|aggregate| aggregate.key == GroupKey::Player { index: 0 })
+            .expect("player A has a row");
+        let a_facts = a.measure.facts.as_deref().expect("A tallied facts");
+        assert_eq!(
+            a_facts.crit,
+            FactTally {
+                measured_yes: 1,
+                measured_no: 1,
+                ..Default::default()
+            }
+        );
+        assert_eq!(a_facts.overdrive_damage, 0, "A's target was never in OD");
+
+        let b = aggregates
+            .iter()
+            .find(|aggregate| aggregate.key == GroupKey::Player { index: 1 })
+            .expect("player B has a row");
+        let b_facts = b.measure.facts.as_deref().expect("B tallied facts");
+        assert_eq!(
+            b_facts.overdrive,
+            FactTally {
+                inferred_yes: 2,
+                ..Default::default()
+            }
+        );
+        assert_eq!(
+            b_facts.overdrive_damage, 1_000,
+            "both of B's hits landed while the target was inferred Overdrive"
+        );
+    }
+
+    /// `(Damage, Enemy)` walks the TAKEN stream (enemy→player hits) — see
+    /// `GroupFacts`'s doc comment for why those facts would describe the
+    /// wrong side. Rows from this combination must carry `facts: None`, the
+    /// same "no data" the frontend already renders for a taken row.
+    #[test]
+    fn enemy_hostility_damage_rows_never_tally_facts() {
+        let events = vec![(
+            1_000,
+            Message::DamageEvent(enemy_hit(0xDEAD_BEEF, 0, 100, 500)),
+        )];
+        let query = damage_enemy_query(Dimension::Source);
+
+        let aggregates = aggregate_groups(
+            &events,
+            &Default::default(),
+            &[],
+            &[],
+            &query,
+            1_000,
+            1_000,
+            1,
+            MeterFilters::default(),
+        )
+        .expect("damage grouped by enemy source is supported");
+
+        assert_eq!(aggregates.len(), 1);
+        assert!(
+            aggregates[0].measure.facts.is_none(),
+            "the taken stream must never tally facts, even under a Damage-metric query"
+        );
+    }
+
+    /// `(Taken, Enemy)` also walks the DEALT stream (see `aggregate_groups`'s
+    /// own table: it is `dealt_stream` true too, just with `source_is_player`
+    /// flipped) — so the gate's `dealt_stream` check alone would let it
+    /// through. Only the `query.metric == GroupMetric::Damage` half of the
+    /// gate excludes it; this pins that half.
+    #[test]
+    fn taken_enemy_dimension_rows_never_tally_facts() {
+        let events = vec![(1_000, Message::DamageEvent(player_hit(0, 9, 100, 500)))];
+        let query = taken_enemy_query(Dimension::Ability);
+
+        let aggregates = aggregate_groups(
+            &events,
+            &Default::default(),
+            &[],
+            &[],
+            &query,
+            1_000,
+            1_000,
+            1,
+            MeterFilters::default(),
+        )
+        .expect("taken+enemy grouped by ability is supported");
+
+        assert_eq!(aggregates.len(), 1);
+        assert!(
+            aggregates[0].measure.facts.is_none(),
+            "(Taken, Enemy) walks the dealt stream but must still never tally facts"
+        );
+    }
+
+    /// The must-fix regression: an echo must tally NOTHING, even when its own
+    /// facts would resolve non-`Unknown`. Both the trigger and its echo land
+    /// on a target inferred Overdrive (a mode event, so no snapshot-building
+    /// needed), so if `!is_echo` were ever dropped from the gate the echo's
+    /// `InferredYes` would double the overdrive count and add its own damage
+    /// to `overdrive_damage` — this pins both halves of that double-count.
+    #[test]
+    fn an_echo_tallies_nothing_even_though_its_own_facts_resolve() {
+        let events = vec![
+            (
+                0,
+                Message::EnemyMode(protocol::EnemyModeEvent {
+                    actor_index: 9,
+                    mode: protocol::EnemyModeEvent::MODE_OVERDRIVE,
+                }),
+            ),
+            // Trigger: a Normal hit under action 9001.
+            (100, Message::DamageEvent(player_hit(0, 9, 9001, 1_000))),
+            // Its echo — same source/target/action id, well inside the
+            // pairing window — `SuppPairing` claims it (mirrors the existing
+            // `a_claimed_echo_whose_trigger_the_window_excluded_lands_on_its_own`
+            // fixture's shape).
+            (150, Message::DamageEvent(player_echo(0, 9, 9001, 600))),
+        ];
+        assert_eq!(
+            SuppPairing::learned_from(&events).trigger_of(2),
+            Some(1),
+            "the echo must really be claimed for this test to pin the right gate"
+        );
+        let query = friendly_damage_query(Dimension::Source);
+
+        let aggregates = aggregate_groups(
+            &events,
+            &Default::default(),
+            &[],
+            &[],
+            &query,
+            0,
+            1_000,
+            1,
+            MeterFilters::default(),
+        )
+        .expect("friendly damage grouped by source is supported");
+
+        let row = aggregates
+            .iter()
+            .find(|aggregate| aggregate.key == GroupKey::Player { index: 0 })
+            .expect("the player has a row");
+        let facts = row
+            .measure
+            .facts
+            .as_deref()
+            .expect("the trigger tallied facts");
+        assert_eq!(
+            facts.overdrive,
+            FactTally {
+                inferred_yes: 1,
+                ..Default::default()
+            },
+            "only the trigger's Overdrive fact counts — the echo's must not"
+        );
+        assert_eq!(
+            facts.overdrive_damage, 1_000,
+            "the OD damage split must be the trigger's damage alone, not trigger + echo"
+        );
     }
 
     #[test]
@@ -1589,6 +1975,9 @@ mod tests {
             source_current_hp: None,
             source_max_hp: None,
             source_statuses: None,
+            instance_snapshot: None,
+            source_snapshot: None,
+            record_snapshot: None,
         };
 
         // Self-parented Pl2000, matching `dragon_form_damage_attributes_to_the_id_player`.

@@ -124,7 +124,9 @@ const label = (text: string): string => text.padEnd(LABEL);
 /** A query as it prints: an empty one is named, never left as a bare label. */
 const queryText = (query: string): string => (query === "" ? "(none)" : query);
 
-const stamp = (atMs: number): string => `+${(atMs / 1000).toFixed(1)}s`;
+/** A step's offset from the session start. Shared with the panel so the trail
+ * on screen and the pasted report stamp one action identically. */
+export const actionStamp = (atMs: number): string => `+${(atMs / 1000).toFixed(1)}s`;
 
 /** What one step SAYS: the landing summary, or a row per field that moved.
  *
@@ -147,7 +149,7 @@ const rowsOf = (entry: ActionEntry): ReportLine[] => [
  * hang under it at the head's own width so a multi-delta action reads as one
  * block rather than as several actions sharing a timestamp. */
 const formatEntry = (entry: ActionEntry): string => {
-  const head = `${String(entry.seq).padStart(3)} ${stamp(entry.atMs)} `.padEnd(10);
+  const head = `${String(entry.seq).padStart(3)} ${actionStamp(entry.atMs)} `.padEnd(10);
   const indent = " ".repeat(head.length);
   return rowsOf(entry)
     .map((row, index) => `${index === 0 ? head : indent}${label(row.label)}${row.value}`)

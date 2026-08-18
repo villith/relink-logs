@@ -1,3 +1,4 @@
+import { useLogLibraryStore } from "@/stores/useLogLibraryStore";
 import { useMeterFilterSync } from "@/stores/useMeterFilterSync";
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import { NavTabKey, tabKeyForPath, targetFor, useNavMemoryStore } from "@/stores/useNavMemoryStore";
@@ -108,6 +109,10 @@ const Layout = () => {
     });
 
     const saveListener = listen("encounter-saved", (event: { payload: number | null }) => {
+      // The window-level listener, so a run recorded while the analysis view
+      // is closed still reaches the picker's library: this window lives in the
+      // tray for the whole session, and the library is fetched once.
+      useLogLibraryStore.getState().invalidate();
       // Never yank the user out of the toolbox mid-task.
       if (event.payload && open_log_on_save && !deriveNavState(pathnameRef.current).toolboxActive) {
         navigate(`/logs/${event.payload}`);

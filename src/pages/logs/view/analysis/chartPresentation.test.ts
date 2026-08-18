@@ -15,9 +15,6 @@ const base = {
   groupsPath: true,
   groupBy: "source" as const,
   hostility: "friendly" as const,
-  metricKey: "damage" as const,
-  level: "players" as const,
-  metricLabelKey: "ui.logs.chart-dps-label",
   metricFormat: "amount" as const,
   rateSmoothing: 10,
 };
@@ -40,7 +37,7 @@ describe("chartPresentation — chartSource", () => {
     // here. They no longer do: with nothing pinned the tab keeps the metric's
     // own damage plot as the context for reading the table beneath it, and
     // only a pinned effect switches the chart to stack depths.
-    expect(chartPresentation({ ...base, groupsPath: false, metricKey: "buffs" }).chartSource).toBe("base");
+    expect(chartPresentation({ ...base, groupsPath: false }).chartSource).toBe("base");
   });
 
   it("reads 'drill' for the fetched aggregates' bands", () => {
@@ -115,72 +112,6 @@ describe("chartPresentation — withTotal", () => {
   });
 });
 
-describe("chartPresentation — labelKey", () => {
-  it("titles the base chart after the metric itself", () => {
-    expect(chartPresentation({ ...base, metricLabelKey: "ui.logs.chart-sba-label" }).labelKey).toBe(
-      "ui.logs.chart-sba-label"
-    );
-  });
-
-  it("keeps the metric's title over the groups path's per-player lines", () => {
-    expect(chartPresentation({ ...base, groupPlayerSeries: { 0: [1, 2] } }).labelKey).toBe("ui.logs.chart-dps-label");
-  });
-
-  it("names the pinned effect's plot as stack depths", () => {
-    expect(chartPresentation({ ...base, statusSeries: series("player:0") }).labelKey).toBe(
-      "ui.logs.chart-stacks-label"
-    );
-  });
-
-  it("titles an unpinned aura tab after its own base chart", () => {
-    // Nothing overlays it, so the heading is the metric's — which on the aura
-    // tabs is the damage plot they now use as context.
-    expect(
-      chartPresentation({ ...base, groupsPath: false, metricKey: "buffs", metricLabelKey: "ui.logs.chart-dps-label" })
-        .labelKey
-    ).toBe("ui.logs.chart-dps-label");
-  });
-
-  it("names a friendly drill after the level it decomposed to", () => {
-    const bands = series("skill:1");
-    expect(chartPresentation({ ...base, groupOverlay: bands, level: "players" }).labelKey).toBe(
-      "ui.logs.chart-dps-label"
-    );
-    expect(chartPresentation({ ...base, groupOverlay: bands, level: "abilities" }).labelKey).toBe(
-      "ui.logs.chart-drill-ability-label"
-    );
-    expect(chartPresentation({ ...base, groupOverlay: bands, level: "skills" }).labelKey).toBe(
-      "ui.logs.chart-drill-target-label"
-    );
-  });
-
-  it("names a taken drill after the incoming damage, whatever the level", () => {
-    expect(
-      chartPresentation({ ...base, groupOverlay: series("taken:1"), metricKey: "taken", level: "skills" }).labelKey
-    ).toBe("ui.logs.chart-taken-drill-label");
-  });
-
-  it("names both ends on the enemy side, per metric", () => {
-    // The toggle swaps the plotted quantity for its opposite, so reusing the
-    // friendly titles would leave the heading unchanged across it.
-    const bands = series("enemy:1");
-    expect(chartPresentation({ ...base, groupOverlay: bands, hostility: "enemy", metricKey: "damage" }).labelKey).toBe(
-      "ui.logs.chart-enemy-dealt-label"
-    );
-    expect(chartPresentation({ ...base, groupOverlay: bands, hostility: "enemy", metricKey: "taken" }).labelKey).toBe(
-      "ui.logs.chart-enemy-received-label"
-    );
-  });
-
-  it("titles the stacks after the plot even on the enemy side", () => {
-    // `chartSource === "stacks"` is checked first: the enemy-side aura tabs
-    // still draw stack depths, not a damage flow.
-    expect(chartPresentation({ ...base, statusSeries: series("actor:1"), hostility: "enemy" }).labelKey).toBe(
-      "ui.logs.chart-stacks-label"
-    );
-  });
-});
-
 describe("chartPresentation — format and stacked", () => {
   it("keeps the metric's own format for the base chart", () => {
     expect(chartPresentation({ ...base, metricFormat: "percent" }).format).toBe("percent");
@@ -219,18 +150,10 @@ describe("chartPresentation — the ability drill", () => {
   it("switches a drilled SBA chart from the gauge level to an amount", () => {
     // Undrilled the SBA chart plots a LEVEL (percent), which cannot be
     // decomposed by contributor; drilled it plots generation, which is a rate.
-    const sba = { ...base, metricKey: "sba" as const, metricFormat: "percent" as const };
+    const sba = { ...base, metricFormat: "percent" as const };
 
     expect(chartPresentation(sba).format).toBe("percent");
     expect(chartPresentation({ ...sba, abilitySeries: series("skill:1") }).format).toBe("amount");
-  });
-
-  it("titles the drill after the metric it decomposes", () => {
-    const stun = { ...base, metricKey: "stun" as const, abilitySeries: series("skill:1") };
-    const sba = { ...base, metricKey: "sba" as const, abilitySeries: series("skill:1") };
-
-    expect(chartPresentation(stun).labelKey).toBe("ui.logs.chart-stun-drill-label");
-    expect(chartPresentation(sba).labelKey).toBe("ui.logs.chart-sba-drill-label");
   });
 
   it("never draws a Total beside the stack", () => {

@@ -5,8 +5,9 @@ import { statusIconUrl } from "@/statusIcon";
 import type { ChartWindow, StatusInterval } from "@/types";
 import { millisecondsToElapsedFormat } from "@/utils";
 
+import { groupBy } from "../../groupBy";
 import type { Hostility } from "../../metrics/types";
-import { clipToWindow, uptimeMs } from "../../statusUptime";
+import { clipToWindow, statusPinKey, uptimeMs } from "../../statusUptime";
 import type { AuraChip } from "../AuraStrip";
 import { auraHolderFor, auraHolderIntervals, heldBy } from "../auraWindows";
 import { WINDOW_LABEL_KEY } from "../chartWindowBands";
@@ -15,8 +16,6 @@ import { auraAnchorOf, auraPinKey, type AnalysisState } from "../machine/state";
 import { statusIdOfKey } from "../statusLabel";
 import { windowChips, type WindowChipGroup } from "../windowChips";
 import { wireWindowsFrom, type WireWindow } from "../wireWindows";
-
-import { groupByPinKey } from "./useStatusNaming";
 
 /** The aura filter and the battle-window filter, combined into the ONE mask
  * every consumer reads — the group query, the derived reparse, the uptime
@@ -239,24 +238,41 @@ export const useFilterChips = ({
       if (index === null) return [];
       const holder = auraHolderFor(dim, hostility, index);
       const held = windowedIntervals.filter((interval) => heldBy(interval, holder));
-      // The same one-pass grouping the row labels use (see `groupByPinKey`),
-      // over this holder's windowed subset rather than the whole fight.
-      return [...groupByPinKey(held).entries()]
-        .map(([key, group]) => {
-          // The same art the effects table shows beside the same name — the
-          // chip is that row's filter form, so the two must wear one picture.
-          const statusId = statusIdOfKey(key);
-          const iconUrl = statusId === null ? undefined : statusIconUrl(statusId);
-          return {
-            aura: `${anchor}:${key}`,
-            label: statusDisplayLabel(key),
-            uptimePercent:
-              fightDurationMs === 0 ? 0 : Math.min(100, Math.round((uptimeMs(group) / fightDurationMs) * 100)),
-            selected: state.aura.includes(`${anchor}:${key}`),
-            ...(iconUrl === undefined ? {} : { iconUrl }),
-          };
-        })
+      // The same art the effects table shows beside the same name — the chip is
+      // that row's filter form, so the two must wear one picture.
+      const chipFor = (key: string, uptimePercent: number): AuraChip => {
+        const statusId = statusIdOfKey(key);
+        const iconUrl = statusId === null ? undefined : statusIconUrl(statusId);
+        return {
+          aura: `${anchor}:${key}`,
+          label: statusDisplayLabel(key),
+          uptimePercent,
+          selected: state.aura.includes(`${anchor}:${key}`),
+          ...(iconUrl === undefined ? {} : { iconUrl }),
+        };
+      };
+      // The same one-pass grouping the row labels use, over this holder's
+      // windowed subset rather than the whole fight.
+      const chips = [...groupBy(held, statusPinKey).entries()]
+        .map(([key, group]) =>
+          chipFor(key, fightDurationMs === 0 ? 0 : Math.min(100, Math.round((uptimeMs(group) / fightDurationMs) * 100)))
+        )
         .sort((a, b) => b.uptimePercent - a.uptimePercent);
+
+      // A SELECTED aura this holder shows nothing for still gets a chip, at 0%.
+      // The filter is live either way — an effect the pinned actor never held
+      // masks the fight to nothing — and without the chip the pane empties with
+      // nothing on screen saying why, and nothing to click to undo it. Reachable
+      // two ways: a scrub into a stretch the effect was down, and a comparison
+      // whose panes pick their sources independently while sharing one filter.
+      // Appended, not sorted in: 0% belongs at the end of a largest-first row.
+      const shown = new Set(chips.map((chip) => chip.aura));
+      return [
+        ...chips,
+        ...state.aura
+          .filter((aura) => auraAnchorOf(aura) === dim && !shown.has(aura))
+          .map((aura) => chipFor(auraPinKey(aura), 0)),
+      ];
     },
     [state.source, state.target, state.aura, hostility, windowedIntervals, statusDisplayLabel, fightDurationMs]
   );

@@ -1,18 +1,29 @@
 import characterIdHashes from "@/assets/character-id-hashes.json";
 import type { CharacterType } from "@/types";
 
-import { selectCapUp, type PlayerCapUp } from "./capBreakdown";
+import { PREDICTED_CAP_DENYLIST, selectCapUp, type CapSource, type PlayerCapUp } from "./capBreakdown";
 import {
   DMG_CAP_TRAIT,
   collectCapFactors,
+  deriveChannelBreakdown,
   evaluateCapFactors,
   type CapConditions,
   type CapFactor,
   type CapFactorReason,
   type CapFactorResult,
 } from "./capFactors";
-import { capConsistent, gameLadderTrace, ladderCurveFor, type LadderRow } from "./capLadder";
-import { capClassOf, dmgCapTraitValue, type CapClass, type CapExclusion, type CapLoadout } from "./capSources";
+import { capBucketOf, classifyOffGrid, type CapBucket, type GridKStates } from "./capGridStates";
+import { capConsistent, gameLadderTrace, isSummonClass, ladderCurveFor, type LadderRow } from "./capLadder";
+import {
+  capClassOf,
+  deriveConditionalSources,
+  deriveRecordComponents,
+  dmgCapTraitValue,
+  type CapClass,
+  type CapExclusion,
+  type CapLoadout,
+} from "./capSources";
+import { round } from "./round";
 
 /**
  * The damage-cap derivation with its working shown — every input, every
@@ -62,7 +73,7 @@ export type ExplainName =
 
 /** Why a line contributed nothing. The factor registry's own reasons, plus the
  * two placements only this projection knows about. */
-export type ExplainReason = CapExclusion | CapFactorReason | "needs-params";
+export type ExplainReason = CapExclusion | CapFactorReason | "needs-params" | "gate-unrecorded";
 
 export type ExplainLine = {
   key: string;
@@ -78,6 +89,11 @@ export type ExplainLine = {
   excluded?: ExplainReason;
   /** A term that is a total rather than an addend. */
   emphasis?: "total";
+  /** The verdict was DERIVED — a window/state reconstruction — rather than
+   * read off this hit's own recorded snapshot. Weaker provenance than a
+   * measured line, even when it is not `excluded`: it says what the game
+   * probably did, not what the hit itself proved. */
+  inferred?: true;
 };
 
 export type ExplainSection = {
@@ -105,6 +121,17 @@ export type ExplainHit = {
   attack_rate: number | null;
   class_flags: number | null;
   flags: number;
+  /** Raw DamageInstance window `0xC0..0x340`, as `DamageEvent.instance_snapshot`
+   * carries it — `null` on old logs and on hits the hook could not capture.
+   * Read by `damageExplain.ts` via `damageSnapshot.ts`'s `parseInstSnapshot`;
+   * `capExplain.ts` itself does not interpret it. */
+  instance_snapshot: number[] | null;
+  /** Raw player-record window `record+0x18..0x28`, as
+   * `DamageEvent.record_snapshot` carries it — `null` on old logs, non-player
+   * attackers, and hits the hook could not resolve the record pointer for.
+   * Read by `damageExplain.ts` via `recordSnapshot.ts`'s `parseRecordSnapshot`;
+   * `capExplain.ts` itself does not interpret it. */
+  record_snapshot: number[] | null;
 };
 
 export type ExplainInput = {
@@ -118,6 +145,15 @@ export type ExplainInput = {
   /** What the caller knows about the moment the hit landed. Absent fields leave
    * the factors that need them unresolved rather than assumed. */
   conditions?: CapConditions;
+  /** The acting player's observed on-grid K sets per attack-class bucket
+   * (`capGridStates`), which name a failed grid check that is really the
+   * game's own ease. Absent, a failed check stays a bare ✗. */
+  gridStates?: ReadonlyMap<CapBucket, GridKStates>;
+  /** Whether this hit's KIND would locally have carried cap fields
+   * (`capPredictableKey` on the row's ability key) — the gate that lets a
+   * capless hit derive a PREDICTED cap instead of stopping at "no cap".
+   * Caller-supplied because the explainer never sees the ability key. */
+  predictable?: boolean;
 };
 
 /** `"Pl0300"` -> `"079df0cc"`. The ladder maps are keyed by the hash, and the
@@ -131,11 +167,6 @@ const HASH_BY_CHARACTER: Map<string, string> = new Map(
  * constant, which is private to it; kept here only to NAME the key in the
  * panel, never to look one up. */
 const SUMMON_CURVE_KEY = "58f4dbd4";
-
-const round = (value: number, places: number): number => {
-  const scale = 10 ** places;
-  return Math.round(value * scale) / scale;
-};
 
 const percent = (fraction: number): ExplainValue => ({ kind: "percent", value: round(fraction * 100, 2) });
 const count = (value: number): ExplainValue => ({ kind: "count", value });
@@ -420,7 +451,11 @@ const factorLine = (
 const capUpSection = (input: ExplainInput, base: number): ExplainSection => {
   const { hit, capUp, loadout, characterType, conditions = {} } = input;
   const cap = hit.damage_cap;
-  const capClass = capClassOf(hit.class_flags);
+  const summon = isSummonClass(hit.class_flags);
+  // A summon hit reads none of the acting player's own cap-up terms — `null`
+  // here is the same "no attributable class" fact every record/trait lookup
+  // below already treats as nothing to attribute (see capSources.ts).
+  const capClass = summon ? null : capClassOf(hit.class_flags);
 
   const blank = {
     key: "capup",
@@ -433,7 +468,10 @@ const capUpSection = (input: ExplainInput, base: number): ExplainSection => {
   if (base <= 0) return { ...blank, unavailableKey: "ui.debug.cap-no-base" };
 
   const gameTotal = cap / base - 1;
-  const record = selectCapUp(capUp, hit.class_flags);
+  // A summon actor carries no store, traits or channel of its own — never the
+  // owning player's own record, which is what `selectCapUp` would otherwise
+  // fall through to (it does not test the summon bit either).
+  const record = summon ? null : selectCapUp(capUp, hit.class_flags);
   const dmgCapTrait = dmgCapTraitValue(loadout, capClass);
 
   const lines: ExplainLine[] = [
@@ -451,6 +489,7 @@ const capUpSection = (input: ExplainInput, base: number): ExplainSection => {
   // game's own cap must be trunc(base x K/100) for some integer K. A cap
   // between grid points is one this base cannot have produced.
   const k = Math.round((100 * cap) / base);
+  const consistent = capConsistent(cap, base);
   lines.push(
     { key: "grid-k", name: literal("K = round(100 x cap / base)"), value: count(k), depth: 1 },
     {
@@ -462,11 +501,23 @@ const capUpSection = (input: ExplainInput, base: number): ExplainSection => {
     {
       key: "grid-verdict",
       name: key("ui.debug.cap-grid-check"),
-      value: verdict(capConsistent(cap, base)),
+      value: verdict(consistent),
       source: key("ui.debug.cap-grid-check-source"),
       depth: 1,
     }
   );
+  // A failed check judged against the actor's own observed grid states: a K
+  // strictly inside their bracket (or on the settling tail) is a state-gated
+  // term's EASE — the game's own arithmetic, not a formula violation. Hoisted
+  // out of the block below: the unaccounted line's own label reads it too.
+  let eased: "transition" | "settling" | null = null;
+  if (!consistent) {
+    const bucket = capBucketOf(hit.class_flags);
+    eased = classifyOffGrid((100 * cap) / base, bucket === null ? undefined : input.gridStates?.get(bucket));
+    if (eased !== null) {
+      lines.push({ key: "grid-transition", name: key("ui.debug.cap-grid-transition"), value: text(eased), depth: 1 });
+    }
+  }
 
   let attributed = 0;
   lines.push({
@@ -478,7 +529,11 @@ const capUpSection = (input: ExplainInput, base: number): ExplainSection => {
   });
   if (record !== null) attributed += record;
 
-  const rows = evaluateCapFactors(collectCapFactors({ loadout, capClass }), conditions);
+  // Bypassed entirely for a summon hit rather than fed `capClass: null`: the
+  // account family (master rank) is not itself class-gated, so it would still
+  // report the owning player's own bonus as active against a hit it never
+  // touches.
+  const rows = evaluateCapFactors(summon ? [] : collectCapFactors({ loadout, capClass }), conditions);
 
   // Everything the game fused into the record at load: the other cap traits,
   // the overmastery rolls, the summon bonuses, and the record-side board nodes
@@ -544,9 +599,13 @@ const capUpSection = (input: ExplainInput, base: number): ExplainSection => {
     lines.push(factorLine(factor, result, characterType, 1));
   }
 
+  // On an eased hit the remainder IS the ease — same relabel capBreakdown.ts's
+  // capUpRows applies to the production hover card, so the debug panel does
+  // not show a bare "Unaccounted" row right under a line that just named the
+  // same gap as a state transition.
   lines.push({
     key: "unaccounted",
-    name: key("ui.debug.cap-unaccounted"),
+    name: key(eased !== null ? "ui.debug.cap-easing-gap" : "ui.debug.cap-unaccounted"),
     value: percent(gameTotal - attributed),
     source: literal("game - attributed"),
     emphasis: "total",
@@ -568,6 +627,134 @@ const capUpSection = (input: ExplainInput, base: number): ExplainSection => {
   return {
     ...blank,
     substituted: `${cap} / ${base} - 1`,
+    unavailableKey: null,
+    lines,
+  };
+};
+
+/** A `CapSource` (a derived cap-up contributor) as a panel line. The sources
+ * carry fractions; the row renders the percent, named by trait id where the
+ * source has one and by its label key otherwise. */
+const capSourceLine = (source: CapSource, depth: number, excluded?: ExplainReason): ExplainLine => ({
+  key: `pred-${source.key}`,
+  name: source.traitId !== undefined ? { kind: "trait", id: source.traitId } : key(source.labelKey),
+  value: percent(source.value),
+  depth,
+  ...(excluded === undefined ? {} : { excluded }),
+});
+
+/**
+ * The PREDICTED cap for a hit that carries none — a remote player's hit.
+ *
+ * The card's own gates and arithmetic (`AmountCell` / `predictedCapRows`), so
+ * this page can never predict a number the events-view card would not:
+ * `trunc(base × (1 + record + DMG Cap trait + active channel))`, bare base on
+ * the summon path, nothing at all for a denylisted character or a missing
+ * term. The base comes from the same ladder walk the base section above
+ * already narrated.
+ */
+const predictedSection = (input: ExplainInput, base: number): ExplainSection => {
+  const { hit, capUp, loadout, characterType, conditions = {} } = input;
+  const capClass = capClassOf(hit.class_flags);
+  const summon = isSummonClass(hit.class_flags);
+
+  const blank = {
+    key: "predicted",
+    titleKey: "ui.debug.cap-section-predicted",
+    formula: "predicted = trunc( base x (1 + record + DMG Cap + channel) )",
+    substituted: null,
+    noteKey: "ui.debug.cap-pred-note",
+    lines: [] as ExplainLine[],
+  };
+  if (typeof characterType === "string" && PREDICTED_CAP_DENYLIST.has(characterType)) {
+    return { ...blank, unavailableKey: "ui.debug.cap-pred-denylist" };
+  }
+  if (base <= 0) return { ...blank, unavailableKey: "ui.debug.cap-no-base" };
+
+  // The summon path predicts the bare ladder base: the multiplier terms are
+  // the attacker's, and the summon actor has none — so none may render, not
+  // even as potentials. It reads neither the record nor the loadout, so it
+  // returns before either is checked below.
+  if (summon) {
+    return {
+      ...blank,
+      substituted: `trunc(${base}) — summon path, base alone`,
+      unavailableKey: null,
+      lines: [
+        {
+          key: "predicted",
+          name: key("ui.debug.cap-predicted"),
+          value: count(Math.trunc(base)),
+          source: key("ui.debug.cap-bit-summon"),
+          emphasis: "total",
+          inferred: true,
+        },
+      ],
+    };
+  }
+
+  const record = selectCapUp(capUp, hit.class_flags);
+  if (record === null) return { ...blank, unavailableKey: "ui.debug.cap-pred-no-record" };
+  if (loadout === undefined) return { ...blank, unavailableKey: "ui.debug.cap-no-loadout" };
+
+  const dmgCapTrait = dmgCapTraitValue(loadout, capClass);
+  const channel = deriveChannelBreakdown(loadout, capClass, conditions);
+  const total = 1 + record + dmgCapTrait + channel.active;
+  if (total <= 0) return { ...blank, unavailableKey: "ui.debug.cap-no-base" };
+
+  const lines: ExplainLine[] = [
+    {
+      key: "predicted",
+      name: key("ui.debug.cap-predicted"),
+      value: count(Math.trunc(base * total)),
+      source: literal(`trunc(${base} x ${round(total, 4)})`),
+      emphasis: "total",
+      inferred: true,
+    },
+    {
+      key: "record",
+      name: key("ui.debug.cap-record"),
+      value: percent(record),
+      source: capClass === null ? key("ui.debug.cap-no-class") : literal(`capUp.${capClass}`),
+      depth: 1,
+    },
+    // The record's derived components, informational sub-rows exactly as the
+    // captured-cap section itemizes them — inside the record, never summed.
+    ...deriveRecordComponents(loadout, capClass).map((source) => capSourceLine(source, 2)),
+  ];
+  if (dmgCapTrait > 0) {
+    lines.push({
+      key: "dmgcap",
+      name: { kind: "trait", id: DMG_CAP_TRAIT },
+      value: percent(dmgCapTrait),
+      source: key("ui.debug.cap-dmg-cap-source"),
+      depth: 1,
+    });
+  }
+  if (channel.active > 0) {
+    lines.push({
+      key: "channel",
+      name: key("ui.debug.cap-pred-channel"),
+      value: percent(channel.active),
+      depth: 1,
+    });
+  }
+  // Conditional potentials and open channel terms: rendered, never summed —
+  // the prediction's honest uncertainty.
+  lines.push(...deriveConditionalSources(loadout, capClass).map((source) => capSourceLine(source, 1, "conditional")));
+  if (channel.unresolved > 0) {
+    lines.push({
+      key: "unresolved",
+      name: key("ui.debug.cap-unresolved"),
+      value: percent(channel.unresolved),
+      depth: 1,
+      excluded: "conditional",
+    });
+  }
+
+  return {
+    ...blank,
+    substituted: `trunc(${base} x (1 + ${round(record, 4)} + ${round(dmgCapTrait, 4)} + ${round(channel.active, 4)}))`,
     unavailableKey: null,
     lines,
   };
@@ -609,6 +796,9 @@ const clampSection = (hit: ExplainHit): ExplainSection => {
       source: literal("min(base_damage, damage_cap)"),
       emphasis: "total",
     },
+    // Strict > : a hit exactly at cap is NOT capped, matching the Rust
+    // authority (`cap_detection::is_capped`) and hitSection's own verdict in
+    // damageExplain.ts, so neither panel ever disagrees with the parser.
     { key: "capped", name: key("ui.debug.cap-was-capped"), value: verdict(base > cap), depth: 1 },
     {
       key: "overcap",
@@ -683,13 +873,17 @@ const postCapSection = (hit: ExplainHit): ExplainSection => {
   };
 };
 
-/** The whole derivation for one hit, in the order the game computes it. */
+/** The whole derivation for one hit, in the order the game computes it. A
+ * capless hit of a kind the cap builder locally always stamps — a remote
+ * player's — derives a PREDICTED cap in the captured section's place. */
 export const explainCapHit = (input: ExplainInput): ExplainSection[] => {
   const { base, section } = baseSection(input.hit, input.characterType);
+  const cap = input.hit.damage_cap;
+  const capless = cap === null || cap <= 0;
   return [
     classSection(input.hit),
     section,
-    capUpSection(input, base),
+    capless && input.predictable === true ? predictedSection(input, base) : capUpSection(input, base),
     clampSection(input.hit),
     postCapSection(input.hit),
   ];

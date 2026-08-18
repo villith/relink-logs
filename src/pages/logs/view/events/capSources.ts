@@ -1,8 +1,11 @@
-import capUpSources from "@/assets/cap-up-sources.json";
 import type { PlayerData } from "@/types";
-import { computeCombinedTraits, isEmptyId, summonBonusValue, toHashString } from "@/utils";
+import { computeCombinedTraits, isEmptyId, toHashString } from "@/utils";
 
 import type { CapSource } from "./capBreakdown";
+import { overmasteryFactors, summonFactors } from "./capFactors/equipment";
+import { SLOT, conditionalTraitTable, traitRow, traitRowValue, traitTable } from "./capFactors/tables";
+import { DMG_CAP_TRAIT } from "./capFactors/traits";
+import type { CapFactor, CapFactorReason } from "./capFactors/types";
 
 /** Which of the three per-class cap-ups a hit draws on. */
 export type CapClass = "normal" | "skill" | "sba";
@@ -34,36 +37,6 @@ export const capClassOf = (classFlags: number | null): CapClass | null => {
   if (classFlags & 0x10000) return "skill";
   return "normal";
 };
-
-const SLOT: Record<CapClass, number> = { normal: 0, skill: 1, sba: 2 };
-
-/** The plain DMG Cap trait. The one unconditional cap trait the game does NOT
- * fuse into the per-player record: the builder reads it through a second
- * lookup keyed by this very hash (`0xDC584F60`), so it attributes as its own
- * term. Confirmed 2026-08-09 by reconciling four players' oracle captures —
- * the multiplier content missing from the record equals this trait's table
- * value, and only this trait's. */
-const DMG_CAP_TRAIT = 0xdc584f60;
-
-const traits = capUpSources.traits as Record<string, number[][]>;
-const conditionalTraits = capUpSources.conditionalTraits as Record<string, number[][]>;
-const overmasteryClass = capUpSources.overmasteries as Record<string, CapClass>;
-const summonBonusClass = capUpSources.summonBonuses as Record<string, CapClass>;
-
-/** The whole three-class row a trait table holds at a combined level, or `null`
- * when the table has no row to offer.
- *
- * Levels past the trait's top row are wasted, not extrapolated — the game
- * stops scaling at its last row, which is what the Builds tab flags. */
-const traitRow = (table: Record<string, number[][]>, id: number, level: number): number[] | null => {
-  const levels = table[toHashString(id)];
-  if (levels === undefined) return null;
-  return levels[Math.min(level, levels.length) - 1] ?? null;
-};
-
-/** One class's percentage out of that row. */
-const traitRowValue = (table: Record<string, number[][]>, id: number, level: number, capClass: CapClass): number =>
-  traitRow(table, id, level)?.[SLOT[capClass]] ?? 0;
 
 /** Why a considered contributor added nothing to THIS hit's cap.
  *
@@ -121,12 +94,12 @@ export const enumerateTraits = (player: CapLoadout | undefined, capClass: CapCla
     // formula through its own second lookup, so counting it here would
     // double-attribute it against the record that does not contain it.
     if (trait.id === DMG_CAP_TRAIT) {
-      return { ...base, row: traitRow(traits, trait.id, trait.level), excluded: "dmg-cap-trait" };
+      return { ...base, row: traitRow(traitTable, trait.id, trait.level), excluded: "dmg-cap-trait" };
     }
-    const conditional = traitRow(conditionalTraits, trait.id, trait.level);
+    const conditional = traitRow(conditionalTraitTable, trait.id, trait.level);
     if (conditional !== null) return { ...base, row: conditional, excluded: "conditional" };
 
-    const row = traitRow(traits, trait.id, trait.level);
+    const row = traitRow(traitTable, trait.id, trait.level);
     if (row === null) return { ...base, row: null, excluded: "not-a-cap-source" };
     const percent = row[SLOT[capClass]];
     if (percent !== 0) return { ...base, row, percent, excluded: null };
@@ -136,43 +109,41 @@ export const enumerateTraits = (player: CapLoadout | undefined, capClass: CapCla
   });
 };
 
-/** Every overmastery roll the player carries, matched against this hit's class. */
-export const enumerateOvermasteries = (
-  player: CapLoadout | undefined,
-  capClass: CapClass | null
-): CapContribution[] => {
-  if (player === undefined || capClass === null) return [];
-  return (player.overmasteryInfo?.overmasteries ?? []).map((entry, index): CapContribution => {
-    // Indexed as well as hashed: a player can roll the same overmastery twice,
-    // and two rows sharing a key would collide in the rendered list.
-    const base = { key: `om-${index}-${toHashString(entry.id)}`, id: entry.id, level: null, row: null, percent: 0 };
-    const rollClass = overmasteryClass[toHashString(entry.id)];
-    if (rollClass === undefined) return { ...base, excluded: "not-a-cap-source" };
-    if (rollClass !== capClass) return { ...base, excluded: "other-class" };
-    if (entry.value === 0) return { ...base, excluded: "value-unrecorded" };
-    return { ...base, percent: entry.value, excluded: null };
-  });
+/** The reasons the two equipment families can give, in `CapExclusion`'s
+ * vocabulary. The factor model's other reasons belong to traits and board
+ * nodes, which do not reach this adapter. */
+const EQUIPMENT_EXCLUSION: Partial<Record<CapFactorReason, CapExclusion>> = {
+  "not-a-cap-source": "not-a-cap-source",
+  "other-class": "other-class",
+  "value-unrecorded": "value-unrecorded",
 };
 
-/** Every equipped summon's equip bonus, matched against this hit's class. */
-export const enumerateSummons = (player: CapLoadout | undefined, capClass: CapClass | null): CapContribution[] => {
-  if (player === undefined || capClass === null) return [];
-  return (player.summons ?? []).map((summon, index): CapContribution => {
-    const base = {
-      key: `summon-${index}-${toHashString(summon.bonusId)}`,
-      id: summon.bonusId,
-      level: summon.bonusLevel,
-      row: null,
-      percent: 0,
-    };
-    const bonusClass = summonBonusClass[toHashString(summon.bonusId)];
-    if (bonusClass === undefined) return { ...base, excluded: "not-a-cap-source" };
-    if (bonusClass !== capClass) return { ...base, excluded: "other-class" };
-    const value = summonBonusValue(summon.bonusId, summon.bonusLevel);
-    if (value === null) return { ...base, excluded: "value-unrecorded" };
-    return { ...base, percent: value.amount, excluded: null };
-  });
+/** A factor restated as a contribution.
+ *
+ * Neither equipment family is conditional, so evaluating against an empty
+ * conditions bag is the whole of what they can say. The class-matching rules
+ * themselves live once, in `capFactors/equipment`, because two copies of them
+ * drift the moment a new exclusion case appears. */
+const contributionOf = (factor: CapFactor): CapContribution => {
+  const result = factor.evaluate({});
+  return {
+    key: factor.key,
+    id: factor.id,
+    level: factor.level,
+    row: null,
+    percent: result.percent,
+    excluded:
+      result.state === "active" ? null : EQUIPMENT_EXCLUSION[result.reason ?? "not-a-cap-source"] ?? "not-a-cap-source",
+  };
 };
+
+/** Every overmastery roll the player carries, matched against this hit's class. */
+export const enumerateOvermasteries = (player: CapLoadout | undefined, capClass: CapClass | null): CapContribution[] =>
+  overmasteryFactors(player, capClass).map(contributionOf);
+
+/** Every equipped summon's equip bonus, matched against this hit's class. */
+export const enumerateSummons = (player: CapLoadout | undefined, capClass: CapClass | null): CapContribution[] =>
+  summonFactors(player, capClass).map(contributionOf);
 
 /** Sigil Booster, the terminus-weapon innate that raises every equipped
  * sigil's trait levels by its own level. The base skill id and the
@@ -212,7 +183,7 @@ export const dmgCapTraitValue = (player: CapLoadout | undefined, capClass: CapCl
   const combined = computeCombinedTraits(player).find((trait) => trait.id === DMG_CAP_TRAIT);
   if (combined === undefined) return 0;
   const level = combined.level + sigilBoosterLevel(player) * sigilInstanceCount(player, DMG_CAP_TRAIT);
-  return traitRowValue(traits, DMG_CAP_TRAIT, level, capClass) / 100;
+  return traitRowValue(traitTable, DMG_CAP_TRAIT, level, capClass) / 100;
 };
 
 /** Every OTHER unconditional cap trait's contribution — the ones the game
@@ -296,7 +267,7 @@ export const deriveConditionalSources = (player: CapLoadout | undefined, capClas
   if (player === undefined || capClass === null) return [];
   const rows: CapSource[] = [];
   for (const trait of computeCombinedTraits(player)) {
-    const value = traitRowValue(conditionalTraits, trait.id, trait.level, capClass) / 100;
+    const value = traitRowValue(conditionalTraitTable, trait.id, trait.level, capClass) / 100;
     if (value !== 0) {
       rows.push({ key: `conditional-${toHashString(trait.id)}`, labelKey: "", traitId: trait.id, value });
     }

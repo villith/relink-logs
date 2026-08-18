@@ -12,7 +12,7 @@ import { AnalysisRow } from "../analysis/AnalysisRow";
 import { HoverCard, type CardAmount, type CardSection } from "../analysis/HoverCard";
 import { ART_SHADOW } from "../analysis/RowArt";
 
-import { TimelineRuler, tickTimes } from "./TimelineRuler";
+import { TimelineRuler, percent, tickTimes } from "./TimelineRuler";
 import { shownHits, type Lane, type LaneMark, type MarkHit } from "./laneMarks";
 import { laneRows } from "./laneRows";
 import { markCardSections } from "./markCard";
@@ -66,10 +66,6 @@ const PRISM = 20;
  * transparent corners, and the head stops being the same figure at every width.
  * A floor on the bar is the honest fix — see `MIN_FILL` there. */
 const MIN_HEADED = PRISM + 4;
-
-/** A percentage, at the precision a sub-pixel position needs and no more —
- * `toFixed` keeps the DOM stable across renders where a raw float would not. */
-const percent = (value: number, of: number): string => (of === 0 ? "0%" : `${((value / of) * 100).toFixed(4)}%`);
 
 /** Which arrow is under the pointer. */
 export type HoveredHit = { label: string; left: string };

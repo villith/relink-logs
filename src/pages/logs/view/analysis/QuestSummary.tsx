@@ -1,97 +1,50 @@
-import { Text, Tooltip } from "@mantine/core";
-import { WarningCircle } from "@phosphor-icons/react";
+import { Group, Text, Tooltip } from "@mantine/core";
+import { CheckCircle, WarningCircle, XCircle } from "@phosphor-icons/react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Figure } from "@/components/ui/Figure";
-import { Label } from "@/components/ui/Label";
 import { Strip } from "@/components/ui/Strip";
-import type { EncounterState } from "@/types";
-import {
-  epochToLocalTime,
-  hasQuestElapsedTime,
-  humanizeNumbers,
-  millisecondsToElapsedFormat,
-  translateQuestId,
-} from "@/utils";
 
 import "./analysis.css";
 
 export type QuestSummaryProps = {
-  encounter: EncounterState;
-  questId: number | null;
-  /** 0-based Conflux room index, or null for an ordinary quest. */
+  title: ReactNode;
   roomIndex: number | null;
-  questCompleted: boolean;
-  /** The game's own quest timer in seconds, when it reported one. */
-  questTimer: number | null;
-  /** Copied in from another installation's logs.db. */
   imported: boolean;
-  /** The log's database id, shown so a specific log can be referred to (bug
-   * reports, the diag examples' `--id`). Null when the route id is not a
-   * number, which never happens off a real logs link. */
-  logId: number | null;
+  /** null hides the indicator: no quest on this log, a Conflux room, or not
+   * yet loaded — the caller collapses all three into one null. */
+  questCompleted: boolean | null;
 };
 
-/** What a log is, on one line: which quest, cleared or not, how long, when, how
- * much.
- *
- * Analysis-only. `QuestHeader.tsx` is the same facts as a stacked label-value
- * list and is what Classic still draws — this does not replace it. */
-export const QuestSummary = ({
-  encounter,
-  questId,
-  roomIndex,
-  questCompleted,
-  questTimer,
-  imported,
-  logId,
-}: QuestSummaryProps) => {
+export const QuestSummary = ({ title, roomIndex, imported, questCompleted }: QuestSummaryProps) => {
   const { t } = useTranslation();
-  const [total, totalSuffix] = humanizeNumbers(encounter.totalDamage);
-
-  // Duration is wall-clock between the first and last hit, which is what DPS is
-  // measured over. The quest timer is the result screen's clear time and also
-  // covers the run up to the boss, so the two are stated separately.
-  const duration = millisecondsToElapsedFormat(encounter.endTime - encounter.startTime);
-  const timer = hasQuestElapsedTime(questTimer)
-    ? ` · ${t("ui.logs.quest-elapsed-time")} ${millisecondsToElapsedFormat(questTimer * 1000)}`
-    : "";
-
-  const name =
-    roomIndex !== null
-      ? `${t("ui.logs.conflux-room", "Conflux Room")} #${roomIndex + 1}`
-      : questId
-        ? translateQuestId(questId)
-        : "";
 
   return (
-    <Strip align="baseline" className="gap-[11px] pb-2.5 pt-[11px]">
-      {/* The quest name truncates so the metadata beside it never has to wrap:
-          at a 620px viewport the block grew 48px -> 71px and "Total Damage"
-          broke onto two lines. */}
-      <Text className="min-w-0 truncate text-xl font-bold tracking-[-0.015em]">{name}</Text>
-      {roomIndex === null && !!questId && (
-        <Text className="text-xs" c={questCompleted ? "teal.4" : "red.5"}>
-          {questCompleted ? t("ui.logs.quest-cleared") : t("ui.logs.quest-failed")}
+    <Strip className="gap-2.5 py-1.5">
+      {title}
+      {roomIndex !== null && (
+        <Text className="whitespace-nowrap text-lg font-semibold">
+          {/* eslint-disable-next-line i18next/no-literal-string -- "#" plus a room number is notation */}
+          {t("ui.logs.conflux-room", "Conflux Room")} #{roomIndex + 1}
         </Text>
       )}
-      <Figure size="sm" tone="dim" className="whitespace-nowrap">
-        {duration}
-        {timer} · {epochToLocalTime(encounter.startTime)}
-        {/* eslint-disable-next-line i18next/no-literal-string -- a "#" plus a
-            database id is notation, not prose */}
-        {logId !== null && ` · #${logId}`}
-      </Figure>
+      {questCompleted !== null && (
+        <Group gap={4} wrap="nowrap">
+          {questCompleted ? (
+            <CheckCircle size={16} color="var(--mantine-color-green-6)" />
+          ) : (
+            <XCircle size={16} color="var(--mantine-color-red-6)" />
+          )}
+          <Text className="whitespace-nowrap text-sm">
+            {questCompleted ? t("ui.logs.quest-cleared") : t("ui.logs.quest-failed")}
+          </Text>
+        </Group>
+      )}
       {imported && (
         <Tooltip label={t("ui.logs.imported-tooltip")} multiline w={280}>
           <WarningCircle size={18} color="var(--mantine-color-yellow-6)" aria-label={t("ui.imported-badge")} />
         </Tooltip>
       )}
-      <Label className="ml-auto whitespace-nowrap">{t("ui.logs.total-damage")}</Label>
-      <Figure size="2xl" className="font-bold">
-        {total}
-        {totalSuffix}
-      </Figure>
     </Strip>
   );
 };

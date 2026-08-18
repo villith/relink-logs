@@ -4,6 +4,7 @@ import { create } from "zustand";
 
 import { Log, LogSortType, SortDirection, StoredLegalityFinding } from "@/types";
 
+import { useLogLibraryStore } from "./useLogLibraryStore";
 import { useMeterSettingsStore } from "./useMeterSettingsStore";
 
 export type SearchResult = {
@@ -99,23 +100,29 @@ export const useLogIndexStore = create<LogIndexState>((set, get) => ({
       toast.success("Logs deleted successfully.");
       const newPage = Math.min(currentPage, searchResult.pageCount - 1);
       set({ currentPage: newPage, selectedLogIds: [] });
+      // The picker's library is a separate, load-once copy of the same set;
+      // left alone it would keep offering rows that no longer open.
+      useLogLibraryStore.getState().invalidate();
       await fetchLogs();
     } catch (e) {
       toast.error(`Failed to delete logs: ${e}`);
     }
   },
   deleteAllLogs: async () => {
-    const { setSearchResult } = get();
+    const { fetchLogs } = get();
 
     try {
       await invoke("delete_all_logs");
       set({ currentPage: 1, selectedLogIds: [], searchResult: DEFAULT_SEARCH_RESULT });
+      useLogLibraryStore.getState().invalidate();
       toast.success("Logs deleted successfully.");
-      const result = await invoke("fetch_logs");
-      setSearchResult(result as SearchResult);
     } catch (e) {
       toast.error(`Failed to delete logs: ${e}`);
+      return;
     }
+    // The sibling deletes' refetch, so the filter and flagged-build rules that
+    // decide what the list may show are stated in one place.
+    await fetchLogs();
   },
   deleteImportedLogs: async () => {
     const { fetchLogs } = get();
@@ -124,6 +131,7 @@ export const useLogIndexStore = create<LogIndexState>((set, get) => ({
     // The same index reset the sibling deletes do: the current page may no
     // longer exist and the selection may name deleted rows.
     set({ currentPage: 1, selectedLogIds: [] });
+    useLogLibraryStore.getState().invalidate();
     await fetchLogs();
     return count;
   },

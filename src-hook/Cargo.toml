@@ -5,7 +5,7 @@ name = "hook"
 # different version as OutOfDate even on a matching wire, and this is the
 # version stamped into the DLL's resource block — so an unbumped change ships
 # a hook indistinguishable from the previous one.
-version = "0.2.0"
+version = "0.2.3"
 edition = "2021"
 
 [lib]
@@ -16,6 +16,19 @@ console = []
 # Verbose per-hit dump of the DamageInstance struct (a2) to the fern log, used to
 # re-derive shifted field offsets (action_id, damage_cap, ...) after a game patch.
 dmgdiag = []
+# Per-hit capture for the UNFINISHED cap / damage-head models: the DamageEvent's
+# `source_snapshot` and `record_snapshot` fields (NOT `source_statuses` — that
+# ships unconditionally, see `hooks/damage.rs::SourceState::capture`, because
+# `src/pages/logs/view/events/capFactors/conditions.ts` reads it for every hit).
+# Unlike every other diagnostic here this rides the EVENT STREAM, not the fern
+# log, so without a gate it lands in every user's logs.db forever — and nothing
+# reads either field yet. It also costs a raw window copy per hit, plus a
+# holder->vtable->virtual chain for the record.
+# `instance_snapshot` is deliberately NOT here: `parser::v1::damage_facts` reads
+# it for the Analysis view's crit / back-attack / weak-point / Break facts, so it
+# has graduated and ships. When one of these two graduates the same way, move
+# it out of the gate and delete its line from the doc table.
+capresearch = []
 # Runtime-address logger for re-deriving broken FUNCTION hooks after a game patch.
 # Logs the module base + the return address (caller RVA) and key pointers from the
 # hooks that still work, so triggering an in-game event (death, SBA, player load)
@@ -62,7 +75,6 @@ tokio = { version = "1.0", features = ["full"] }
 windows = { version = "0.52.0", features = [
   "Win32_Foundation",
   "Win32_System_Diagnostics_Debug",
-  "Win32_System_Diagnostics_ToolHelp",
   "Win32_System_Console",
   "Win32_System_Memory",
   "Win32_System_LibraryLoader",

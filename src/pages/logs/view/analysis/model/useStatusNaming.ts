@@ -6,33 +6,11 @@ import { statusClassName } from "@/statusClassName";
 import type { CharacterType, ComputedPlayerState, StatusInterval } from "@/types";
 import { causeSkillName, translateStatusName } from "@/utils";
 
+import { groupBy } from "../../groupBy";
 import { statusPinKey } from "../../statusUptime";
 import type { CauseClass } from "../causeClass";
 import { causeClassOfKey } from "../causeClass";
 import { casterActionOf, causeCandidatesOf, causeNameFor, statusKeyParts, statusLabelFor } from "../statusLabel";
-
-/** Every interval filed under the row key it belongs to, in one pass.
- *
- * A plain function rather than a memo, because the two callers pass DIFFERENT
- * inputs: every interval in the fight for the row labels, and only the pinned
- * holder's windowed subset for the aura chips. Both need "the intervals for
- * this key", and each scanning the whole fight per key made them quadratic
- * together.
- *
- * The key is the EFFECT — id, cause and class — never the holder, which is what
- * makes one effect one row however many actors held it. Groups keep arrival
- * order: a hidden sort would silently change which interval `casterActionOf`
- * reads first. */
-export const groupByPinKey = (intervals: StatusInterval[]): Map<string, StatusInterval[]> => {
-  const byKey = new Map<string, StatusInterval[]>();
-  for (const interval of intervals) {
-    const key = statusPinKey(interval);
-    const group = byKey.get(key);
-    if (group) group.push(interval);
-    else byKey.set(key, [interval]);
-  }
-  return byKey;
-};
 
 /** The four rungs a status cause is named through, in order: the recorded cause
  * id against the row's own casters, then the caster's action through those same
@@ -86,7 +64,7 @@ export const useStatusNaming = ({
 }): StatusNaming => {
   const { t, i18n } = useTranslation();
 
-  const intervalsByPinKey = useMemo(() => groupByPinKey(statusIntervals), [statusIntervals]);
+  const intervalsByPinKey = useMemo(() => groupBy(statusIntervals, statusPinKey), [statusIntervals]);
 
   // A cause is the CASTER's action id, so it is named through the tables of
   // that row's own casters (and their sub-actors) — never the whole party,

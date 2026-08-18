@@ -1,3 +1,6 @@
+import { parseAbilityKey } from "../abilityKey";
+import { round } from "./round";
+
 /** What a cap-card row renders as. The card formats by kind rather than
  * pre-formatting here, so the projection stays a pure numeric fact and the
  * locale decides how it reads. `verdict` renders as a pass/fail mark. */
@@ -18,6 +21,9 @@ export type CapRow = {
   /** For rows named after a trait rather than a fixed label — the renderer
    * translates the trait id and ignores `labelKey`. */
   traitId?: number;
+  /** Rendered with a leading `≈`: the figure is a model's estimate, not a
+   * number the game logged. Set only by the predicted projection. */
+  approx?: boolean;
 };
 
 /** The fields of a damage event this card reads. Narrower than the wire type on
@@ -50,10 +56,12 @@ export type CapSource = {
  * pre-ladder behaviour. */
 export type CapContext = {
   ladderBase: number | null;
-  /** Whether the logged cap sits on the integer-percent grid the formula
-   * produces from `ladderBase` — the per-hit validity check. `null` when the
-   * ladder cannot say. */
-  consistent: boolean | null;
+  /** The per-hit grid check, refined by the residual-scan classification when
+   * it fails: `pass` sits on the integer-percent grid, `transition`/`settling`
+   * are a state-gated term's ease judged against the actor's own grid states
+   * (both render as one "state transition" mark), `fail` is genuinely
+   * unexplained. `null` when the ladder cannot say. */
+  verdict: CapVerdict | null;
   /** The captured per-player record channel for this hit's class — the fused
    * loadout total the game computed at load (overmasteries, summon bonuses,
    * every cap trait except plain DMG Cap, board nodes). */
@@ -70,6 +78,8 @@ export type CapContext = {
    * fallback total never contained them. */
   channel?: CapSource[];
 };
+
+export type CapVerdict = "pass" | "transition" | "settling" | "fail";
 
 /** Mirrors the Rust `PlayerCapUp`. */
 export type PlayerCapUp = {
@@ -94,11 +104,6 @@ export const selectCapUp = (capUp: PlayerCapUp | undefined, classFlags: number |
   return capUp.normal;
 };
 
-const round = (value: number, places: number): number => {
-  const scale = 10 ** places;
-  return Math.round(value * scale) / scale;
-};
-
 /** A fraction as a percentage row, e.g. 13.13 -> 1313. */
 const asPercent = (key: string, labelKey: string, fraction: number, extra?: Partial<CapRow>): CapRow => ({
   key,
@@ -121,14 +126,15 @@ const capUpRows = (cap: number, context: CapContext): CapRow[] => {
   const total = gameTotal ?? record;
   if (total === null || 1 + total <= 0) return rows;
 
+  const easing = context.verdict === "transition" || context.verdict === "settling";
   if (gameTotal !== null) {
     rows.push({ key: "basecap", labelKey: "ui.logs.cap-base", value: ladderBase!, kind: "count" });
     rows.push(asPercent("gamecapup", "ui.logs.cap-game-capup", gameTotal));
-    if (context.consistent !== null) {
+    if (context.verdict !== null) {
       rows.push({
         key: "verdict",
         labelKey: "ui.logs.cap-formula-check",
-        value: context.consistent ? 1 : 0,
+        value: context.verdict === "pass" ? 1 : easing ? 2 : 0,
         kind: "verdict",
       });
     }
@@ -176,7 +182,10 @@ const capUpRows = (cap: number, context: CapContext): CapRow[] => {
   // badly is when the reader most needs it.
   const unaccounted =
     gameTotal !== null ? gameTotal - attributed : total - context.recordComponents.reduce((sum, c) => sum + c.value, 0);
-  rows.push(asPercent("unaccounted", "ui.logs.cap-unaccounted", unaccounted));
+  // On an eased hit the remainder IS the ease — the gap between the game's
+  // mid-transition multiplier and the attributed resting terms. Same number,
+  // honest name.
+  rows.push(asPercent("unaccounted", easing ? "ui.logs.cap-easing-gap" : "ui.logs.cap-unaccounted", unaccounted));
   return rows;
 };
 
@@ -219,5 +228,97 @@ export const capCardRows = (hit: CapHit, context?: CapContext): CapRow[] => {
     kind: "multiplier",
   });
 
+  return rows;
+};
+
+/** Whether a row's ability key names a hit kind the game runs through the cap
+ * builder. Locally every Normal/LinkAttack/SBA hit carries cap fields and
+ * DoT/supplementary hits never do (lobby-log census, 2654/2619), so this is
+ * exactly the set a missing cap can honestly be predicted for. */
+export const capPredictableKey = (key: string | null): boolean => {
+  if (key === null) return false;
+  const action = parseAbilityKey(key);
+  if (action === null) return false;
+  return action === "LinkAttack" || action === "SBA" || (typeof action === "object" && "Normal" in action);
+};
+
+/** Characters the prediction is withheld for, because for them the formula is
+ * known-wrong rather than approximately right (blind sweep, re-measured
+ * 2026-08-14 on a dedicated local capture, log 2655):
+ * - Rosetta (Pl0600): one large flat term the factor model does not carry, on
+ *   every hit of every class — measured +233%..+263.5% of ladder base across
+ *   her two logs (per-loadout, half-percent grid), plus smaller
+ *   status-correlated increments on top.
+ * Fediel and Seofon were cleared by the same capture: Fediel predicts exactly
+ * at rest (median ratio 1.000, both logs; misses are transient +10%/+30%
+ * additive undershoots, the tolerated Zeta class), and Seofon's old ~5x
+ * overprediction was entirely level-sync contamination from log 2622 — on
+ * clean data he is exact on 2,326/2,326 non-SBA hits. */
+export const PREDICTED_CAP_DENYLIST: ReadonlySet<string> = new Set(["Pl0600"]);
+
+/** Everything the caller resolved for a hit with NO captured cap: the
+ * independent ladder base plus the terms of the game's own multiplier. All
+ * required — the caller gates on having them, because a predicted figure built
+ * on a substituted term would be a guess wearing a formula's clothes. */
+export type PredictedCapContext = {
+  /** `isSummonClass(class_flags)` — a summon-class hit predicts the bare
+   * ladder base: the multiplier terms are the attacker's, and the summon
+   * actor has none (see the helper's provenance note). */
+  summonClass: boolean;
+  ladderBase: number;
+  /** The captured per-class store (`selectCapUp`), as a fraction. */
+  record: number;
+  dmgCapTrait: number;
+  /** Active channel-placement terms (`deriveChannelBreakdown().active`). */
+  channelActive: number;
+  /** Open channel potentials (`deriveChannelBreakdown().unresolved`) — the
+   * prediction's honest uncertainty, rendered but never summed. */
+  channelUnresolved: number;
+  recordComponents: CapSource[];
+  conditional: CapSource[];
+};
+
+/** The rows for a hit whose cap is PREDICTED rather than logged.
+ *
+ * The same formula the residual scan verified against 99.65% of local capped
+ * hits: `trunc(base × (1 + record + dmgCapTrait + activeChannel))`. Ground-truth
+ * rows (logged cap, formula check, pre-cap base, overcap, post-cap multiplier)
+ * are deliberately absent — nothing exists to check a prediction against. */
+export const predictedCapRows = (hit: CapHit, context: PredictedCapContext): CapRow[] => {
+  const { summonClass, ladderBase, record, dmgCapTrait, channelActive, channelUnresolved } = context;
+  const total = summonClass ? 1 : 1 + record + dmgCapTrait + channelActive;
+  if (ladderBase <= 0 || total <= 0) return [];
+
+  const rows: CapRow[] = [
+    { key: "damage", labelKey: "ui.logs.cap-damage-dealt", value: hit.damage, kind: "count" },
+    {
+      key: "predicted",
+      labelKey: "ui.logs.cap-predicted",
+      value: Math.trunc(ladderBase * total),
+      kind: "count",
+      approx: true,
+    },
+  ];
+  if (hit.attack_rate !== null) {
+    rows.push({ key: "mv", labelKey: "ui.logs.cap-mv", value: hit.attack_rate, kind: "rate" });
+  }
+  rows.push({ key: "basecap", labelKey: "ui.logs.cap-base", value: ladderBase, kind: "count" });
+  // A summon-class prediction is the base alone — none of the player's terms
+  // apply, so none may render, not even as potentials.
+  if (summonClass) return rows;
+  rows.push(asPercent("capup", "ui.logs.cap-term-record", record));
+  for (const component of context.recordComponents) {
+    rows.push(asPercent(component.key, component.labelKey, component.value, { variant: "sub" }));
+  }
+  if (dmgCapTrait > 0) rows.push(asPercent("dmgcap", "ui.logs.cap-source-dmg-cap", dmgCapTrait));
+  if (channelActive > 0) rows.push(asPercent("channel", "ui.logs.cap-term-channel", channelActive));
+  for (const source of context.conditional) {
+    rows.push(
+      asPercent(source.key, source.labelKey, source.value, { variant: "conditional", traitId: source.traitId })
+    );
+  }
+  if (channelUnresolved > 0) {
+    rows.push(asPercent("unresolved", "ui.logs.cap-unresolved", channelUnresolved, { variant: "conditional" }));
+  }
   return rows;
 };

@@ -608,6 +608,9 @@ mod tests {
             source_current_hp: None,
             source_max_hp: None,
             source_statuses: None,
+            instance_snapshot: None,
+            source_snapshot: None,
+            record_snapshot: None,
         }
     }
 

@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { capConsistent, gameCapUp, gameLadderBase, gameLadderTrace, ladderCurveFor } from "./capLadder";
+import { capConsistent, gameCapUp, gameLadderBase, gameLadderTrace, isSummonClass, ladderCurveFor } from "./capLadder";
+
+describe("isSummonClass", () => {
+  it("reads the builder's summon bit (bit 7 of the class flags)", () => {
+    expect(isSummonClass(0x81)).toBe(true);
+    expect(isSummonClass(0x80)).toBe(true);
+    expect(isSummonClass(0x1)).toBe(false);
+    expect(isSummonClass(0x40001)).toBe(false);
+    expect(isSummonClass(null)).toBe(false);
+  });
+});
 
 // The standard normal ladder most characters share, as extracted and
 // runtime-verified (cap_ladder_dump, 2026-08-09). f32 row values on purpose:

@@ -82,6 +82,20 @@ export const setHostility = (state: AnalysisState, hostility: Hostility): Analys
   by: null,
 });
 
+/** A drag on the plot, committed as a zoom.
+ *
+ * Indexes arrive relative to the DATA the chart was given, so a drag while
+ * already scoped is relative to the current window — offset back into
+ * whole-fight indexes before committing. Shared by every chart in the view: a
+ * pane's own plot and the frame's compare overlay both hand their drag here, so
+ * a scrub cannot mean two different spans depending on which chart was dragged.
+ */
+export const scrubWindow = (state: AnalysisState, dragged: [number, number] | null): AnalysisState => {
+  if (dragged === null) return setWindow(state, null);
+  const offset = state.window === null ? 0 : state.window[0];
+  return setWindow(state, [dragged[0] + offset, dragged[1] + offset]);
+};
+
 export const setWindow = (state: AnalysisState, window: [number, number] | null): AnalysisState => ({
   ...state,
   window,
@@ -102,17 +116,22 @@ export const regroup = (state: AnalysisState, dim: Dimension, caps: MetricCapabi
 const toggleIn = (values: string[], value: string): string[] =>
   values.includes(value) ? values.filter((held) => held !== value) : [...values, value];
 
-/** Toggles one effect in the Auras Filter. No `by` reset: a filter narrows the
- * data, it does not advance the drill the way a pin does.
+/** Selects or deselects one effect in the Auras Filter, ABSOLUTELY.
  *
- * Source and target auras share ONE list and all apply together — selecting on
- * either strip no longer replaces the other's picks, because two strips whose
- * selections silently erase each other is the behaviour that made the filter
- * read as broken. */
-export const toggleAura = (state: AnalysisState, aura: string): AnalysisState => ({
-  ...state,
-  aura: toggleIn(state.aura, aura),
-});
+ * The absolute form is what a write reaching several panes needs: a toggle
+ * applied to two panes that disagree about the effect flips them apart, so the
+ * pane the user clicked in decides what "selected" now means and every pane is
+ * set to it. Returns the state unchanged when it already reads that way.
+ *
+ * No `by` reset: a filter narrows the data, it does not advance the drill the
+ * way a pin does. Source and target auras share ONE list and all apply
+ * together — selecting on either strip does not replace the other's picks,
+ * because two strips whose selections silently erase each other is the
+ * behaviour that made the filter read as broken. */
+export const setAura = (state: AnalysisState, aura: string, selected: boolean): AnalysisState => {
+  if (state.aura.includes(aura) === selected) return state;
+  return { ...state, aura: selected ? [...state.aura, aura] : state.aura.filter((held) => held !== aura) };
+};
 
 /** Clears every aura at once — the strips' shared ✕. */
 export const clearAuras = (state: AnalysisState): AnalysisState =>

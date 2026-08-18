@@ -11,6 +11,7 @@
 use anyhow::{anyhow, Result};
 use retour::static_detour;
 
+use crate::hooks::damage::within_module_image;
 use crate::hooks::diag::{read_f32_guarded, read_ptr_guarded, read_u32_guarded};
 use crate::process::Process;
 
@@ -559,9 +560,13 @@ fn overmastery_terms(
     }
     let holder = read_ptr_guarded(context, BUILD_STATUS_HOLDER).filter(|h| *h != 0)?;
     let vtable = read_ptr_guarded(holder, 0).filter(|v| *v != 0)?;
-    vtable.checked_sub(module_base)?;
+    if !within_module_image(vtable, module_base) {
+        return None;
+    }
     let slot = read_ptr_guarded(vtable, HOLDER_PLAYER_RECORD_SLOT).filter(|s| *s != 0)?;
-    slot.checked_sub(module_base)?;
+    if !within_module_image(slot, module_base) {
+        return None;
+    }
 
     // Same `this`-only getter the builder calls, on the same object.
     let get_record: unsafe extern "system" fn(usize) -> usize =

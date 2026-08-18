@@ -1,18 +1,8 @@
-import type { Hostility, RowLevel } from "../metrics/types";
+import type { Hostility } from "../metrics/types";
 
 import type { DpsChartProps } from "./DpsChart";
-import type { Dimension, MetricKey } from "./machine/state";
+import type { Dimension } from "./machine/state";
 import type { DrillSeries } from "./statusChart";
-
-/** What the plot is titled once it decomposes a pinned row, per level. */
-const DRILL_LABEL_KEY = {
-  players: "ui.logs.chart-dps-label",
-  abilities: "ui.logs.chart-drill-ability-label",
-  // The chart always stacks by enemy here. The table agrees when the pinned row
-  // held one action and decomposed into enemies too, and lists the group's
-  // members when it held several — the plot stays the coarser of the two.
-  skills: "ui.logs.chart-drill-target-label",
-} as const;
 
 /** Which series the plot ended up drawing, and how it is presented.
  *
@@ -20,8 +10,8 @@ const DRILL_LABEL_KEY = {
  * the resolved machine state, so it is a pure fold of them — no store, no
  * i18n, no React. Extracted from the view because these were the last
  * chart decisions with no test able to reach them: nothing mounts the chart
- * (recharts' `ResponsiveContainer` measures zero in jsdom), so the title
- * ternary and the Total-series rule were only ever exercised by eye.
+ * (recharts' `ResponsiveContainer` measures zero in jsdom), so the Total-series
+ * rule was only ever exercised by eye.
  *
  * The four series inputs are compared BY REFERENCE, not by shape — `overlay`
  * is whichever of them won, so `overlay === statusSeries` recognises the plot
@@ -32,8 +22,6 @@ export type ChartPresentation = {
   overlay: DrillSeries[] | null;
   chartSource: "base" | "scoped" | "stacks" | "drill" | "ability";
   withTotal: boolean;
-  /** i18next key naming what is plotted. */
-  labelKey: string;
   format: DpsChartProps["format"];
   stacked: boolean;
   /** Trailing moving-average window in buckets; 1 leaves values untouched. */
@@ -63,9 +51,6 @@ export const chartPresentation = ({
   groupsPath,
   groupBy,
   hostility,
-  metricKey,
-  level,
-  metricLabelKey,
   metricFormat,
   rateSmoothing,
 }: {
@@ -91,11 +76,6 @@ export const chartPresentation = ({
   groupBy: Dimension;
   /** The EFFECTIVE side (a metric with no enemy side reads friendly). */
   hostility: Hostility;
-  metricKey: MetricKey;
-  /** The legacy row level, a projection of `groupBy`. */
-  level: RowLevel;
-  /** The base chart's own title key, used when nothing overlays it. */
-  metricLabelKey: string;
   /** The base chart's own format (the SBA gauge is a percent). */
   metricFormat: "amount" | "percent";
   /** The trailing window a RATE chart smooths over. Injected rather than
@@ -108,8 +88,8 @@ export const chartPresentation = ({
   const overlay = overlayOf(statusSeries, groupOverlay, abilitySeries);
 
   // WHICH of those the plot ended up drawing, recognised from the value itself
-  // rather than re-derived from the pins, so the title cannot disagree with
-  // what is on screen. "scoped" is the groups path's per-player lines (the
+  // rather than re-derived from the pins, so the axis format cannot disagree
+  // with what is on screen. "scoped" is the groups path's per-player lines (the
   // query's filters applied); "drill" its stacked bands.
   const chartSource: "base" | "scoped" | "stacks" | "drill" | "ability" =
     overlay === null
@@ -130,18 +110,12 @@ export const chartPresentation = ({
   // AreaChart would be ADDED to the stack and double it.
   const withTotal = groupsPath && groupBy === "source" && hostility === "friendly" && overlay === null;
 
-  // Whether the enemy side is actually on screen. `hostility` is already the
-  // EFFECTIVE side (the resolver's rule: a metric with no enemy side reads
-  // friendly whatever the URL says), so this one spelling keeps the chart, its
-  // title, the hover cards and the empty state agreeing about what is showing.
-  const enemySide = hostility === "enemy";
-
   // An overlay of any kind plots an amount; the base sources keep their metric's
   // own format (the SBA gauge is a percent). A drilled SBA chart plots gauge
   // GENERATED, an amount, where the undrilled one plots the gauge LEVEL — the
-  // axis follows the grouping, the same way the title does. Hoisted out of the
-  // literal below because `smoothing` keys off it: in this view "amount" IS the
-  // spelling for "this series is a rate".
+  // axis follows the grouping. Hoisted out of the literal below because
+  // `smoothing` keys off it: in this view "amount" IS the spelling for "this
+  // series is a rate".
   const format: DpsChartProps["format"] =
     chartSource === "stacks" ? "count" : chartSource === "ability" || groupOverlay !== null ? "amount" : metricFormat;
 
@@ -149,30 +123,6 @@ export const chartPresentation = ({
     overlay,
     chartSource,
     withTotal,
-    // Titled after what is DRAWN, never after what the pins would suggest.
-    labelKey:
-      chartSource === "ability"
-        ? // The derived tabs decompose into their own abilities, and the SBA
-          // one changes QUANTITY as it does (see `format`), so it says so.
-          metricKey === "sba"
-          ? "ui.logs.chart-sba-drill-label"
-          : "ui.logs.chart-stun-drill-label"
-        : chartSource === "stacks"
-          ? // The one aura plot: the pinned effect's per-holder stack depths.
-            "ui.logs.chart-stacks-label"
-          : groupOverlay !== null
-            ? // The enemy side inverts which way the damage flows, so both
-              // of these name both ends. Reusing the friendly titles would
-              // leave the heading unchanged across a toggle that swapped
-              // the plotted quantity for its opposite.
-              enemySide
-              ? metricKey === "damage"
-                ? "ui.logs.chart-enemy-dealt-label"
-                : "ui.logs.chart-enemy-received-label"
-              : metricKey === "taken"
-                ? "ui.logs.chart-taken-drill-label"
-                : DRILL_LABEL_KEY[level]
-            : metricLabelKey,
     format,
     stacked: overlay !== null,
     // RATES are smoothed; LEVELS are not. The SBA gauge and the aura stack

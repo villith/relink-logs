@@ -62,19 +62,40 @@ export const DEFAULT_STATE: AnalysisState = {
 export const isPinned = (state: AnalysisState, dim: Dimension): boolean =>
   dim === "source" ? state.source !== null : dim === "ability" ? state.ability !== null : state.target !== null;
 
-/** The raw query-string fields, one per URL param. */
-export type RawState = {
+/** The raw query-string fields every pane shares.
+ *
+ * Every one of them means the same thing in any log: a metric, a side, and a
+ * zoom expressed in elapsed-time buckets. That is the test for belonging here —
+ * a field whose value is an index into one log's OWN data is pane-scoped, or
+ * one pane's selection resolves to a different thing in the other. */
+export type SharedRaw = {
   metric: string | null;
   side: string | null;
+  from: string | null;
+  to: string | null;
+};
+
+/** The raw query-string fields scoped to ONE pane. */
+export type PaneRaw = {
   src: string | null;
   tgt: string | null;
   abil: string | null;
-  from: string | null;
-  to: string | null;
   by: string | null;
   aura: string | null;
+  /** Per-pane because a `win` entry can name ONE window by ordinal
+   * (`sba:1` = that log's second SBA window, in start order), which is an index
+   * into this log's own `chartWindows`. Shared, pane B resolves pane A's chip
+   * against its own windows — a different span of a different fight — and a
+   * chip with no counterpart there resolves to NO windows, which
+   * `useFilterWindows` hands on as an EMPTY mask rather than as no filter, so
+   * pane B's chart, table and every uptime denominator go blank with its own
+   * strip showing the chip as selected and nothing on screen saying why. */
   win: string | null;
 };
+
+/** One pane's whole raw state. Unchanged in shape — `decodeState` and
+ * `encodeState` still take and return exactly this. */
+export type RawState = SharedRaw & PaneRaw;
 
 export const encodeState = (state: AnalysisState): RawState => ({
   metric: state.metric === DEFAULT_STATE.metric ? null : state.metric,
@@ -93,7 +114,7 @@ export const encodeState = (state: AnalysisState): RawState => ({
  * of the URL) rather than as an empty string, so a cleared filter leaves the
  * same address a never-set one does. Comma-separated because neither grammar
  * admits a comma — `AURA_KEY` and `WIN_KEY` below are the proof. */
-const encodeList = (values: string[]): string | null => (values.length === 0 ? null : values.join(","));
+export const encodeList = (values: string[]): string | null => (values.length === 0 ? null : values.join(","));
 
 /** The inverse, gating each entry through its own grammar and dropping
  * duplicates.
@@ -136,7 +157,7 @@ export const auraPinKey = (aura: string): string => aura.slice(4);
 /** How a window filter is spelled: the kind, optionally `:index` for one
  * individual window. The gate every `win` value passes on the way out of the
  * URL — a value it rejects makes the filter inert, exactly like `AURA_KEY`. */
-const WIN_KEY = /^(sba|link|break)(:\d+)?$/;
+const WIN_KEY = /^(sba|link|overdrive|break)(:\d+)?$/;
 
 /** The kind and 0-based per-kind index a `win` value names; null index = the
  * whole kind. Only call on a value `WIN_KEY` admits. */

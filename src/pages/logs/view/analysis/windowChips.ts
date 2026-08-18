@@ -71,7 +71,8 @@ export const windowChips = (windows: ChartWindow[], win: string[], labels: Windo
 
     const allSelected = selected.has(kind as string);
     const items = ofKind.map((span, index) => {
-      const enemy = kind === "break" ? labels.breakEnemyLabel(span.actorIndex, span) : null;
+      // Overdrive windows carry a per-enemy actor index exactly like Break's.
+      const enemy = kind === "break" || kind === "overdrive" ? labels.breakEnemyLabel(span.actorIndex, span) : null;
       const range = labels.rangeLabel(span.startMs, span.endMs);
       return {
         value: `${kind}:${index}`,

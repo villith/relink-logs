@@ -1,12 +1,18 @@
 import { MantineProvider } from "@mantine/core";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { explainCapHit, type ExplainInput } from "@/pages/logs/view/events/capExplain";
+import { explainCapHit, type ExplainInput, type ExplainSection } from "@/pages/logs/view/events/capExplain";
 
-// Keys pass through verbatim so a row can be addressed by the key it renders.
+// Keys pass through verbatim so a row can be addressed by the key it renders;
+// interpolation params are appended so a reason inside a wrapper key stays
+// findable ("cap-tt-not-counted cap-excl-other-class").
 vi.mock("react-i18next", () => ({
-  useTranslation: () => ({ t: (key: string) => key, i18n: { language: "en" } }),
+  useTranslation: () => ({
+    t: (key: string, params?: Record<string, unknown>) =>
+      params === undefined ? key : `${key} ${Object.values(params).join(" ")}`,
+    i18n: { language: "en" },
+  }),
 }));
 
 import { CapDetailPanel, MIN_ROW_WIDTH } from "./CapDetailPanel";
@@ -19,6 +25,8 @@ const input: ExplainInput = {
     attack_rate: 0.54,
     class_flags: 0x1,
     flags: 0,
+    instance_snapshot: null,
+    record_snapshot: null,
   },
   characterType: "Pl0300",
 };
@@ -30,19 +38,21 @@ const renderPanel = (over: Partial<ExplainInput> = {}) =>
     </MantineProvider>
   );
 
-const lineText = (key: string) => document.querySelector(`[data-cap-line="${key}"]`)?.textContent ?? "";
+const renderSections = (sections: ExplainSection[]) =>
+  render(
+    <MantineProvider>
+      <CapDetailPanel sections={sections} />
+    </MantineProvider>
+  );
+
+const line = (key: string) => document.querySelector<HTMLElement>(`[data-cap-line="${key}"]`);
+const lineText = (key: string) => line(key)?.textContent ?? "";
+const hover = (element: Element) => fireEvent.mouseEnter(element, { clientX: 100, clientY: 100 });
 
 describe("CapDetailPanel", () => {
   it("renders a section per stage of the derivation", () => {
     renderPanel();
     expect(document.querySelectorAll("[data-cap-section]")).toHaveLength(5);
-  });
-
-  it("shows the substituted expression beside the symbolic one", () => {
-    renderPanel();
-    const base = document.querySelector('[data-cap-section="base"]')?.textContent ?? "";
-    expect(base).toContain("base = trunc(");
-    expect(base).toContain("trunc( 4999 + (5999 - 4999) x (0.54 - 0.5) / (0.6 - 0.5) )");
   });
 
   it("formats each value kind its own way", () => {
@@ -54,41 +64,37 @@ describe("CapDetailPanel", () => {
     expect(lineText("flags")).toContain("0x1");
   });
 
+  it("keeps the formula out of the section body and serves it on hover", () => {
+    renderPanel();
+    const base = document.querySelector('[data-cap-section="base"]')!;
+    expect(base.textContent).not.toContain("base = trunc(");
+
+    hover(base.querySelector('[aria-label="ui.debug.cap-formula"]')!);
+    const card = screen.getByTestId("cap-formula-card-base");
+    expect(card.textContent).toContain("base = trunc(");
+    expect(card.textContent).toContain("trunc( 4999 + (5999 - 4999) x (0.54 - 0.5) / (0.6 - 0.5) )");
+  });
+
+  it("keeps provenance out of the row and serves it on hover", () => {
+    renderPanel();
+    const row = line("rate")!;
+    expect(row.textContent).not.toContain("event.attack_rate");
+
+    hover(row);
+    expect(screen.getByTestId("cap-line-card-rate").textContent).toContain("event.attack_rate");
+  });
+
   it("gives a row a floor width instead of letting a long value bleed", () => {
     // jsdom does no layout, so the guarantee that CAN be asserted is the one
     // that produces it: the row claims a minimum width, and the value column
-    // never wraps or shrinks. Without both, `0.10000002384185791` overflowed
-    // its 130px column and painted over the provenance column beside it.
+    // never wraps or shrinks.
     renderPanel();
-    const row = document.querySelector<HTMLElement>('[data-cap-line="span"]');
+    const row = line("span");
     expect(row?.style.minWidth).toBe(`${MIN_ROW_WIDTH}px`);
 
     const value = row?.children[1] as HTMLElement;
     expect(value.style.whiteSpace).toBe("nowrap");
     expect(value.style.flexShrink).toBe("0");
-  });
-
-  it("sets identifiers in monospace and prose annotations in the body font", () => {
-    // Why the provenance column overran twice: a 49-character sentence needs
-    // about a third more width in monospace than in the body font, for no
-    // legibility at all. Only literals wear the monospace face.
-    renderPanel();
-    const mono = (lineKey: string) =>
-      (document.querySelector<HTMLElement>(`[data-cap-line="${lineKey}"]`)?.children[2] as HTMLElement).style
-        .fontFamily;
-
-    // `event.attack_rate` is a field path; the walk-arm annotation is a sentence.
-    expect(mono("rate")).not.toBe("");
-    expect(mono("branch")).toBe("");
-  });
-
-  it("wraps a long provenance instead of ellipsising it", () => {
-    // This column is the whole point of the panel — an ellipsised provenance
-    // answers nothing, so a second line is the right cost.
-    renderPanel();
-    const source = document.querySelector<HTMLElement>('[data-cap-line="branch"]')?.children[2] as HTMLElement;
-    expect(source.style.overflowWrap).toBe("anywhere");
-    expect(source.className).not.toContain("truncate");
   });
 
   it("renders a missing fact as a dash, never as a zero", () => {
@@ -98,7 +104,7 @@ describe("CapDetailPanel", () => {
     expect(lineText("record")).toContain("—");
   });
 
-  it("keeps a rejected source visible with the reason it was rejected", () => {
+  it("marks a rejected source and serves the reason on hover", () => {
     renderPanel({
       loadout: {
         sigils: [],
@@ -108,7 +114,68 @@ describe("CapDetailPanel", () => {
         overmasteryInfo: { overmasteries: [{ id: 0x0b0e4311, flags: 1, value: 40 }] },
       },
     });
-    expect(lineText("om-0-0b0e4311")).toContain("ui.debug.cap-excl-other-class");
+    const row = line("om-0-0b0e4311")!;
+    // The reason is not inline any more — the row is marked and the hover card
+    // carries the phrase.
+    expect(row.dataset.capExcluded).toBe("other-class");
+    expect(row.textContent).not.toContain("ui.debug.cap-excl-other-class");
+
+    hover(row);
+    expect(screen.getByTestId("cap-line-card-om-0-0b0e4311").textContent).toContain("ui.debug.cap-excl-other-class");
+  });
+
+  it("distinguishes 'ruled out' from 'could not be resolved' in the marker", () => {
+    renderSections([
+      {
+        key: "s",
+        titleKey: "t",
+        formula: null,
+        substituted: null,
+        unavailableKey: null,
+        lines: [
+          {
+            key: "off",
+            name: { kind: "literal", value: "inactive" },
+            value: { kind: "percent", value: 10 },
+            excluded: "conditional",
+          },
+          {
+            key: "open",
+            name: { kind: "literal", value: "unknown" },
+            value: { kind: "percent", value: 10 },
+            excluded: "gate-unrecorded",
+          },
+        ],
+      },
+    ]);
+    expect(line("off")!.querySelector('[aria-label="ui.debug.cap-marker-off"]')).toBeTruthy();
+    expect(line("open")!.querySelector('[aria-label="ui.debug.cap-marker-unknown"]')).toBeTruthy();
+  });
+
+  it("marks an inferred line with its own icon, overriding the excluded-based marker", () => {
+    // `excluded: "conditional"` alone would render `cap-marker-off` (see the
+    // test above) — `inferred: true` must win that precedence, since its
+    // provenance is the more specific thing to say about the row.
+    renderSections([
+      {
+        key: "s",
+        titleKey: "t",
+        formula: null,
+        substituted: null,
+        unavailableKey: null,
+        lines: [
+          {
+            key: "inferred-off",
+            name: { kind: "literal", value: "window-inferred, ruled out" },
+            value: { kind: "percent", value: 10 },
+            excluded: "conditional",
+            inferred: true,
+          },
+        ],
+      },
+    ]);
+    expect(line("inferred-off")!.querySelector('[aria-label="ui.debug.cap-marker-inferred"]')).toBeTruthy();
+    expect(line("inferred-off")!.querySelector('[aria-label="ui.debug.cap-marker-off"]')).toBeNull();
   });
 
   it("names the missing fact when a section cannot be derived", () => {
@@ -116,8 +183,12 @@ describe("CapDetailPanel", () => {
     expect(screen.getByText("ui.debug.cap-no-character")).toBeTruthy();
   });
 
-  it("carries the standing caveat about the post-cap chain", () => {
+  it("serves the standing post-cap caveat from the note icon", () => {
     renderPanel();
-    expect(screen.getByText("ui.debug.cap-postcap-note")).toBeTruthy();
+    const section = document.querySelector('[data-cap-section="postcap"]')!;
+    expect(section.textContent).not.toContain("ui.debug.cap-postcap-note");
+
+    hover(section.querySelector('[aria-label="ui.debug.cap-note"]')!);
+    expect(screen.getByTestId("cap-note-card-postcap").textContent).toContain("ui.debug.cap-postcap-note");
   });
 });

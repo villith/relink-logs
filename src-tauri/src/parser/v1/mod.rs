@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, Window};
 
 use super::{
-    constants::{CharacterType, EnemyType},
+    constants::{CharacterType, EnemyType, SIR_BARROLD},
     v0,
 };
 
@@ -24,6 +24,7 @@ mod ability_charts;
 pub mod audit;
 mod cap_detection;
 mod chart_scope;
+pub mod damage_facts;
 mod filters;
 mod groups;
 mod live_emit;
@@ -54,7 +55,7 @@ use phantom_targets::{is_excluded_target_type, PhantomTargets};
 use player_state::{PlayerState, SbaSourceKind};
 pub use status::{assemble_intervals, StatusInterval};
 pub use windows::{
-    assemble_chart_windows, corroborated_sba_activations, ChartWindow, ChartWindowKind,
+    assemble_chart_windows, sba_activations, ChartWindow, ChartWindowKind, SbaActivation,
 };
 
 pub struct AdjustedDamageInstance<'a> {
@@ -938,6 +939,9 @@ mod data_coverage_tests {
             source_current_hp: None,
             source_max_hp: None,
             source_statuses: None,
+            instance_snapshot: None,
+            source_snapshot: None,
+            record_snapshot: None,
         })
     }
 
@@ -2803,6 +2807,12 @@ pub struct Parser {
     #[serde(skip)]
     db: Option<Connection>,
 
+    /// Called after a successful save. The binary crate keeps a decoded-log
+    /// cache this crate cannot see, and a save can hand out an id SQLite has
+    /// reused from a deleted row — this is that cache's only way to hear about it.
+    #[serde(skip)]
+    pub on_saved: Option<fn()>,
+
     /// Active Conflux run id (None when not in a run). Assigned on run-start.
     #[serde(skip)]
     active_run_id: Option<i64>,
@@ -4405,8 +4415,11 @@ impl Parser {
             .get_primary_target()
             .map(|target| target.raw_target_type);
 
-        // Sir Barrold should never save quest ID, as it could be stale.
-        if primary_target == Some(0xA379AC65) {
+        // Sir Barrold should never save quest ID, as it could be stale. What
+        // the runs are FILED under instead is decided when they are handed out
+        // (`db::logs::quest_id_for_display`), which reaches the ones saved
+        // before this guard existed and kept a stale id.
+        if primary_target == Some(SIR_BARROLD) {
             self.encounter.quest_id = None;
             self.encounter.quest_timer = None;
         }
@@ -4492,6 +4505,10 @@ impl Parser {
             // agrees with the sweep by construction rather than by coincidence.
             if crate::legality::should_audit(start_datetime.timestamp_millis()) {
                 self.encounter.write_legality_findings(conn, id)?;
+            }
+
+            if let Some(on_saved) = self.on_saved {
+                on_saved();
             }
 
             return Ok(Some(id));
@@ -4746,6 +4763,9 @@ mod tests {
             source_current_hp: None,
             source_max_hp: None,
             source_statuses: None,
+            instance_snapshot: None,
+            source_snapshot: None,
+            record_snapshot: None,
         }
     }
 
@@ -4779,6 +4799,9 @@ mod tests {
             source_current_hp: None,
             source_max_hp: None,
             source_statuses: None,
+            instance_snapshot: None,
+            source_snapshot: None,
+            record_snapshot: None,
         }
     }
 
@@ -6707,6 +6730,9 @@ mod tests {
             source_current_hp: None,
             source_max_hp: None,
             source_statuses: None,
+            instance_snapshot: None,
+            source_snapshot: None,
+            record_snapshot: None,
         }
     }
 
@@ -9610,6 +9636,9 @@ mod tests {
                 source_current_hp: None,
                 source_max_hp: None,
                 source_statuses: None,
+                instance_snapshot: None,
+                source_snapshot: None,
+                record_snapshot: None,
             }),
         ));
 
@@ -9648,6 +9677,9 @@ mod tests {
                 source_current_hp: None,
                 source_max_hp: None,
                 source_statuses: None,
+                instance_snapshot: None,
+                source_snapshot: None,
+                record_snapshot: None,
             }),
         ));
 
@@ -9679,6 +9711,9 @@ mod tests {
                 source_current_hp: None,
                 source_max_hp: None,
                 source_statuses: None,
+                instance_snapshot: None,
+                source_snapshot: None,
+                record_snapshot: None,
             }),
         ));
 
@@ -9722,6 +9757,9 @@ mod tests {
                 source_current_hp: None,
                 source_max_hp: None,
                 source_statuses: None,
+                instance_snapshot: None,
+                source_snapshot: None,
+                record_snapshot: None,
             }),
         ));
 
@@ -9753,6 +9791,9 @@ mod tests {
                 source_current_hp: None,
                 source_max_hp: None,
                 source_statuses: None,
+                instance_snapshot: None,
+                source_snapshot: None,
+                record_snapshot: None,
             }),
         ));
 
@@ -9798,6 +9839,9 @@ mod tests {
                 source_current_hp: None,
                 source_max_hp: None,
                 source_statuses: None,
+                instance_snapshot: None,
+                source_snapshot: None,
+                record_snapshot: None,
             }
         }
 

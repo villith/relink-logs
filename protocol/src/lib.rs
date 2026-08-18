@@ -253,16 +253,55 @@ pub struct DamageEvent {
     /// missing buff as evidence a conditional cap source did NOT apply.
     #[serde(default)]
     pub source_statuses: Option<Vec<SourceStatus>>,
+    /// Raw DamageInstance window `0xC0..0x340` (640 bytes), copied AFTER the
+    /// game's own damage call so the gate bytes the call writes (crit
+    /// +0x15D .. Break +0x163) are visible. The hook records, it does not
+    /// interpret: the offset map lives in `parser::v1::damage_facts`, so a
+    /// wrong interpretation is a parser fix and the logs stay good. `None` on
+    /// old logs, DoT ticks, and when the window fails its readability probe.
+    ///
+    /// Encoded with `serde_bytes`: a plain `Vec<u8>` would serialize to CBOR
+    /// as an integer array (~1.7x the size of these windows at rest), while
+    /// this emits a compact byte string and its visitor still accepts the
+    /// array form on read.
+    #[serde(default, with = "serde_bytes")]
+    pub instance_snapshot: Option<Vec<u8>>,
+    /// Raw SOURCE-actor-instance window `0x2480..0x24A0` (32 bytes), captured
+    /// pre-call (the builder computed this hit from pre-call state), and only
+    /// for attackers whose own record carries a party slot — the offsets are
+    /// verified against the `Pl####` layout alone. Known residents: elemental
+    /// base `+0x2488`, at-cap overflow k `+0x249C`; the rest of the window is
+    /// captured for future interpretation.
+    #[serde(default, with = "serde_bytes")]
+    pub source_snapshot: Option<Vec<u8>>,
+    /// Raw window `record+0x18..0x28` (16 bytes) off the attacker's own
+    /// per-player stats record, captured pre-call alongside
+    /// [`DamageEvent::source_snapshot`] — same player-family gate, same
+    /// "state before the call decided the cap" reasoning.
+    ///
+    /// The record pointer is reached from the attacker's specified-instance
+    /// pointer (the same pointer [`DamageEvent::source_snapshot`] is read
+    /// from) in two RE-verified hops, both already load-bearing elsewhere in
+    /// this repo (`cap_oracle.rs` / `dmg_oracle.rs`): `holder =
+    /// *(attacker+0x2300)`, then `record = holder.vtable[0x9f0](holder)` — a
+    /// `this`-only virtual getter, the same one the game's own damage
+    /// formula calls. Known residents of the window: `+0x1C` SBA class
+    /// dmg%, `+0x24` Skill class dmg% (damage-head formula tree, "record
+    /// twin of the cap's fused record"); the rest is captured for future
+    /// interpretation. `None` on old logs, DoT ticks, the damage-TAKEN
+    /// stream, and when the pointer chain or window read fails.
+    #[serde(default, with = "serde_bytes")]
+    pub record_snapshot: Option<Vec<u8>>,
 }
 
 /// One status held by the attacker at the moment of a hit, as
 /// [`DamageEvent::source_statuses`] reports it.
 ///
-/// Deliberately just the effect and its count: this is a per-hit snapshot on a
-/// stream that carries thousands of events per fight, and everything else about
-/// a status (its caster, its cause, its class, its window) is already on the
-/// [`StatusApplyEvent`] / [`StatusRemoveEvent`] pair, keyed by the same
-/// `status_id`.
+/// Deliberately small — the effect, its count, and one probed cached term:
+/// this is a per-hit snapshot on a stream that carries thousands of events
+/// per fight, and everything else about a status (its caster, its cause, its
+/// class, its window) is already on the [`StatusApplyEvent`] /
+/// [`StatusRemoveEvent`] pair, keyed by the same `status_id`.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct SourceStatus {
     /// `status.tbl` StatusId — the same id [`StatusApplyEvent::status_id`] carries.
@@ -271,6 +310,13 @@ pub struct SourceStatus {
     /// object's `+0xb0` count for the classes `status.tbl` marks `HasLevels`,
     /// and 1 for everything else.
     pub stacks: u32,
+    /// Candidate cached per-status term, as raw f32 bits (`status+0x8`).
+    /// Proven live for cap buffs (`IStatusDamageLimitBuff+8` holds the live
+    /// cap term); a PROBE for every other status class — downstream code
+    /// interprets or ignores it per class, and a relabel never touches logs.
+    /// `None` when the read is unavailable or the bits are not a finite f32.
+    #[serde(default)]
+    pub term_bits: Option<u32>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -1097,6 +1143,9 @@ mod source_state_tests {
         assert_eq!(new.source_current_hp, None);
         assert_eq!(new.source_max_hp, None);
         assert_eq!(new.source_statuses, None);
+        assert_eq!(new.instance_snapshot, None);
+        assert_eq!(new.source_snapshot, None);
+        assert_eq!(new.record_snapshot, None);
     }
 
     /// "Captured, and the attacker held nothing" must survive a round trip as
@@ -1120,6 +1169,9 @@ mod source_state_tests {
             source_current_hp: Some(4_200),
             source_max_hp: Some(10_000),
             source_statuses: Some(Vec::new()),
+            instance_snapshot: None,
+            source_snapshot: None,
+            record_snapshot: None,
         };
 
         let round_trip = |e: &DamageEvent| -> DamageEvent {
@@ -1136,10 +1188,12 @@ mod source_state_tests {
             SourceStatus {
                 status_id: 4,
                 stacks: 3,
+                term_bits: None,
             },
             SourceStatus {
                 status_id: 0,
                 stacks: 1,
+                term_bits: None,
             },
         ]);
         let back = round_trip(&event);
@@ -1148,17 +1202,69 @@ mod source_state_tests {
             Some(vec![
                 SourceStatus {
                     status_id: 4,
-                    stacks: 3
+                    stacks: 3,
+                    term_bits: None,
                 },
                 SourceStatus {
                     status_id: 0,
-                    stacks: 1
+                    stacks: 1,
+                    term_bits: None,
                 },
             ])
         );
 
         event.source_statuses = None;
         assert_eq!(round_trip(&event).source_statuses, None);
+    }
+
+    /// The raw snapshot windows and a status's cached term survive a round
+    /// trip byte-for-byte and bit-for-bit, through both wire formats: bincode
+    /// (hook -> app) and the `serde_bytes`-encoded CBOR the app writes to
+    /// disk.
+    #[test]
+    fn snapshot_windows_and_a_term_round_trip_through_both_formats() {
+        let event = DamageEvent {
+            source: super::Actor::default(),
+            target: super::Actor::default(),
+            damage: 999,
+            flags: 0,
+            action_id: super::ActionType::Normal(2),
+            attack_rate: None,
+            stun_value: None,
+            damage_cap: None,
+            base_damage: None,
+            target_current_hp: None,
+            target_max_hp: None,
+            class_flags: None,
+            source_current_hp: None,
+            source_max_hp: None,
+            source_statuses: Some(vec![SourceStatus {
+                status_id: 7,
+                stacks: 2,
+                term_bits: Some(0x3F800000), // 1.0f32
+            }]),
+            instance_snapshot: Some((0u8..64).collect()),
+            source_snapshot: Some(vec![0xAA; 32]),
+            record_snapshot: Some(vec![0x55; 16]),
+        };
+
+        let cbor_back: DamageEvent = {
+            let blob = cbor4ii::serde::to_vec(Vec::new(), &event).expect("cbor encode");
+            cbor4ii::serde::from_slice(&blob).expect("cbor decode")
+        };
+        assert_eq!(cbor_back.instance_snapshot, event.instance_snapshot);
+        assert_eq!(cbor_back.source_snapshot, event.source_snapshot);
+        assert_eq!(cbor_back.record_snapshot, event.record_snapshot);
+        assert_eq!(cbor_back.source_statuses, event.source_statuses);
+
+        let bincode_back: DamageEvent = {
+            let blob = super::bincode::serialize(&event).expect("bincode encode");
+            super::bincode::deserialize(&blob).expect("bincode decode")
+        };
+        assert_eq!(bincode_back.instance_snapshot, event.instance_snapshot);
+        assert_eq!(bincode_back.source_snapshot, event.source_snapshot);
+        assert_eq!(bincode_back.record_snapshot, event.record_snapshot);
+        assert_eq!(bincode_back.source_statuses, event.source_statuses);
     }
 }
 

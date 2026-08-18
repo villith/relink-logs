@@ -1426,6 +1426,26 @@ export const PLAYER_COLORS = ["#FF5630", "#FFAB00", "#36B37E", "#00B8D9", "#9BCF
 /// selectors and the events stream all go through.
 export const ENEMY_COLORS = ["#F06595", "#CC5DE8", "#845EF7", "#5C7CFA", "#A9B1BD", "#D6336C", "#9775FA", "#4DABF7"];
 
+/// The categorical palette for compared LOGS — one colour per pane, worn by that
+/// log's line on the compare overlay, the rule where its run ended, its selector
+/// in the actor bar and its column's title (see `paneSeriesColor`).
+///
+/// A third list rather than reusing PLAYER_COLORS, for two reasons:
+///
+/// * Nothing here is red, orange or amber. A whole column tinted in one of those
+///   reads as an error or a warning about that log, which is what every other
+///   red/amber mark in this app means (the imported badge, a failed fetch, the
+///   legality findings). A log is not in a bad state for being compared.
+/// * A pane colour and a party colour appear TOGETHER in the split layout — the
+///   end rules wear this palette while the bands under them wear the party's —
+///   so drawing both from one list would put a log and a player in one colour.
+///
+/// The first two are what a two-log comparison actually uses, and they are a
+/// blue and a magenta on purpose: that pair keeps its separation under deutan
+/// and protan simulation, where blue-against-green or blue-against-violet does
+/// not. Green is deliberately absent as well — in this app it means "cleared".
+export const COMPARE_COLORS = ["#4DABF7", "#DA77F2", "#22B8CF", "#748FFC", "#E599F7", "#66D9E8", "#B197FC", "#A9B1BD"];
+
 /// Resolves a player row's chart/overlay color. A filled party slot's color belongs
 /// to the row matched to it. A row that doesn't resolve to a slot picks, by its sort
 /// position, from the remaining colors: first the EMPTY slots' colors (so four
@@ -1493,16 +1513,20 @@ export const translateEnemyType = (type: EnemyType | null): string => {
   if (type === null) return "";
 
   if (typeof type == "object" && Object.hasOwn(type, "Unknown")) {
-    const hash = type.Unknown.toString(16).padStart(8, "0");
-
-    return t([`enemies:${hash}.text`, `enemies.unknown.${hash}`, "enemies.unknown-type"], { id: hash });
+    return translateEnemyTypeId(type.Unknown);
   } else {
     return t([`enemies.${type}`, "enemies.unknown-type"]);
   }
 };
 
+/** One author for the enemy-name fallback chain. The tagged-union form delegates
+ * here, so a rung added to the chain cannot reach only one of the two — which is
+ * how `enemies.unknown.<hash>` came to be read by one and not the other.
+ *
+ * The pad is written out rather than taken from `toHashString`, which answers
+ * `""` for 0: a type hash keeps all eight digits. */
 export const translateEnemyTypeId = (id: number): string => {
-  const hash = toHashString(id);
+  const hash = id.toString(16).padStart(8, "0");
   return t([`enemies:${hash}.text`, `enemies.unknown.${hash}`, "enemies.unknown-type"], { id: hash });
 };
 
@@ -1630,9 +1654,23 @@ export const mergeSupplementaryRows = <T extends SkillState>(rows: T[]): T[] => 
   });
 };
 
+/** The quest a training-dummy run is filed under. Mirrors
+ * `parser::constants::TRAINING_DUMMY_QUEST_ID`, which is what the backend puts
+ * on every log whose enemy is Sir Barrold — training is not a quest and carries
+ * no id of its own.
+ *
+ * Named here rather than in the `quests` bundle because that bundle is
+ * generated from the game's own quest table, and this id is the app's. */
+export const TRAINING_DUMMY_QUEST_ID = 0xa379ac65;
+
 /// Translates the quest ID to a human-readable string.
 export const translateQuestId = (id: number | null): string => {
   if (id === null) return "";
+  // `ui.logs.…`, not `logs.…`: the `ui` NAMESPACE is the whole of `ui.json`,
+  // whose root holds a `ui` object beside `quest`/`characters`/… — so the app's
+  // own strings are two segments deep and a key that drops the first renders as
+  // itself. (`quest.unknown` below is a root sibling, which is why it does not.)
+  if (id === TRAINING_DUMMY_QUEST_ID) return t("ui.logs.quest-training-dummy");
   const hash = id.toString(16);
   return t([`quests:${hash}.text`, "quest.unknown"], { id: hash });
 };
@@ -1868,6 +1906,16 @@ export const deriveNavState = (pathname: string) => {
  * disabled tab would leave the page with no panel rendered at all. */
 export const resolveAvailableTab = <T extends string>(tab: string | null, available: readonly T[], fallback: T): T =>
   available.includes(tab as T) ? (tab as T) : fallback;
+
+/** `set` with `member` flipped in or out, as a NEW set — the shape a set held as
+ * React state is updated in. One author, because a set-as-state that is mutated
+ * in place instead of replaced does not re-render, and that mistake reads as
+ * "the click did nothing" rather than as a bug. */
+export const toggled = <T>(set: ReadonlySet<T>, member: T): Set<T> => {
+  const next = new Set(set);
+  if (!next.delete(member)) next.add(member);
+  return next;
+};
 
 /// Hook that returns the previous value of a variable.
 export const usePrevious = <T>(value: T): T | undefined => {

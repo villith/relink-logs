@@ -190,6 +190,47 @@ describe("EventRowsTable", () => {
     expect(ability?.style.color).toBe("");
   });
 
+  // A capless hit of a kind the cap builder locally always stamps is a REMOTE
+  // hit: with the actor's store and loadout captured, its Amount cell opens the
+  // PREDICTED card rather than none.
+  it("opens the predicted card for a capless damage row with the inputs captured", () => {
+    const remote: EventRow = {
+      ...ROWS[0],
+      amount: 80_000,
+      abilityKey: "Normal:9001",
+      capHit: { damage: 80_000, damage_cap: null, base_damage: null, attack_rate: 0.54, class_flags: 0x1 },
+    };
+    render(
+      <MantineProvider>
+        <EventRowsTable
+          rows={[remote]}
+          rowHeight={22}
+          startIndex={0}
+          totalRows={1}
+          labels={LABELS}
+          capUp={{ [String(remote.sourceIndex)]: { normal: 13.13, skill: null, sba: null } }}
+          loadout={
+            new Map([
+              [
+                remote.sourceIndex!,
+                {
+                  sigils: [],
+                  summons: [],
+                  weaponState: null,
+                  weaponInfo: null,
+                  overmasteryInfo: null,
+                  characterType: "Pl0300",
+                } as never,
+              ],
+            ])
+          }
+        />
+      </MantineProvider>
+    );
+    fireEvent.mouseEnter(screen.getByText("80,000"), { clientX: 10, clientY: 10 });
+    expect(screen.getByTestId("cap-card").textContent).toContain("ui.logs.cap-predicted-title");
+  });
+
   // The stream is a body of the analysis view, so it draws its rows through the
   // same shell the metric table and the timeline lanes do — one height, one
   // hover, one focus ring. It used to hand-roll all three a size smaller.
@@ -388,6 +429,9 @@ const NO_CAPTURE = {
   source_current_hp: null,
   source_max_hp: null,
   source_statuses: null,
+  instance_snapshot: null,
+  record_snapshot: null,
+  source_snapshot: null,
 };
 
 /** The same hit, from a nominated player — for the cases that need more than

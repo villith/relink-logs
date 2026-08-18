@@ -16,6 +16,11 @@ export type CapDebugHit = {
    * stored loadout and the ladder's character are all held under. */
   sourceIndex: number;
   targetIndex: number;
+  /** The target's own actor index (`target.parent_index`) — the key
+   * `EnemyMode`/`ChartWindow` name an enemy by, and NOT the same value as
+   * `targetIndex` (the folded instance pointer). What the mode-window join
+   * matches against. */
+  targetParentIndex: number;
   actionId: ActionType;
   abilityKey: string;
   hit: ExplainHit;
@@ -38,6 +43,7 @@ export const damageHits = (events: LogEvent[]): CapDebugHit[] => {
       timeMs,
       sourceIndex: event.source.parent_index,
       targetIndex: event.target.index,
+      targetParentIndex: event.target.parent_index,
       actionId: event.action_id,
       abilityKey: abilityKey(event.action_id),
       hit: {
@@ -47,6 +53,10 @@ export const damageHits = (events: LogEvent[]): CapDebugHit[] => {
         attack_rate: event.attack_rate,
         class_flags: event.class_flags,
         flags: event.flags,
+        // `?? null`-tolerant: an old stored log can deserialize with this key
+        // absent rather than null (see eventRows.ts's own note on this).
+        instance_snapshot: event.instance_snapshot ?? null,
+        record_snapshot: event.record_snapshot ?? null,
       },
       attacker: {
         source_current_hp: event.source_current_hp,

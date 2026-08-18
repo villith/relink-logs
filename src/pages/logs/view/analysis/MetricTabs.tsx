@@ -1,10 +1,13 @@
 import { UnstyledButton } from "@mantine/core";
+import type { Icon } from "@phosphor-icons/react";
 import { useTranslation } from "react-i18next";
 
 import { onArrowKeys } from "@/components/ui/rovingKeys";
 import { Strip } from "@/components/ui/Strip";
 
-export type MetricTab = { value: string; labelKey: string };
+/** `icon` is the component, not an element: the tab lists are plain `.ts`
+ * modules and cannot spell JSX. Only the body switch carries one. */
+export type MetricTab = { value: string; labelKey: string; icon?: Icon };
 
 export type MetricTabsProps = {
   tabs: MetricTab[];
@@ -57,6 +60,7 @@ export const MetricTabs = ({
     >
       {tabs.map((tab) => {
         const active = tab.value === value;
+        const Glyph = tab.icon;
         return (
           <UnstyledButton
             key={tab.value}
@@ -71,8 +75,12 @@ export const MetricTabs = ({
               // push the underline off the text and double the gutter.
               variant === "inline" ? "py-[3px]" : "mr-5 py-[7px]",
               active ? "border-accent text-ink" : "border-transparent text-ink-3",
+              // An `<svg>` in a text box sits on the baseline; the pair have to
+              // be flex items to centre. Left off the tabs that carry no icon.
+              Glyph === undefined ? "" : "inline-flex items-center gap-1.5",
             ].join(" ")}
           >
+            {Glyph !== undefined && <Glyph size={16} aria-hidden />}
             {t(tab.labelKey)}
           </UnstyledButton>
         );

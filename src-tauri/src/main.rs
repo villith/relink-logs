@@ -5,7 +5,10 @@ use std::{
     collections::HashMap,
     fs::File,
     io::Write,
-    sync::atomic::{AtomicBool, Ordering},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex, OnceLock,
+    },
 };
 
 use anyhow::Context;
@@ -903,6 +906,10 @@ async fn import_logs_from_file(
         )
         .map_err(|e| e.to_string())?;
 
+        // An import writes rows and can reuse rowids freed by an earlier delete
+        // — see `forget_decoded_logs`.
+        forget_decoded_logs();
+
         // Imported rows arrive unstamped; judge them now rather than making the
         // cheat audit wait for the next launch. Same background sweep as startup,
         // so the audit page's progress banner covers this pass too.
@@ -937,6 +944,8 @@ async fn delete_imported_logs() -> Result<u32, String> {
         .map_err(|e| e.to_string())?;
     // Verdicts go with their logs — see delete_logs.
     db::legality::sweep_orphaned_findings(&conn).map_err(|e| e.to_string())?;
+    // And so do decoded logs — see delete_logs.
+    forget_decoded_logs();
     Ok(deleted as u32)
 }
 
@@ -961,6 +970,8 @@ async fn delete_all_logs() -> Result<(), String> {
     // Conflux tab doesn't keep showing ghost "×0 rooms" runs.
     conn.execute("DELETE FROM runs", [])
         .map_err(|e| e.to_string())?;
+    // And so do decoded logs — see delete_logs.
+    forget_decoded_logs();
     Ok(())
 }
 
@@ -1071,6 +1082,22 @@ struct SearchResult {
     /// not the whole table the audit page reads. Logs nobody was flagged in are
     /// absent; the quest list reads a miss as clean.
     legality: HashMap<i64, Vec<db::legality::StoredFinding>>,
+}
+
+/// The whole log library, unpaginated, for the picker's client-side search.
+/// Kept separate from [`fetch_logs`] rather than an "unpaginated" flag on it —
+/// the two return different shapes ([`db::logs::LogSummary`] is deliberately
+/// narrower than [`db::logs::LogEntry`]) and want different callers.
+///
+/// Plain `fn`, so Tauri runs this synchronously on the IPC thread — the same
+/// as every other DB reader here. If a large library ever makes that a visible
+/// hitch, the fix is `#[tauri::command(async)]` (used 11 times in this file
+/// already), not a `LIMIT`: a limit would silently truncate the library the
+/// picker searches, breaking client-side search in a way the user can't see.
+#[tauri::command]
+fn fetch_log_summaries() -> Result<Vec<db::logs::LogSummary>, String> {
+    let conn = db::connect_to_db().map_err(|e| e.to_string())?;
+    db::logs::fetch_log_summaries(&conn).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -1185,7 +1212,11 @@ fn fetch_logs(
             }
         }
 
-        if let Some(quest_id) = quest_id {
+        // Through the SAME display rule `get_logs` files each row under, or the
+        // filter offers ids no row is labelled with and withholds the one every
+        // dummy row IS labelled with — leaving that branch of
+        // `apply_log_filters` unreachable from this dropdown.
+        if let Some(quest_id) = db::logs::quest_id_for_display(quest_id, primary_target) {
             if !quest_ids.contains(&quest_id) {
                 quest_ids.push(quest_id);
             }
@@ -1622,10 +1653,68 @@ fn fetch_encounter_events(id: u64, offset: usize, count: usize) -> Result<v1::Ev
     ))
 }
 
-// `(async)` so the decompress + full reparse runs off the main thread — this is
-// called on every log open, filter change, and brush release.
-#[tauri::command(async)]
-fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStateResponse, String> {
+/// One log, decoded once and reused by every request against it.
+///
+/// Everything in here is a function of the STORED BLOB alone — nothing a pin, a
+/// window, a metric or a filter can change — which is exactly why it is worth
+/// keeping. The parser is reused IN PLACE rather than cloned: the first thing
+/// `reparse_with_options` does is `derived_state = Default::default()`, so a
+/// request cannot see what the last one left behind, and `filters`/`selection`
+/// are runtime fields both set before every reparse.
+struct CachedLog {
+    parser: v1::Parser,
+    /// The spawn segmentation over the UNWINDOWED raw log — the one thing every
+    /// caller here has to share, because a `SelectionFact`'s `target_segment`
+    /// and a `GroupKey::EnemySpawn` both index this very vector (see
+    /// `aggregate_groups`). Cached because it depends only on the log, and it
+    /// was being recomputed twice per request on top of the copy
+    /// `reparse_with_options` makes internally.
+    segments: Vec<v1::TargetSegment>,
+    assignment: Vec<Option<usize>>,
+    /// From the log's own row, and immutable per log like the blob beside it.
+    room_index: Option<u32>,
+    imported: bool,
+}
+
+/// How many decoded logs to keep.
+///
+/// Deliberately small: an entry is a whole decompressed event log, and the view
+/// reads at most a couple at a time (a comparison holds two, and flicking
+/// between runs wants a little room behind them). The cost of a miss is what it
+/// always was, so this errs low.
+const DECODED_LOG_CAPACITY: usize = 4;
+
+fn decoded_logs() -> &'static Mutex<gbfr_logs::log_cache::LogCache<CachedLog>> {
+    static CACHE: OnceLock<Mutex<gbfr_logs::log_cache::LogCache<CachedLog>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(gbfr_logs::log_cache::LogCache::new(DECODED_LOG_CAPACITY)))
+}
+
+/// The cache, recovering from a poisoned lock rather than failing every request
+/// after one panic. Nothing in the cache is a partial write worth protecting —
+/// it is a map of ids to decoded logs, and the worst a panicking request can
+/// leave behind is an entry that will be reparsed from scratch by the next one.
+fn lock_decoded_logs() -> std::sync::MutexGuard<'static, gbfr_logs::log_cache::LogCache<CachedLog>>
+{
+    decoded_logs()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+/// Drop every decoded log.
+///
+/// Called by anything that WRITES the log store. Deletion is the one that makes
+/// it mandatory rather than merely tidy: the `logs` table has no `AUTOINCREMENT`,
+/// so SQLite recycles the rowid of a deleted log, and a cached entry under that
+/// id would then serve one fight's events under the next one's name — the same
+/// hazard `sweep_orphaned_findings` exists for.
+fn forget_decoded_logs() {
+    lock_decoded_logs().clear();
+}
+
+/// Read one log out of the database and decode it. Runs with NO cache lock held
+/// — it opens a connection and decompresses megabytes, and holding the lock
+/// across that would serialise every pane behind the first miss.
+fn decode_log(id: u64) -> Result<CachedLog, String> {
     let conn = db::connect_to_db().map_err(|e| e.to_string())?;
     let mut stmt = conn
         .prepare("SELECT data, version, room_index, imported FROM logs WHERE id = ?")
@@ -1637,11 +1726,58 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         })
         .map_err(|e| e.to_string())?;
 
-    // Regrouped from the flat stored rows into one vector per party slot, so
-    // the response lines up with `players` by index. A log the sweep has not
-    // reached yet simply has no rows and reads as clean, which is the honest
-    // answer until it has been judged.
+    // @TODO(false): If we deserialize from an older version, we should save it back into the DB as the newer format.
+    let parser = parser::deserialize_version(&blob, version).map_err(|e| e.to_string())?;
+    let (segments, assignment) =
+        v1::segment_targets_indexed(&parser.encounter.raw_event_log, parser.start_time());
+
+    Ok(CachedLog {
+        parser,
+        segments,
+        assignment,
+        room_index,
+        imported,
+    })
+}
+
+/// The decoded log for `id`, from the cache or freshly read.
+///
+/// Two panes can both miss and both decode — the read above deliberately runs
+/// unlocked — and `insert` settles that by keeping whichever landed first, so
+/// they end up sharing one entry rather than reparsing each other's work away.
+/// The generation captured before that unlocked read guards a rarer case: a
+/// `forget_decoded_logs` landing mid-decode, which must not let this decode's
+/// now-stale result back into the cache once it finishes.
+fn decoded_log(id: u64) -> Result<Arc<Mutex<CachedLog>>, String> {
+    let mut cache = lock_decoded_logs();
+    if let Some(cached) = cache.get(id) {
+        return Ok(cached);
+    }
+    let generation = cache.generation();
+    drop(cache);
+
+    let decoded = decode_log(id)?;
+    Ok(lock_decoded_logs().insert_if_current(id, decoded, generation))
+}
+
+/// One log's stored legality verdicts, regrouped from the flat rows into one
+/// vector per party slot so the response lines up with `players` by index.
+///
+/// Read per request rather than cached beside the parser: a legality sweep can
+/// land while a log is open, and this is one indexed lookup against a table of
+/// verdicts — nothing like the decompress the cache exists to avoid. A log the
+/// sweep has not reached yet simply has no rows and reads as clean, which is the
+/// honest answer until it has been judged.
+fn stored_findings(id: u64) -> [Vec<legality::Finding>; 4] {
     let mut findings: [Vec<legality::Finding>; 4] = Default::default();
+    let conn = match db::connect_to_db() {
+        Ok(conn) => conn,
+        // Never fatal: a log still opens without its verdicts.
+        Err(error) => {
+            log::warn!("could not open the db for log {id}'s legality findings: {error:#}");
+            return findings;
+        }
+    };
     match db::legality::findings_for_log(&conn, id as i64) {
         Ok(stored) => {
             for row in stored {
@@ -1650,12 +1786,38 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
                 }
             }
         }
-        // Never fatal: a log still opens without its verdicts.
         Err(error) => log::warn!("could not read legality findings for log {id}: {error:#}"),
     }
+    findings
+}
 
-    // @TODO(false): If we deserialize from an older version, we should save it back into the DB as the newer format.
-    let mut parser = parser::deserialize_version(&blob, version).map_err(|e| e.to_string())?;
+// `(async)` so the reparse runs off the main thread — this is called on every
+// log open, filter change, brush release, pin, regroup and tab.
+//
+// The decompress it used to carry too is now behind `decoded_logs`: the blob
+// read, the bincode deserialise and the spawn segmentation are the same for
+// every request against one log, so they happen once (see `CachedLog`).
+#[tauri::command(async)]
+fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStateResponse, String> {
+    let entry = decoded_log(id)?;
+    // Recovered rather than propagated, for the reason in `lock_decoded_logs`:
+    // the reparse below rebuilds everything a panicking request could have left
+    // half-written.
+    let mut cached = entry
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    // Split up front so the parser can be reparsed (&mut) while the segmentation
+    // beside it is read (&) — they are separate fields of one guard.
+    let CachedLog {
+        parser,
+        segments,
+        assignment,
+        room_index,
+        imported,
+    } = &mut *cached;
+    let (room_index, imported) = (*room_index, *imported);
+
+    let findings = stored_findings(id);
 
     parser.filters = options.filters;
     parser.selection = options.selection.clone();
@@ -1670,26 +1832,24 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         // Included even here, unlike the charts: it is one pass over the events
         // with no buffers to build, and the analysis view's selectors have to
         // re-cascade against the new window on the very fetch that applies it.
-        // The segmentation is over the UNWINDOWED log, exactly as the base load
-        // computes `target_entries` — a fact's `target_segment` indexes into
-        // those, so the two must be the same segmentation or a pin would point
-        // at a different enemy on a scoped fetch than on the load.
-        let (segments, assignment) =
-            v1::segment_targets_indexed(&parser.encounter.raw_event_log, parser.start_time());
+        // The segmentation it indexes into is the CACHED one — over the
+        // unwindowed log, exactly as the base load's `target_entries` is — so a
+        // pin cannot point at a different enemy on a scoped fetch than on the
+        // load.
         let selection_facts = v1::selection_facts(
             &parser.encounter.raw_event_log,
             parser.start_time(),
             options.from_ms,
             options.up_to_ms,
-            &assignment,
+            assignment,
         );
 
         // The group aggregation: the analysis view's table rows and chart
         // bands under the current pins, window and grouping. Its series span
         // the FULL fight (the view slices client-side), while its measures
         // honor the query's own scrub window.
-        let groups = build_groups(&parser, &options, &segments, &assignment);
-        let group_reference = build_group_reference(&parser, &options, &segments, &assignment);
+        let groups = build_groups(parser, &options, segments, assignment);
+        let group_reference = build_group_reference(parser, &options, segments, assignment);
 
         // The drilled Stun/SBA bands, built here too: unlike the other charts
         // these are NOT carried over from the base load. A drill is a pin
@@ -1703,14 +1863,20 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
             .values()
             .map(|player| player.index)
             .collect();
-        let ability_series = build_ability_series(&parser, &options, &player_indices);
+        let ability_series = build_ability_series(parser, &options, &player_indices);
 
         // Only the fields the scrub commit actually consumes; everything else stays at its
         // Default so a new response field doesn't have to be mirrored as a hand-written
         // zero here (where forgetting it would silently return stale-looking data).
         return Ok(EncounterStateResponse {
-            encounter_state: parser.derived_state,
-            players: parser.encounter.player_data,
+            // TAKEN, not cloned: the parser stays in the cache, and the first
+            // thing the next request's reparse does is overwrite this field
+            // wholesale — so moving it out costs nothing and saves copying every
+            // player's whole skill breakdown.
+            encounter_state: std::mem::take(&mut parser.derived_state),
+            // Cloned, because this one is log DATA rather than derived state:
+            // taking it would empty the cached copy for every later request.
+            players: parser.encounter.player_data.clone(),
             quest_id: parser.encounter.quest_id,
             quest_timer: parser.encounter.quest_timer,
             quest_completed: parser.encounter.quest_completed,
@@ -1736,8 +1902,8 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
     // Indexed, because a `SelectionFact` names the SEGMENT it hit rather than
     // the game's actor index (which is recycled between bosses) — and those
     // indices are into this very vector, which ships as `target_entries`.
-    let (target_entries, assignment) =
-        v1::segment_targets_indexed(&parser.encounter.raw_event_log, start_time);
+    // Cached beside the parser, since it depends on the log and nothing else.
+    let target_entries = segments;
     // Windowed, but never narrowed by the pins themselves: each selector must
     // keep offering everything the OTHER pins still allow.
     let selection_facts = v1::selection_facts(
@@ -1745,7 +1911,7 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         start_time,
         options.from_ms,
         options.up_to_ms,
-        &assignment,
+        assignment,
     );
 
     let player_indices: Vec<u32> = parser
@@ -1806,7 +1972,7 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         &parser.encounter.raw_event_log,
         start_time,
         duration,
-        &target_entries,
+        target_entries,
     );
 
     // Same closing rule as the status intervals: a state still active at the
@@ -1814,34 +1980,39 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
     let chart_windows =
         v1::assemble_chart_windows(&parser.encounter.raw_event_log, start_time, duration);
 
-    let groups = build_groups(&parser, &options, &target_entries, &assignment);
-    let group_reference = build_group_reference(&parser, &options, &target_entries, &assignment);
+    let groups = build_groups(parser, &options, target_entries, assignment);
+    let group_reference = build_group_reference(parser, &options, target_entries, assignment);
 
     // The drilled Stun/SBA tabs' bands.
-    let ability_series = build_ability_series(&parser, &options, &player_indices);
+    let ability_series = build_ability_series(parser, &options, &player_indices);
 
     let sba_chart = parser.generate_sba_chart(SBA_INTERVAL);
 
-    // Activations pass only when same-actor SBA damage corroborates them: the
-    // per-frame perform capture can re-fire the previous fight's leftover
-    // casting state once at a Repeat Quest boundary, and that phantom drew an
-    // "X used their art" marker at the first millisecond of the next log. The
-    // SBA chart windows drop the same events by the same rule, so a marker and
-    // its window can never disagree about whether an art was real.
-    let corroborated = v1::corroborated_sba_activations(&parser.encounter.raw_event_log);
-    let sba_events = parser
+    // One entry per art the fight actually contains, recovered from the SBA
+    // damage: the hook records an activation event for only some arts, and one
+    // for no art at all at a Repeat Quest boundary (see `sba_activations`).
+    // Attempts are the button press and pass through as recorded.
+    let mut sba_events: Vec<(i64, Message)> = parser
         .encounter
         .event_log()
-        .enumerate()
-        .filter(|(index, (_, e))| match e {
-            Message::OnAttemptSBA(_) => true,
-            Message::OnPerformSBA(_) | Message::OnContinueSBAChain(_) => {
-                corroborated.contains(index)
-            }
-            _ => false,
-        })
-        .map(|(_, (ts, e))| (*ts - start_time, e.clone()))
+        .filter(|(_, e)| matches!(e, Message::OnAttemptSBA(_)))
+        .map(|(ts, e)| (*ts - start_time, e.clone()))
         .collect();
+    sba_events.extend(
+        v1::sba_activations(&parser.encounter.raw_event_log)
+            .into_iter()
+            .map(|activation| match activation {
+                v1::SbaActivation::Recorded(index) => {
+                    let (ts, event) = &parser.encounter.raw_event_log[index];
+                    (*ts - start_time, event.clone())
+                }
+                v1::SbaActivation::Derived { at, actor_index } => (
+                    at - start_time,
+                    Message::OnPerformSBA(protocol::OnPerformSBAEvent { actor_index }),
+                ),
+            }),
+    );
+    sba_events.sort_by_key(|(ts, _)| *ts);
 
     let death_events = parser
         .encounter
@@ -1851,8 +2022,11 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         .collect();
 
     Ok(EncounterStateResponse {
-        encounter_state: parser.derived_state,
-        players: parser.encounter.player_data,
+        // Taken and cloned respectively, for the reasons on the `state_only`
+        // response above: the derived state is rebuilt by the next reparse, the
+        // player data is not.
+        encounter_state: std::mem::take(&mut parser.derived_state),
+        players: parser.encounter.player_data.clone(),
         quest_id: parser.encounter.quest_id,
         quest_timer: parser.encounter.quest_timer,
         quest_completed: parser.encounter.quest_completed,
@@ -1873,7 +2047,10 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         ability_series,
         sba_events,
         death_events,
-        target_entries,
+        // Cloned out of the cache: one entry per spawn, so a handful of structs
+        // — the vector this indexes into is what had to be shared, not this
+        // copy of it.
+        target_entries: target_entries.clone(),
         selection_facts,
     })
 }
@@ -1911,6 +2088,11 @@ fn delete_logs(ids: Vec<u64>) -> Result<(), String> {
     // doesn't linger as a ghost "×0 rooms" row (the startup sweep only reaps in-progress
     // runs).
     db::runs::delete_runs_without_rooms(&conn).map_err(|e| e.to_string())?;
+
+    // MANDATORY, not tidiness: `logs` has no AUTOINCREMENT, so SQLite hands a
+    // deleted log's rowid to the next encounter recorded — and a cached entry
+    // under that id would serve one fight's events under the next one's name.
+    forget_decoded_logs();
 
     Ok(())
 }
@@ -2541,6 +2723,9 @@ fn connect_and_run_parser(app: AppHandle) {
     // start either side of the frontend's first push, and the parser outlives
     // game reconnects, so it must not depend on being pushed to again.
     state.filters = *app.state::<MeterFilterState>().current.lock().unwrap();
+    // A live save can hand out an id SQLite recycled from a deleted log — see
+    // forget_decoded_logs.
+    state.on_saved = Some(forget_decoded_logs);
 
     let (reset_tx, mut reset_rx) = tokio::sync::mpsc::unbounded_channel::<()>();
     *app.state::<ResetChannel>().0.lock().unwrap() = Some(reset_tx);
@@ -3048,6 +3233,7 @@ fn main() {
             fetch_encounter_state,
             fetch_encounter_events,
             fetch_logs,
+            fetch_log_summaries,
             fetch_conflux_runs,
             fetch_legality_players,
             delete_logs,

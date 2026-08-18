@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { checkSurface, countMarker, exportedNames, PROTON_MARKERS } from "./check-hook-surface.mjs";
+import { checkSurface, countMarker, DIAG_MARKERS, exportedNames, PROTON_MARKERS } from "./check-hook-surface.mjs";
 
 /**
  * A minimal PE32+ image with one section and an export directory carrying
@@ -46,12 +46,14 @@ function fakePe({ names = [] } = {}) {
 /** A scan result for a DLL that carries the full Proton surface. */
 const proton = () => ({
   markers: Object.fromEntries(PROTON_MARKERS.map((m) => [m, 1])),
+  diag: Object.fromEntries(DIAG_MARKERS.map((m) => [m, 0])),
   exports: ["DirectInput8Create"],
 });
 
 /** A scan result for a clean injected Windows DLL. */
 const windows = () => ({
   markers: Object.fromEntries(PROTON_MARKERS.map((m) => [m, 0])),
+  diag: Object.fromEntries(DIAG_MARKERS.map((m) => [m, 0])),
   exports: [],
 });
 
@@ -125,5 +127,28 @@ describe("checkSurface", () => {
     broken.markers = Object.fromEntries(PROTON_MARKERS.map((m) => [m, 0]));
     const errors = checkSurface({ windows: windows(), proton: broken });
     expect(errors.length).toBeGreaterThan(0);
+  });
+
+  // The CONFLUX lines shipped in every release for months because nothing
+  // asserted their absence: they are ordinary `log::warn!`/`log::info!` calls
+  // that nobody remembered to put behind `hookdiag`. Source review did not
+  // catch it and the feature gate could not, so the bytes have to.
+  it("fails when a diagnostic marker survives into the Windows DLL", () => {
+    const dirty = windows();
+    dirty.diag.CONFLUX = 3;
+    const errors = checkSurface({ windows: dirty, proton: proton() });
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatch(/CONFLUX/);
+  });
+
+  // Diagnostics are gated by feature, not by platform, so a Proton release
+  // build has to be just as clean. Checking only Windows would let the Linux
+  // artifact ship per-hit logging unnoticed.
+  it("fails when a diagnostic marker survives into the Proton DLL", () => {
+    const dirty = proton();
+    dirty.diag.CAPORACLE = 1;
+    const errors = checkSurface({ windows: windows(), proton: dirty });
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatch(/CAPORACLE/);
   });
 });

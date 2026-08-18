@@ -18,7 +18,7 @@ import { translateCharacterType } from "@/utils";
 import { childOfPin, type RowKeying } from "../../abilitySkills";
 import { keyColor } from "../../actorColor";
 import type { EntityCell } from "../../entity";
-import { buffs } from "../../metrics/buffs";
+import { buffs, slotsOf } from "../../metrics/buffs";
 import { damageDone } from "../../metrics/damageDone";
 import { damageTaken } from "../../metrics/damageTaken";
 import { debuffs } from "../../metrics/debuffs";
@@ -109,6 +109,9 @@ export type RowModelInput = {
   statusWindow: { startMs: number; endMs: number };
   fightDurationMs: number;
   rowKeying: RowKeying;
+  /** The `show_damage_facts` setting — whether damage rows carry their WP%/BA%
+   * cells and their fact tallies at all (see `GroupRowsContext`). */
+  showDamageFacts: boolean;
   shownEncounter: EncounterState | null;
   sourcePin: number | null;
   identity: ActorIdentity;
@@ -134,6 +137,7 @@ export const useRowModel = ({
   statusWindow,
   fightDurationMs,
   rowKeying,
+  showDamageFacts,
   shownEncounter,
   sourcePin,
   identity,
@@ -149,10 +153,7 @@ export const useRowModel = ({
   const metric = METRICS[metricKey] ?? damageDone;
 
   // Party slot per player index, for the group fold's row colours.
-  const partySlots = useMemo(
-    () => new Map(identityPlayers.map((player) => [player.index, player.partyIndex])),
-    [identityPlayers]
-  );
+  const partySlots = useMemo(() => slotsOf(identityPlayers), [identityPlayers]);
 
   // Which machinery produces rows is the metric's declared data path: the
   // groups path folds the fetched aggregates; the derived and interval paths
@@ -175,6 +176,7 @@ export const useRowModel = ({
         // It also carries which view the rows report: landings only when the
         // reader asked for echoes to be merged.
         keying: rowKeying,
+        showDamageFacts,
       });
     }
     return shownEncounter
@@ -214,6 +216,7 @@ export const useRowModel = ({
     statusWindow,
     hostility,
     rowKeying,
+    showDamageFacts,
   ]);
 
   // Child rows behind one table row — the descriptor's split bound to the

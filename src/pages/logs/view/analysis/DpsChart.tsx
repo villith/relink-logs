@@ -5,11 +5,9 @@ import { useTranslation } from "react-i18next";
 import { ReferenceArea, ReferenceLine } from "recharts";
 
 import { AnimatedHeight } from "@/components/AnimatedHeight";
-// Aliased: `Label` in this file is the chart's own series-label type.
-import { Label as UiLabel } from "@/components/ui/Label";
 import { PillGroup } from "@/components/ui/PillGroup";
 import { useCtrlHeld } from "@/components/useCtrlHeld";
-import { humanizeNumber } from "@/utils";
+import { humanizeNumber, toggled } from "@/utils";
 
 import { DPS_BUCKET_MS, type ChartDatapoint, type Label } from "../DetailCharts";
 import { bandOpacity, type Band } from "../statusBands";
@@ -17,11 +15,13 @@ import { bandOpacity, type Band } from "../statusBands";
 import { ChartLegend } from "./ChartLegend";
 import { ChartToggle } from "./ChartToggle";
 import { CardNotes, HoverCardBody } from "./HoverCard";
+import { SmoothingSelect } from "./SmoothingSelect";
 import "./analysis.css";
 import { SBA_MARKER_COLOR, type ChartMarker, type MarkerKind } from "./chartMarkers";
 import { ROLLUP_SERIES_KEY, rollupIsDrawn, withRollupSeries } from "./chartRollup";
 import { TOTAL_SERIES_KEY } from "./chartSeries";
 import {
+  DEFAULT_HIDDEN_WINDOW_KINDS,
   WINDOW_BAND_COLOR,
   WINDOW_KINDS,
   WINDOW_LABEL_KEY,
@@ -46,20 +46,13 @@ export const formatChartValue = (format: DpsChartProps["format"], value: number)
  * (overlapping areas — the default) or summed into a stack. */
 export type StackMode = "normal" | "stacked";
 
-/** Selectable trailing-average windows, in buckets. One bucket is one second
- * (`DPS_BUCKET_MS`), so a value IS its duration in seconds; 1 is "off", since a
- * one-bucket trailing mean is the bucket itself. */
-const SMOOTHING_OPTIONS = [1, 5, 10, 30];
-
 export type DpsChartProps = {
   /** Already sliced to the committed window, so the chart IS the window. */
   data: ChartDatapoint[];
   labels: Label;
-  /** i18next key naming what is plotted; follows the metric tabs. */
-  labelKey: string;
   /** i18next key naming what ONE SERIES is — the table's row-label key, which
    * heads the tooltip's breakdown so the card and the rows beneath it name the
-   * same thing. Distinct from `labelKey`, which names the whole plot. */
+   * same thing. */
   sectionKey: string;
   /** How a value reads: a humanized amount, a gauge percentage, or a plain
    * integer count (a stack depth, which `humanizeNumbers` would render as
@@ -95,6 +88,26 @@ export type DpsChartProps = {
    * `bands`). Drawn as vertical reference lines and appended to the tooltip of
    * the bucket they land in; a control row above the plot toggles each kind. */
   markers?: ChartMarker[];
+  /** Where ANOTHER log being compared ran out, in buckets on this chart's own
+   * axis. Drawn as a labelled dashed rule.
+   *
+   * Comparing two runs of different lengths, the shorter one's line simply
+   * stops and the longer one carries on — which reads as the shorter run having
+   * gone quiet rather than having ended. This is the line that says which. No
+   * control-row switch: it is not a class of event the reader turns off, it is
+   * a fact about the comparison currently on screen, and it disappears on its
+   * own the moment there is only one log. */
+  endLines?: EndLine[];
+  /** Which marker and window KINDS are hidden, and how to flip one.
+   *
+   * CONTROLLED when given, so several plots of one comparison can share one set
+   * of switches — the split layout draws the same fight twice, and two charts
+   * that each hid a different kind would not be showing the same thing. Omitted,
+   * the chart keeps its own set, which is what a lone plot wants. */
+  hiddenMarkerKinds?: ReadonlySet<MarkerKind>;
+  onToggleMarkerKind?: (kind: MarkerKind) => void;
+  hiddenWindowKinds?: ReadonlySet<WindowKind>;
+  onToggleWindowKind?: (kind: WindowKind) => void;
   /** For the STACKS chart (aura holder/effect series): whether the areas
    * overlap ("normal", WCL's default) or sum into a stack. Absent, a stacked
    * chart stacks — the damage drills are decompositions whose stack height IS
@@ -123,6 +136,13 @@ export type DpsChartProps = {
   /** Providing this renders the Normal | Stacked SegmentedControl in the
    * chart header. */
   onStackModeChange?: (mode: StackMode) => void;
+  /** The hover card's fixed width in pixels, where this plot's rows are wider
+   * than a party member's name. The compare overlay raises it: every one of its
+   * rows names a whole LOG — an id and when the run happened — and a window
+   * line carries that id on top of the span it already states, so at the
+   * default the labels the comparison exists to tell apart were the part that
+   * ellipsized. Absent, `TOOLTIP_WIDTH`. */
+  tooltipWidth?: number;
   /** Extra controls for the header strip, drawn ahead of the chart's own.
    *
    * A slot rather than a prop per control: what belongs here is anything that
@@ -141,7 +161,39 @@ export type DpsChartProps = {
  * would silently claim the bucket for one of them, so it goes neutral (the same
  * grey the Total series uses) and the tooltip, which still lists every marker,
  * names who died. */
+/** The end rules this chart actually draws.
+ *
+ * A line at or past the chart's own last bucket is DROPPED rather than clamped
+ * onto it: the run being marked is as long as or longer than this one, so there
+ * is no "the other log ended here" to point at, and a clamped rule would sit on
+ * the axis edge claiming otherwise. Negative buckets are the empty-pane case —
+ * a pane whose chart has not landed publishes a length of 0, hence -1.
+ *
+ * Exported for its own test: the drawing is recharts SVG, but the rule about
+ * which lines exist is this project's and is what regresses. */
+export const visibleEndLines = (endLines: EndLine[], maxIndex: number): EndLine[] =>
+  endLines.filter((line) => line.bucket >= 0 && line.bucket < maxIndex);
+
+/** The `endLines` default, hoisted so it is one identity across renders —
+ * a fresh `[]` in the parameter list re-runs the memo that reads it every time. */
+const EMPTY_END_LINES: EndLine[] = [];
+
 const MIXED_MARKER_COLOR = "var(--mantine-color-gray-5)";
+
+/** Where another compared log's fight ended, on this chart's axis.
+ *
+ * `bucket` rather than milliseconds because the caller comparing two plots
+ * already holds both in buckets (a series index IS a bucket), and converting to
+ * ms here only to divide it back would be two chances to disagree about the
+ * rounding. */
+export type EndLine = {
+  bucket: number;
+  /** The log's own line colour on the compare overlay, so the rule and the
+   * series it belongs to read as one thing. */
+  color: string;
+  /** What ended — the log id, as the picker and the overlay's legend name it. */
+  label: string;
+};
 
 /** The chart tooltip's width, in pixels.
  *
@@ -153,7 +205,11 @@ const MIXED_MARKER_COLOR = "var(--mantine-color-gray-5)";
  * own name cell already does in the table.
  *
  * Its own constant rather than `HoverCard`'s min/max pair: those bound a card
- * whose content is fixed by the row it explains, and are free to fit it. */
+ * whose content is fixed by the row it explains, and are free to fit it.
+ *
+ * FIXED per chart, not per bucket: the caller may raise it (see
+ * `DpsChartProps.tooltipWidth`), and the compare overlay does, because its rows
+ * name a whole log rather than a party member. */
 const TOOLTIP_WIDTH = 320;
 
 /** Control-row label per marker kind. */
@@ -183,6 +239,7 @@ export const ChartTooltip = ({
   sectionKey,
   markers,
   windowLines,
+  width = TOOLTIP_WIDTH,
   sumTotal = false,
 }: {
   label: string;
@@ -201,8 +258,11 @@ export const ChartTooltip = ({
   markers?: ChartMarker[];
   /** Battle-window lines covering THIS bucket, already coloured and worded —
    * appended under the marker rows, grouped by kind under their own headings
-   * (so the row text no longer names its own kind). */
-  windowLines?: { kind: WindowKind; color: string; text: string }[];
+   * (so the row text no longer names its own kind). `tag` names the LOG a span
+   * belongs to on the compare overlay, where several fights share one card. */
+  windowLines?: { kind: WindowKind; color: string; text: string; tag?: { text: string; color: string } }[];
+  /** The card's fixed width — see `TOOLTIP_WIDTH`. */
+  width?: number;
   /** Whether the bucket's total is the SUM of the plotted series.
    *
    * True on a stacked chart, where the stack's height IS the total and no
@@ -280,6 +340,9 @@ export const ChartTooltip = ({
           // particular: every SBA line wears one colour, so the swatch says
           // only that an SBA happened and the art is what says by whom.
           ...(marker.icon === undefined ? {} : { icon: marker.icon }),
+          // And on the compare overlay, WHICH RUN's — the swatch is the kind's
+          // there too.
+          ...(marker.tag === undefined ? {} : { tag: marker.tag }),
         })),
     }))
     .filter((section) => section.notes.length > 0);
@@ -288,7 +351,12 @@ export const ChartTooltip = ({
     kind,
     notes: (windowLines ?? [])
       .filter((line) => line.kind === kind)
-      .map((line, index) => ({ key: `${kind}-${index}`, color: line.color, text: line.text })),
+      .map((line, index) => ({
+        key: `${kind}-${index}`,
+        color: line.color,
+        text: line.text,
+        ...(line.tag === undefined ? {} : { tag: line.tag }),
+      })),
   })).filter((section) => section.notes.length > 0);
 
   // Hidden, never unmounted. Recharts positions its wrapper by transform only
@@ -319,7 +387,7 @@ export const ChartTooltip = ({
       withBorder
       shadow="md"
       radius="md"
-      style={{ width: TOOLTIP_WIDTH, ...(nothingToShow ? { visibility: "hidden" } : {}) }}
+      style={{ width, ...(nothingToShow ? { visibility: "hidden" } : {}) }}
     >
       <Text fw={500} mb={5}>
         {label}
@@ -409,7 +477,6 @@ export const ChartTooltip = ({
 export const DpsChart = ({
   data,
   labels,
-  labelKey,
   sectionKey,
   format,
   onScope,
@@ -422,6 +489,12 @@ export const DpsChart = ({
   onSmoothingChange,
   stackMode = "stacked",
   onStackModeChange,
+  endLines = EMPTY_END_LINES,
+  hiddenMarkerKinds: controlledMarkerKinds,
+  onToggleMarkerKind,
+  hiddenWindowKinds: controlledWindowKinds,
+  onToggleWindowKind,
+  tooltipWidth,
   controls,
 }: DpsChartProps) => {
   const { t } = useTranslation();
@@ -436,19 +509,29 @@ export const DpsChart = ({
   // reason to hide the others.
   const [hidden, setHidden] = useState<Set<string>>(new Set());
 
-  // Which marker KINDS are hidden. Component-local like the legend's hidden
-  // set, but not reset with it: hiding deaths is a way of reading every chart,
-  // not a property of one pin's series keys.
-  const [hiddenMarkerKinds, setHiddenMarkerKinds] = useState<Set<MarkerKind>>(new Set());
+  // Which marker KINDS are hidden. Not reset with the legend's hidden set:
+  // hiding deaths is a way of reading every chart, not a property of one pin's
+  // series keys — which is also why the caller may own it (see the prop).
+  const [ownMarkerKinds, setOwnMarkerKinds] = useState<Set<MarkerKind>>(new Set());
+  const hiddenMarkerKinds = controlledMarkerKinds ?? ownMarkerKinds;
+  const toggleMarkerKind = (kind: MarkerKind) => {
+    if (onToggleMarkerKind) return onToggleMarkerKind(kind);
+    setOwnMarkerKinds((previous) => toggled(previous, kind));
+  };
 
   const markerKinds = useMemo(
     () => (["death", "sba"] as const).filter((kind) => (markers ?? []).some((marker) => marker.kind === kind)),
     [markers]
   );
 
-  // Which window KINDS are hidden — same lifecycle reasoning as the marker
-  // kinds: a way of reading every chart, not a property of one pin's series.
-  const [hiddenWindowKinds, setHiddenWindowKinds] = useState<Set<WindowKind>>(new Set());
+  // Which window KINDS are hidden — same reasoning, and the same caller-owns-it
+  // option, as the marker kinds above.
+  const [ownWindowKinds, setOwnWindowKinds] = useState<Set<WindowKind>>(() => new Set(DEFAULT_HIDDEN_WINDOW_KINDS));
+  const hiddenWindowKinds = controlledWindowKinds ?? ownWindowKinds;
+  const toggleWindowKind = (kind: WindowKind) => {
+    if (onToggleWindowKind) return onToggleWindowKind(kind);
+    setOwnWindowKinds((previous) => toggled(previous, kind));
+  };
 
   const windowKinds = useMemo(
     () => WINDOW_KINDS.filter((kind) => (windowBands ?? []).some((band) => band.kind === kind)),
@@ -460,24 +543,10 @@ export const DpsChart = ({
     [windowBands, hiddenWindowKinds]
   );
 
-  const toggleWindowKind = (kind: WindowKind) =>
-    setHiddenWindowKinds((previous) => {
-      const next = new Set(previous);
-      if (!next.delete(kind)) next.add(kind);
-      return next;
-    });
-
   const shownMarkers = useMemo(
     () => (markers ?? []).filter((marker) => !hiddenMarkerKinds.has(marker.kind)),
     [markers, hiddenMarkerKinds]
   );
-
-  const toggleMarkerKind = (kind: MarkerKind) =>
-    setHiddenMarkerKinds((previous) => {
-      const next = new Set(previous);
-      if (!next.delete(kind)) next.add(kind);
-      return next;
-    });
 
   // Bands ranked past the chart's cap. Plotted like any other, but hidden
   // until the legend switches them on, with `other` standing in for whichever
@@ -617,6 +686,7 @@ export const DpsChart = ({
         sectionKey={sectionKey}
         markers={markersByLabel.get(String(label ?? ""))}
         windowLines={windowLinesByLabel.get(String(label ?? ""))}
+        width={tooltipWidth ?? TOOLTIP_WIDTH}
         // A stacked plot draws its total as the stack's height but plots no
         // Total series — one would be added to the stack and double it — so
         // the card sums the bands to report the figure already on screen.
@@ -702,6 +772,34 @@ export const DpsChart = ({
     ));
   }, [bucketedMarkers]);
 
+  // The other logs' end rules. Longer dashes than a marker's "3 3" and a label
+  // at the top, because this line means something different in kind: a marker
+  // says an event happened, this says a whole series stopped having data.
+  //
+  // A line at or past this chart's own last bucket is dropped rather than
+  // clamped onto it: the run being marked is as long as or longer than this
+  // one, so there is no "the other log ended here" to point at, and a clamped
+  // rule would sit on the axis edge claiming otherwise.
+  const endLineRules = useMemo(
+    () =>
+      visibleEndLines(endLines, maxIndex).map((line, index) => (
+        <ReferenceLine
+          key={`end-${index}`}
+          x={data[line.bucket]?.timestamp}
+          stroke={line.color}
+          strokeDasharray="6 4"
+          strokeOpacity={0.75}
+          label={{
+            value: line.label,
+            position: "insideTopRight",
+            fill: line.color,
+            fontSize: "var(--text-xs)",
+          }}
+        />
+      )),
+    [endLines, data, maxIndex]
+  );
+
   // The markers of each bucket, keyed by that bucket's x label — which is what
   // the recharts tooltip hands its content, so the lookup is one map get.
   const markersByLabel = useMemo(() => {
@@ -719,19 +817,17 @@ export const DpsChart = ({
   // markersByLabel — the tooltip's lookup is one map get. Hidden kinds drop
   // out here so shading and tooltip always agree on what is visible.
   const windowLinesByLabel = useMemo(() => {
-    const byLabel = new Map<string, { kind: WindowKind; color: string; text: string }[]>();
+    const byLabel = new Map<string, NonNullable<DpsChartProps["windowTooltips"]>>();
     for (const entry of windowTooltips ?? []) {
       if (hiddenWindowKinds.has(entry.kind)) continue;
       const from = Math.max(0, Math.floor(entry.startMs / DPS_BUCKET_MS));
       const upTo = Math.min(maxIndex, Math.ceil(entry.endMs / DPS_BUCKET_MS) - 1);
-      // The kind rides the line: the card heads each kind with its own name.
-      const line = { kind: entry.kind, color: entry.color, text: entry.text };
       for (let bucket = from; bucket <= upTo; bucket += 1) {
         const label = data[bucket]?.timestamp;
         if (label === undefined) continue;
         const group = byLabel.get(label);
-        if (group) group.push(line);
-        else byLabel.set(label, [line]);
+        if (group) group.push(entry);
+        else byLabel.set(label, [entry]);
       }
     }
     return byLabel;
@@ -750,30 +846,31 @@ export const DpsChart = ({
 
   return (
     <Box style={{ padding: "10px 16px 8px" }}>
-      <Box style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
-        <UiLabel>{t(labelKey)}</UiLabel>
+      {/* The strip reserves its own height rather than taking it from whatever
+          it happens to hold. Its members are not the same height — a captioned
+          `PillGroup` stands taller than a `ChartToggle` — and half of them come
+          and go with the metric: smoothing is offered on rate charts only (a
+          level averaged over a trailing window reads as something it never
+          was), the stack mode only where bands stack, the band switches only
+          where the fight had those windows. So the row followed the tallest
+          control the current tab happened to have, and the plot, the strips and
+          the whole table below it stepped up and down as you moved between tabs.
+          `min-h`, not a fixed height, so a locale that wraps a caption is not
+          clipped — it grows, which is the failure worth having.
+
+          Nothing on the left of it any more: the row used to open with the
+          plot's own title ("Damage per second, by skill"), which restated the
+          metric tab, the side toggle, the pins and the regroup strip standing
+          directly above it. */}
+      <Box
+        data-chart-control-row
+        className="min-h-control"
+        style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginBottom: 5 }}
+      >
         <Group gap="sm" data-testid="chart-controls">
           {controls}
           {onSmoothingChange !== undefined && smoothing !== undefined && (
-            <PillGroup
-              // The options are bare durations, so both the caption and the
-              // aria-label are load-bearing: "Off 5s 10s 30s" on its own names
-              // four values and no question, which is a control the reader can
-              // operate without ever learning what it does. The title says what
-              // choosing one MEANS.
-              caption={t("ui.logs.chart-smoothing-caption")}
-              ariaLabel={t("ui.logs.chart-smoothing-label")}
-              title={t("ui.logs.chart-smoothing-hint")}
-              value={String(smoothing)}
-              onChange={(value) => onSmoothingChange(Number(value))}
-              options={SMOOTHING_OPTIONS.map((buckets) => ({
-                value: String(buckets),
-                label:
-                  buckets === 1
-                    ? t("ui.logs.chart-smoothing-off")
-                    : t("ui.logs.chart-smoothing-seconds", { seconds: buckets }),
-              }))}
-            />
+            <SmoothingSelect value={smoothing} onChange={onSmoothingChange} />
           )}
           {onStackModeChange && (
             <PillGroup
@@ -837,12 +934,14 @@ export const DpsChart = ({
           >
             {statusBands}
             {markerLines}
+            {endLineRules}
             {scopeBand}
           </AreaChart>
         ) : (
           <LineChart {...shared} lineChartProps={interaction} tooltipProps={tooltip}>
             {statusBands}
             {markerLines}
+            {endLineRules}
             {scopeBand}
           </LineChart>
         )}

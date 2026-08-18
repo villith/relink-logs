@@ -1,11 +1,13 @@
-import { ActionIcon, Box, Menu, UnstyledButton } from "@mantine/core";
-import { CaretDown, Check, X } from "@phosphor-icons/react";
+import { Box, Menu, UnstyledButton } from "@mantine/core";
+import { CaretDown, X } from "@phosphor-icons/react";
 import { useTranslation } from "react-i18next";
 
+import { Button } from "@/components/ui/Button";
 import { Figure } from "@/components/ui/Figure";
 import { Label } from "@/components/ui/Label";
 import { Strip } from "@/components/ui/Strip";
 
+import { MenuTick } from "./MenuTick";
 import { WINDOW_BAND_COLOR } from "./chartWindowBands";
 import {
   CHIP_BUTTON_CLASS,
@@ -25,21 +27,6 @@ export type WindowStripProps = {
   onToggleKind: (kind: string) => void;
   onClear: () => void;
 };
-
-/** The tick in front of a menu row. Always drawn, empty when unticked: a glyph
- * that appears and disappears moves the label under the cursor, and a menu the
- * eye is scanning down a column of is the worst place for that. */
-const MenuTick = ({ checked }: { checked: boolean }) => (
-  <Box
-    aria-hidden
-    className={[
-      "inline-flex size-[calc(13px*var(--density))] flex-none items-center justify-center rounded-xs border",
-      checked ? "border-accent bg-accent text-bg" : "border-line-strong",
-    ].join(" ")}
-  >
-    {checked && <Check size={9} weight="bold" />}
-  </Box>
-);
 
 /** One row of battle-window chips — the window filter's whole UI.
  *
@@ -143,16 +130,14 @@ export const WindowStrip = ({ groups, onToggleWindow, onToggleKind, onClear }: W
           kind", which is what unticking its rows already says, and four of them
           in a row reads as four different filters. */}
       {anySelected && (
-        <ActionIcon
-          size="sm"
-          variant="transparent"
-          color="gray"
+        <Button
+          variant="icon"
           aria-label={t("ui.logs.window-clear")}
           title={t("ui.logs.window-clear")}
           onClick={onClear}
         >
           <X size={12} weight="bold" />
-        </ActionIcon>
+        </Button>
       )}
     </Strip>
   );

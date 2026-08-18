@@ -21,6 +21,10 @@ mod battle;
 // hooks/cap_oracle.rs for why it is gated rather than always compiled.
 #[cfg(feature = "hookdiag")]
 pub(crate) mod cap_oracle;
+// Damage-HEAD oracle — the pre-cap damage factorization capture for the
+// damage-amount forward model. Same gating rationale as cap_oracle.
+#[cfg(feature = "hookdiag")]
+pub(crate) mod dmg_oracle;
 // Compiled under `cfg(test)` too, so a plain `cargo test` type-checks and exercises the
 // quest-classification logic. The hook itself is still only INSTALLED behind the feature
 // (see `setup_hooks`), so a release `hook.dll` contains none of this.
@@ -149,6 +153,16 @@ pub fn setup_hooks(tx: event::Tx) -> Result<()> {
     try_step(
         "cap_oracle",
         cap_oracle::CapOracleHook::new().setup(&process),
+    );
+
+    // hookdiag-only: the damage-HEAD oracle (see dmg_oracle.rs). Emits the
+    // per-hit pre-cap damage factorization (DMGHEAD/DMGREC/DMGEXTRAS lines)
+    // for the damage-amount forward model. Rides cap_oracle's BuildGuard, so
+    // it must be set up alongside it. No-op without the feature.
+    #[cfg(feature = "hookdiag")]
+    try_step(
+        "dmg_oracle",
+        dmg_oracle::DmgOracleHook::new().setup(&process),
     );
 
     try_step(
@@ -351,6 +365,8 @@ pub fn teardown_hooks() {
     loadprobe::disable();
     #[cfg(feature = "hookdiag")]
     cap_oracle::disable();
+    #[cfg(feature = "hookdiag")]
+    dmg_oracle::disable();
     status::disable();
     #[cfg(any(feature = "fullassist", test))]
     assist::disable();

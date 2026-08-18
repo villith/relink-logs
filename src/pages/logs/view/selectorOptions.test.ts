@@ -150,4 +150,40 @@ describe("deriveSelectorOptions", () => {
     expect(options.targets).toEqual([]);
     expect(options.abilities).toEqual([]);
   });
+
+  /** THE SIDE TOGGLE. It is not a filter: it swaps which population each of the
+   * two actor dimensions draws from (`universeOf`), exactly as the backend's own
+   * group query swaps them. Read straight off the fact's fields, both selectors
+   * offered the friendly universes on both sides — so the toggle appeared to do
+   * nothing to the two controls it is meant to swap. */
+  describe("under the enemy side", () => {
+    it("offers enemy spawns as SOURCES and the party as TARGETS", () => {
+      const options = deriveSelectorOptions(FACTS, NO_PINS, "enemy");
+
+      expect(options.sources.map((o) => o.value)).toEqual([String(BOSS), String(ADD)]);
+      expect(options.targets.map((o) => o.value)).toEqual([String(NARMAYA), String(EUGEN)]);
+    });
+
+    // The cascade has to narrow the dimension the pin actually names. A source
+    // pin is a SPAWN here, so applying it to the fact's `sourceIndex` would
+    // narrow by a player index that spawn number happens to collide with.
+    it("cascades a source pin as the spawn it now names", () => {
+      const options = deriveSelectorOptions(FACTS, { ...NO_PINS, source: ADD }, "enemy");
+
+      expect(options.targets.map((o) => o.value)).toEqual([String(NARMAYA)]);
+      expect(options.abilities.map((o) => o.value)).toEqual(["Normal:200"]);
+    });
+
+    it("cascades a target pin as the player it now names", () => {
+      const options = deriveSelectorOptions(FACTS, { ...NO_PINS, targets: [EUGEN] }, "enemy");
+
+      expect(options.sources.map((o) => o.value)).toEqual([String(BOSS)]);
+      expect(options.abilities.map((o) => o.value)).toEqual(["Normal:300"]);
+    });
+
+    // The friendly side is the default, so nothing that omits the argument moves.
+    it("leaves the friendly side exactly where it was", () => {
+      expect(deriveSelectorOptions(FACTS, NO_PINS, "friendly")).toEqual(deriveSelectorOptions(FACTS, NO_PINS));
+    });
+  });
 });

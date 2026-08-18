@@ -1,4 +1,5 @@
 import { MantineProvider } from "@mantine/core";
+import { Table } from "@phosphor-icons/react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -50,6 +51,18 @@ describe("MetricTabs", () => {
     renderIt({ ariaLabelKey: "ui.logs.view-tablist-label" });
     expect(screen.getByRole("tablist", { name: "ui.logs.view-tablist-label" })).toBeTruthy();
     expect(screen.queryByRole("tablist", { name: "ui.logs.metric-tablist-label" })).toBeNull();
+  });
+
+  it("draws a tab's icon without naming the tab twice", () => {
+    renderIt({ tabs: [{ value: "damage", labelKey: "ui.logs.view-table-tab", icon: Table }], value: "damage" });
+
+    const tab = screen.getByRole("tab", { name: "ui.logs.view-table-tab" });
+    expect(tab.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("draws nothing extra for a tab with no icon", () => {
+    renderIt();
+    expect(screen.getByRole("tab", { name: "ui.logs.metric-stun" }).querySelector("svg")).toBeNull();
   });
 
   // Inline, the tabs sit inside the selector bar, which draws its own rule —

@@ -5,6 +5,17 @@ version without a section here, and the section body becomes the GitHub
 release body — which the in-app update prompt shows as patch notes. Renders
 markdown in the app.
 
+## 1.12.14
+
+### Features
+
+- Added a "Compare" feature to the beta log viewer
+  - Allows you to compare two logs side-by-side
+  - Feature is mostly complete for the table view, but requires more work in the timeline and events view
+- Added a log selector to the beta log viewer
+  - This lets you navigate from log to log without having to go back to the log list
+- The beta log viewer now shows Overdrive in the chart
+
 ## 1.12.13
 
 ### Notes

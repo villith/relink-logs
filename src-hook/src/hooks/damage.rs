@@ -640,8 +640,17 @@ impl OnProcessDamageHook {
             return;
         }
 
+        // Post-call, and only on this emit path (after every null-source/
+        // zero-damage/player-victim bail above) — see `run`'s matching
+        // comment for why: the gate bytes are written INSIDE the original
+        // call, so a pre-call copy would miss them, and a rejected hit
+        // shouldn't pay for the copy.
+        let instance_snapshot =
+            snapshot_window(a2 as usize, INSTANCE_SNAPSHOT_START, INSTANCE_SNAPSHOT_LEN);
+
         let _ = self.tx.send(Message::DamageEvent(build_damage_event(
             damage_instance,
+            instance_snapshot,
             Actor {
                 index: source_idx,
                 // See the main path: resolved so summons sharing a body class
@@ -1181,8 +1190,16 @@ impl OnProcessDamageHook {
             return original_value;
         }
 
+        // Post-call: the gate bytes at 0x15D..0x163 are written INSIDE the
+        // original call, so a pre-call copy would miss them. Computed only on
+        // this emit path (after every whiff/zero-damage/victim-slot bail
+        // above), not on every evaluated hit.
+        let instance_snapshot =
+            snapshot_window(a2 as usize, INSTANCE_SNAPSHOT_START, INSTANCE_SNAPSHOT_LEN);
+
         let _ = self.tx.send(Message::DamageEvent(build_damage_event(
             damage_instance,
+            instance_snapshot,
             Actor {
                 index: source_idx,
                 // Resolved, not reported: summons sharing a generic body all
@@ -1425,6 +1442,9 @@ impl OnProcessDotHook {
             source_current_hp: None,
             source_max_hp: None,
             source_statuses: None,
+            instance_snapshot: None,
+            source_snapshot: None,
+            record_snapshot: None,
         });
 
         let _ = self.tx.send(event);
@@ -1615,11 +1635,26 @@ impl OnPlayerHitApplyHook {
                 .as_ref()
         };
         let (target_current_hp, target_max_hp) = read_actor_hp_pair(victim_ptr).unzip();
+        // Late — after every early-return gate above — so a rejected call
+        // never pays for the copy. `snapshot_window` does its own readability
+        // probe for the full `INSTANCE_SNAPSHOT_LEN` span (0x340, wider than
+        // the 0x2D8 already proven above), same as the dealt paths. Only the
+        // first 0x2D8 is proven on THIS path though: the stack-built
+        // 0xa7fc80 apply never established the tail, so the probe can pass on
+        // a mapped stack while 0x2D8..0x340 is neighbouring-frame garbage —
+        // no fault risk, but offline consumers must not treat taken-stream
+        // snapshot tail bytes as real DamageInstance fields.
+        let instance_snapshot = snapshot_window(
+            damage_instance_ptr as usize,
+            INSTANCE_SNAPSHOT_START,
+            INSTANCE_SNAPSHOT_LEN,
+        );
         // `victim_slot` rather than letting the builder resolve it: that lookup
         // keys only actors carrying a slot identity THEMSELVES, while the
         // resolution above also covers owned bodies (dragon form).
         let _ = self.tx.send(Message::DamageEvent(build_damage_event(
             damage_instance,
+            instance_snapshot,
             source,
             // No attacker state on the taken stream. A player source is
             // rejected outright above, so every attacker reaching here is an
@@ -1658,6 +1693,16 @@ struct SourceState {
     current_hp: Option<u64>,
     max_hp: Option<u64>,
     statuses: Option<Vec<protocol::SourceStatus>>,
+    /// Raw attacker window (`SOURCE_SNAPSHOT_START`), same player-family gate
+    /// as everything else here — including the dragon-form owner walk, which
+    /// reads the HUMAN body.
+    source_snapshot: Option<Vec<u8>>,
+    /// Raw player-record window (`RECORD_SNAPSHOT_START`), resolved via
+    /// [`resolve_player_record`] off the same `body` pointer as
+    /// `source_snapshot` — same player-family gate, same pre-call timing.
+    /// `None` whenever the pointer chain or the window read fails, same as
+    /// every other guarded read in this file.
+    record_snapshot: Option<Vec<u8>>,
 }
 
 impl SourceState {
@@ -1694,9 +1739,51 @@ impl SourceState {
             current_hp,
             max_hp,
             statuses: super::status::snapshot_player_statuses(body),
+            ..Self::research(body)
+        }
+    }
+
+    /// The two heavier fields the unfinished cap / damage-head models want,
+    /// and nothing else reads: `source_snapshot`, `record_snapshot`. Off (the
+    /// default), this is [`Default`] and none of the work below runs — no raw
+    /// window copy, no holder->vtable->virtual chain for the record.
+    ///
+    /// `source_statuses` is NOT one of these two: it ships unconditionally
+    /// from [`capture`](Self::capture), not from here — the Events tab's
+    /// cap-factor explanations (`capFactors/conditions.ts`) read it for every
+    /// hit, gated build or not.
+    ///
+    /// The gate is a `const` rather than `#[cfg]` on the body so the capture
+    /// stays type-checked by a plain `cargo test`, the same reason
+    /// `hooks/assist.rs` carries a dev-dependency to stay compiled. What that
+    /// buys is the guarantee users need — [`RESEARCH_CAPTURE`] is `false`, so
+    /// this returns [`Default`] and does no work — NOT a claim about the
+    /// shipped bytes: release builds with and without the gate can differ in
+    /// size with the capture-off one the LARGER, so whether the unreachable
+    /// tail survives is unmeasured. If a release DLL ever needs to provably
+    /// not CONTAIN this code, `#[cfg]` is the tool; it costs the type-checking.
+    fn research(body: *const usize) -> Self {
+        if !RESEARCH_CAPTURE {
+            return Self::default();
+        }
+        Self {
+            source_snapshot: snapshot_window(
+                body as usize,
+                SOURCE_SNAPSHOT_START,
+                SOURCE_SNAPSHOT_LEN,
+            ),
+            record_snapshot: resolve_player_record(body as usize).and_then(|record| {
+                snapshot_window(record, RECORD_SNAPSHOT_START, RECORD_SNAPSHOT_LEN)
+            }),
+            ..Self::default()
         }
     }
 }
+
+/// Whether the unfinished cap / damage-head research capture is compiled in
+/// (cargo feature `capresearch`, off by default — see its comment in
+/// `src-hook/Cargo.toml` for what it costs a user and why nothing reads it).
+const RESEARCH_CAPTURE: bool = cfg!(feature = "capresearch");
 
 /// The hit's victim, as the calling detour already resolved it. Every caller
 /// has to walk the actor before it can decide whether to emit at all, so the
@@ -1716,6 +1803,7 @@ struct Victim {
 /// sanity guard and the per-spawn target id.
 fn build_damage_event(
     damage_instance: &DamageInstance,
+    instance_snapshot: Option<Vec<u8>>,
     source: Actor,
     source_state: SourceState,
     target: Victim,
@@ -1726,6 +1814,8 @@ fn build_damage_event(
         current_hp: source_current_hp,
         max_hp: source_max_hp,
         statuses: source_statuses,
+        source_snapshot,
+        record_snapshot,
     } = source_state;
     let Victim {
         specified_instance_ptr: target_specified_instance_ptr,
@@ -1808,6 +1898,9 @@ fn build_damage_event(
         source_current_hp,
         source_max_hp,
         source_statuses,
+        instance_snapshot,
+        source_snapshot,
+        record_snapshot,
     }
 }
 
@@ -1861,6 +1954,164 @@ fn read_actor_hp_pair(instance: usize) -> Option<(u64, u64)> {
     sanitize_hp_pair(Some(current), Some(max))
 }
 
+/// DamageInstance snapshot window: `0xC0..0x340`. Covers d0/d4, both rate
+/// floats, flags, class_flags, the seven gate bytes (0x15D..0x163), action
+/// id, part id, floor/cap/precap — and every not-yet-RE'd neighbour, which
+/// is the point: a blob captures what a named field cannot.
+pub(crate) const INSTANCE_SNAPSHOT_START: usize = 0xC0;
+pub(crate) const INSTANCE_SNAPSHOT_LEN: usize = 0x340 - 0xC0;
+/// Attacker extras window: `0x2480..0x24A0` (elemental base +0x2488,
+/// at-cap overflow k +0x249C). Player-family instances only.
+pub(crate) const SOURCE_SNAPSHOT_START: usize = 0x2480;
+pub(crate) const SOURCE_SNAPSHOT_LEN: usize = 0x20;
+
+/// The attacker's per-player stats record, one dereference off the
+/// specified-instance pointer this file already resolves as `pre_call_source_ptr`
+/// (== the damage-head formula tree's "attacker"/"this"). The damage builder
+/// `FUN_1409c1cf0` computes a local `slice = attacker + 0x22F0` (pure address
+/// arithmetic — `lea r14,[rcx+0x22f0]` in its own prologue, no dereference) and
+/// then reads `holder = *(slice + 0x10)`, i.e. `*(attacker + 0x2300)`. Same
+/// constant `cap_oracle.rs`'s `BUILD_STATUS_HOLDER` and `dmg_oracle.rs`'s
+/// `SLICE_STATUS_HOLDER` (relative to `slice`) already read off this exact
+/// decompile.
+const RECORD_HOLDER_OFFSET: usize = 0x2300;
+/// The holder's `this`-only player-record getter — a virtual call, not a plain
+/// field read: `(**(code**)(*holder + 0x9f0))(holder)`. The same slot
+/// `cap_oracle.rs`'s `HOLDER_PLAYER_RECORD_SLOT` and `dmg_oracle.rs`'s constant
+/// of the same name call to read the cap-up / damage-head record fields.
+const HOLDER_PLAYER_RECORD_SLOT: usize = 0x9f0;
+/// Record window covering the two class dmg% fields the damage-head formula
+/// tree calls "the record twin of the cap's fused record": `+0x1C` SBA,
+/// `+0x24` Skill. Both `f32` (per `dmg_oracle.rs`'s `read_f32_guarded` reads
+/// of the same fields, not an integer reinterpreted), applied by the game as
+/// `1 + v * 0.01` — the float itself IS the percent number.
+pub(crate) const RECORD_SNAPSHOT_START: usize = 0x18;
+pub(crate) const RECORD_SNAPSHOT_LEN: usize = 0x10;
+
+/// The span above `MODULE_BASE` that still counts as "inside the game
+/// module" — the same test `diag.rs`'s `log_callers_depth` uses to keep stack
+/// frames to the exe and skip system DLLs (exe is ~123 MB; 256 MB gives it
+/// room). A bare `checked_sub(module_base)` only rejects addresses BELOW the
+/// module — an ordinary heap pointer sits far ABOVE it and would pass that
+/// check, so on a future patch a garbage-but-mapped chain (`attacker+0x2300`
+/// resolving to unrelated heap data with some non-zero value at what used to
+/// be +0x9F0) would transmute-call through an arbitrary address on the game
+/// thread instead of failing closed.
+const MODULE_IMAGE_SPAN: usize = 0x1000_0000;
+
+/// Floor-and-span "is this address inside the game module" test. Shared by
+/// both pointers `resolve_player_record` is about to call through, and by
+/// `dmg_oracle::player_record` / `cap_oracle::overmastery_terms`, which
+/// resolve the same vtable-slot pointer chain before their own transmuted
+/// calls.
+pub(crate) fn within_module_image(addr: usize, module_base: usize) -> bool {
+    addr > module_base && addr - module_base < MODULE_IMAGE_SPAN
+}
+
+/// Resolve the attacker's player-record pointer from its specified-instance
+/// pointer, two guarded hops: a pointer dereference (`RECORD_HOLDER_OFFSET`)
+/// then a bounds-checked `this`-only virtual call (`HOLDER_PLAYER_RECORD_SLOT`)
+/// — the same resolution `dmg_oracle.rs`'s `player_record` performs from
+/// `slice`, folded here to start from `attacker` directly (`slice` itself is
+/// never dereferenced, only offset, so the two are the same pointer chain).
+///
+/// Checks the vtable pointer AND the slot value against
+/// [`within_module_image`] before the transmuted call, not merely "not below
+/// the module": a garbage vtable pointer (unfamiliar actor class, shifted
+/// layout) must never be called through, and an ordinary heap address is
+/// exactly the shape that check has to catch.
+///
+/// Accepted residual: an in-image-but-WRONG slot value — a future vtable
+/// reshuffle that lands some other function at `+0x9f0` — calls that
+/// function with `holder` as `this`. Nothing here can catch that; it is the
+/// same residual every other virtual call in this file already carries
+/// unguarded (`actor_type_id`'s vtable dispatch, for one).
+fn resolve_player_record(attacker: usize) -> Option<usize> {
+    use crate::hooks::diag::{read_ptr_guarded, MODULE_BASE};
+
+    // Which hop fails, said out loud a few times per session: rec was None on
+    // every hit of nine fresh-hook logs (2026-08-15) while the oracles'
+    // identical chain (dmg_oracle::player_record off the builder's own
+    // pointer) resolved fine in the same fights — the discriminating evidence
+    // is WHICH branch returns here, and it is invisible without a line.
+    macro_rules! recdiag {
+        ($($arg:tt)+) => {{
+            #[cfg(feature = "hookdiag")]
+            {
+                use std::sync::atomic::{AtomicUsize, Ordering};
+                static BUDGET: AtomicUsize = AtomicUsize::new(0);
+                if BUDGET.fetch_add(1, Ordering::Relaxed) < 32 {
+                    log::info!($($arg)+);
+                }
+            }
+        }};
+    }
+
+    let module_base = MODULE_BASE.load(std::sync::atomic::Ordering::Relaxed);
+    if module_base == 0 {
+        recdiag!("RECDIAG no-module-base");
+        return None;
+    }
+    let Some(holder) = read_ptr_guarded(attacker, RECORD_HOLDER_OFFSET).filter(|h| *h != 0) else {
+        recdiag!("RECDIAG holder-read-failed attacker={attacker:#x}");
+        return None;
+    };
+    let Some(vtable) = read_ptr_guarded(holder, 0).filter(|v| *v != 0) else {
+        recdiag!("RECDIAG vtable-read-failed attacker={attacker:#x} holder={holder:#x}");
+        return None;
+    };
+    if !within_module_image(vtable, module_base) {
+        recdiag!(
+            "RECDIAG vtable-out-of-image attacker={attacker:#x} holder={holder:#x} \
+             vtable={vtable:#x} delta={:#x}",
+            vtable.wrapping_sub(module_base)
+        );
+        return None;
+    }
+    let Some(slot) = read_ptr_guarded(vtable, HOLDER_PLAYER_RECORD_SLOT).filter(|s| *s != 0) else {
+        recdiag!("RECDIAG slot-read-failed vtable={vtable:#x}");
+        return None;
+    };
+    if !within_module_image(slot, module_base) {
+        recdiag!(
+            "RECDIAG slot-out-of-image vtable={vtable:#x} slot={slot:#x} delta={:#x}",
+            slot.wrapping_sub(module_base)
+        );
+        return None;
+    }
+    let get_record: unsafe extern "system" fn(usize) -> usize =
+        unsafe { std::mem::transmute(slot) };
+    let record = unsafe { get_record(holder) };
+    if record == 0 {
+        recdiag!("RECDIAG getter-returned-null holder={holder:#x} slot={slot:#x}");
+        return None;
+    }
+    recdiag!("RECDIAG ok attacker={attacker:#x} record={record:#x}");
+    Some(record)
+}
+
+/// Copy `base+start .. base+start+len` as a raw blob — ONE readability probe
+/// and one memcpy, because this runs per hit on a game thread (per-call guard
+/// cost is what caused the v1.9.2 in-combat slowdown). `None` (never a
+/// partial copy) when the span is unreadable.
+///
+/// Only ever point this at heap structs (see `readable`'s `IsBadReadPtr`/
+/// PAGE_GUARD caveat): never a guard-page frontier like a growing stack's
+/// tip; established stack-built instances are fine — the taken path has
+/// probed one since 2026-08-05.
+fn snapshot_window(base: usize, start: usize, len: usize) -> Option<Vec<u8>> {
+    if base == 0 {
+        return None;
+    }
+    let addr = base.checked_add(start)?;
+    if !readable(addr, len) {
+        return None;
+    }
+    let mut out = vec![0u8; len];
+    unsafe { std::ptr::copy_nonoverlapping(addr as *const u8, out.as_mut_ptr(), len) };
+    Some(out)
+}
+
 /// Validate a raw (current, max) HP pair read from the target's ExHp component.
 /// Accepts the pair only when it plausibly IS one: both reads succeeded, the pool
 /// is initialized (max > 0), current fits inside it, the magnitude is sane, and
@@ -1889,6 +2140,23 @@ fn sanitize_hp_pair(current: Option<u64>, max: Option<u64>) -> Option<(u64, u64)
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The research capture must be OFF unless someone asks for it.
+    ///
+    /// `source_snapshot` and `record_snapshot` exist for the unfinished cap /
+    /// damage-head models, which live offline — nothing reads either yet.
+    /// Until one of them graduates the way `instance_snapshot` did (into
+    /// `parser::v1::damage_facts`), a user's logs.db must not carry them and a
+    /// user's game thread must not pay for them. This test is what stops the
+    /// feature from quietly becoming a default.
+    ///
+    /// `source_statuses` is deliberately NOT one of these: it ships
+    /// unconditionally from `SourceState::capture` because the Events tab's
+    /// cap-factor explanations already read it for every hit.
+    #[test]
+    fn research_capture_is_off_in_a_default_build() {
+        assert!(!RESEARCH_CAPTURE);
+    }
 
     /// Live log 2026-07-21: EVERY perfect guard fires TWO player-sourced
     /// action-id -1 zero-damage events ~150ms apart — the real counter
@@ -2059,5 +2327,49 @@ mod tests {
             sanitize_hp_pair(Some(0x7FF6_0000_0000), Some(0x7FF6_0000_0008)),
             None
         );
+    }
+
+    /// The snapshot is raw insurance for future RE: it must be exactly the
+    /// window's bytes, and any unreadable/degenerate input must yield None —
+    /// never a partial or zero-filled blob that could be mistaken for data.
+    #[test]
+    fn snapshot_window_copies_exactly_the_requested_span() {
+        let buf: Vec<u8> = (0u8..=255).cycle().take(0x400).collect();
+        let base = buf.as_ptr() as usize;
+        let snap = snapshot_window(base, 0x40, 0x20).expect("readable heap span");
+        assert_eq!(snap.len(), 0x20);
+        assert_eq!(&snap[..], &buf[0x40..0x60]);
+    }
+
+    #[test]
+    fn snapshot_window_refuses_null_and_unmapped_bases() {
+        assert_eq!(snapshot_window(0, 0x40, 0x20), None);
+        // Unmapped low address: the readability probe must fail closed.
+        assert_eq!(snapshot_window(0x10, 0x40, 0x20), None);
+        assert_eq!(snapshot_window(usize::MAX - 0x100, 0x40, 0x20), None);
+    }
+
+    /// The check `resolve_player_record` uses to keep its transmuted virtual
+    /// call inside the game module. A bare `checked_sub` only rejects
+    /// addresses BELOW the base — this must ALSO reject an address far above
+    /// it, which is exactly where an ordinary heap pointer sits (the failure
+    /// mode a garbage-but-mapped record chain would produce on a future
+    /// patch).
+    #[test]
+    fn within_module_image_rejects_below_and_far_above_accepts_inside() {
+        let base = 0x1_4000_0000usize;
+        // Inside: just above base, and just under the span ceiling.
+        assert!(within_module_image(base + 1, base));
+        assert!(within_module_image(base + MODULE_IMAGE_SPAN - 1, base));
+        // At the floor (not strictly above) and below it: rejected.
+        assert!(!within_module_image(base, base));
+        assert!(!within_module_image(base - 1, base));
+        assert!(!within_module_image(0, base));
+        // At and past the span ceiling: rejected.
+        assert!(!within_module_image(base + MODULE_IMAGE_SPAN, base));
+        // A typical heap address is far above a typical module base (heap
+        // allocations commonly sit multiple GB above the exe's load
+        // address) — exactly the case a bare `checked_sub` would miss.
+        assert!(!within_module_image(base + 0x10_0000_0000, base));
     }
 }

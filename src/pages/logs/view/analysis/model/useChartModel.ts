@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
@@ -12,7 +12,7 @@ import type {
 } from "@/types";
 import { PLAYER_COLORS, humanizeNumber, millisecondsToElapsedFormat, translateCharacterType } from "@/utils";
 
-import { DPS_SMOOTHING_WINDOW, type ChartDatapoint, type Label } from "../../DetailCharts";
+import { DPS_SMOOTHING_WINDOW, bucketLabel, type ChartDatapoint, type Label } from "../../DetailCharts";
 import type { RowKeying } from "../../abilitySkills";
 import { keyColor } from "../../actorColor";
 import { enemyHolderKey, heldByRoster, narrowedByPins, slotsOf } from "../../metrics/buffs";
@@ -20,7 +20,7 @@ import type { Hostility } from "../../metrics/types";
 import { playerRowKey } from "../../rowKey";
 import type { SelectorPins } from "../../selectorOptions";
 import type { Band } from "../../statusBands";
-import type { StackMode } from "../DpsChart";
+
 import { abilityBands } from "../abilityBands";
 import { auraExcludedBands } from "../auraWindows";
 import { bandColorAt, paletteOrderOf, referenceBandOrder } from "../bandPalette";
@@ -33,10 +33,9 @@ import { WINDOW_BAND_COLOR, windowBandsFor } from "../chartWindowBands";
 import { admittedBucketsOf } from "../chartWindowFilter";
 import { windowMetricAmount, windowTooltipEntries } from "../chartWindowTooltip";
 import { legendLabelFor } from "../legendLabel";
-import { levelFor, type MetricCapabilities } from "../machine/capabilities";
+import type { MetricCapabilities } from "../machine/capabilities";
 import { groupBandsFor } from "../machine/groupRows";
 import { GROUP_TOP_N, type ViewSpec } from "../machine/resolve";
-import type { MetricKey } from "../machine/state";
 import { buildStatusSeries } from "../statusChart";
 import type { WireWindow } from "../wireWindows";
 
@@ -59,14 +58,10 @@ const iconField = (icon: string | undefined) => (icon === undefined ? {} : { ico
 export type ChartModel = {
   shownChartData: ChartDatapoint[];
   labels: Label;
-  labelKey: string;
   format: "amount" | "percent" | "count";
   stacked: boolean;
   smoothing: number;
   chartSource: "base" | "scoped" | "stacks" | "drill" | "ability";
-  stackMode: StackMode;
-  setStackMode: (mode: StackMode) => void;
-  setRateSmoothing: (buckets: number) => void;
   chartMarkers: ChartMarker[];
   maskBands: { color: string; band: Band }[] | undefined;
   stateWindowBands: ReturnType<typeof windowBandsFor>;
@@ -74,12 +69,23 @@ export type ChartModel = {
 };
 
 export type ChartModelInput = {
-  /** The log being viewed — the stack mode resets per log as well as per
-   * metric, because a mode chosen for one fight says nothing about the next. */
-  id: string | undefined;
+  /** The trailing smoothing window in buckets — the ONE chart control this
+   * model reads. It comes in from the FRAME rather than being held here:
+   * `useChartModel` runs once per pane, so pane-local state gave two compared
+   * plots two independent control strips, and two runs drawn under different
+   * smoothing are not a comparison (see `ChartControls`).
+   *
+   * It feeds `chartPresentation` rather than overriding its result, so the
+   * rate-vs-level rule still decides: a LEVEL chart stays unsmoothed whatever is
+   * chosen here.
+   *
+   * The rest of the shared controls — the stack mode, the marker and window
+   * kinds — are the frame's and go straight to `DpsChart`; passing the whole
+   * bundle through here only made the pane read three of them back out of a hook
+   * that never touched them. */
+  rateSmoothing: number;
   caps: MetricCapabilities;
   spec: ViewSpec;
-  metricKey: MetricKey;
   hostility: Hostility;
   pins: SelectorPins;
   range: [number, number] | null;
@@ -115,10 +121,9 @@ export type ChartModelInput = {
 };
 
 export const useChartModel = ({
-  id,
+  rateSmoothing,
   caps,
   spec,
-  metricKey,
   hostility,
   pins,
   range,
@@ -159,19 +164,9 @@ export const useChartModel = ({
   } = identity;
   const { cellOf } = cells;
   const groupsPath = caps.dataPath === "groups";
-  const level = levelFor(chartGroupBy);
-  /** Bucket index → "M:SS", for the plotted points' timestamps. */
-  const bucketLabel = useCallback((bucket: number) => millisecondsToElapsedFormat(bucket * bucketMs), [bucketMs]);
-  // Normal | Stacked for the stacks chart. Component-local: a way of reading
-  // the plot, not what the page is about. Reset per metric/log because a mode
-  // chosen for one chart says nothing about the next one.
-  const [stackMode, setStackMode] = useState<StackMode>("normal");
-  // The chart's smoothing window, in buckets. Feeds `chartPresentation` as
-  // `rateSmoothing` rather than overriding its result, so the rate-vs-level rule
-  // still decides: a LEVEL chart stays unsmoothed whatever is chosen here.
-  const [rateSmoothing, setRateSmoothing] = useState<number>(DPS_SMOOTHING_WINDOW);
-  useEffect(() => setStackMode("normal"), [metricKey, id]);
-
+  /** This model's bucket width bound into the shared clock, for the plotted
+   * points' timestamps. */
+  const labelBucket = useCallback((bucket: number) => bucketLabel(bucket, bucketMs), [bucketMs]);
   // Death and SBA markers, rebased onto the same window the chart shows and
   // resolved to display form here — the extractor stays pure of names and
   // colours. Deaths wear the dead player's party colour; SBA lines wear
@@ -221,7 +216,6 @@ export const useChartModel = ({
             ? sbaChart
             : dpsChart;
     return {
-      labelKey: decl.labelKey,
       source,
       // The SBA gauge is captured on its own cadence, so it carries its own
       // length; everything else rides the shared bucket count.
@@ -377,23 +371,19 @@ export const useChartModel = ({
   // keeps drawing the whole fight beside a table that has halved. Damage only:
   // it is the only metric a target span can narrow honestly (see
   // `build_scoped_player_chart`).
-  // Which series won, what that makes the plot, and how it is titled and
-  // formatted — one pure fold of the series above (see chartPresentation.ts),
-  // so the heading can never disagree with what is on screen.
-  const { overlay, chartSource, withTotal, labelKey, format, stacked, smoothing } = chartPresentation({
+  // Which series won, what that makes the plot, and how it is formatted — one
+  // pure fold of the series above (see chartPresentation.ts).
+  const { overlay, chartSource, withTotal, format, stacked, smoothing } = chartPresentation({
     statusSeries,
     groupOverlay,
     abilitySeries,
     groupPlayerSeries,
     groupsPath,
     // The grouping the plotted aggregates ANSWER, not the one just requested —
-    // so the Total series and the title change with the data rather than a
-    // fetch ahead of it (see `answeredGroups`).
+    // so the Total series changes with the data rather than a fetch ahead of it
+    // (see `answeredGroups`).
     groupBy: chartGroupBy,
     hostility,
-    metricKey,
-    level: level,
-    metricLabelKey: chartMetric.labelKey,
     metricFormat: chartMetric.format,
     rateSmoothing,
   });
@@ -443,7 +433,7 @@ export const useChartModel = ({
     // are baked into the data, so hiding a player later cannot lower the Total.
     return (withTotal ? withTotalSeries(points, chartInputs.keys) : points).map((point, bucket) => ({
       ...point,
-      timestamp: bucketLabel(bucket),
+      timestamp: labelBucket(bucket),
     })) as ChartDatapoint[];
   }, [chartInputs, smoothing, withTotal, format, maskWindows]);
 
@@ -467,7 +457,10 @@ export const useChartModel = ({
           // still leads with the enemy — that is what distinguishes two Breaks
           // of the same kind from each other.
           text: (span, amount) => {
-            const enemy = span.kind === "break" ? breakEnemyOf(span.actorIndex, span) : null;
+            // Overdrive windows carry a per-enemy actor index exactly like
+            // Break's.
+            const enemy =
+              span.kind === "break" || span.kind === "overdrive" ? breakEnemyOf(span.actorIndex, span) : null;
             const withAmount = amount !== null;
             return t(
               enemy === null
@@ -625,14 +618,10 @@ export const useChartModel = ({
   return {
     shownChartData,
     labels,
-    labelKey,
     format,
     stacked,
     smoothing,
     chartSource,
-    stackMode,
-    setStackMode,
-    setRateSmoothing,
     chartMarkers,
     maskBands,
     stateWindowBands,

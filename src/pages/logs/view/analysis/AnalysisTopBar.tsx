@@ -1,7 +1,8 @@
-import { Alert, Box, Button } from "@mantine/core";
+import { Alert, Box } from "@mantine/core";
 import { Warning } from "@phosphor-icons/react";
 import { useTranslation } from "react-i18next";
 
+import { Button } from "@/components/ui/Button";
 import { useBackTo } from "@/hooks/useBackTo";
 import { ViewModeToggle } from "@/pages/logs/view/ViewModeToggle";
 
@@ -31,7 +32,7 @@ export const AnalysisTopBar = () => {
 
   return (
     <Box style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px" }}>
-      <Button size="xs" variant="default" onClick={goBack} style={{ flex: "none" }}>
+      <Button onClick={goBack} className="flex-none">
         {t("ui.back-btn")}
       </Button>
       {/* Takes the slack so the switch stays pinned right, and shrinks before

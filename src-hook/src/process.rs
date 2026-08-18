@@ -5,19 +5,14 @@ use pelite::{
 };
 use thiserror::Error;
 use windows::Win32::Foundation::HMODULE;
-use windows::Win32::System::Diagnostics::ToolHelp::{
-    CreateToolhelp32Snapshot, Module32FirstW, Process32FirstW, Process32NextW, MODULEENTRY32W,
-    PROCESSENTRY32W, TH32CS_SNAPMODULE, TH32CS_SNAPMODULE32, TH32CS_SNAPPROCESS,
-};
+use windows::Win32::System::LibraryLoader::{GetModuleFileNameW, GetModuleHandleW};
 
 #[derive(Error, Debug)]
 pub enum ProcessError {
     #[error("Process was not found with that name")]
     ProcessNotFound,
-    #[error("Could not snapshot process")]
-    ProcessSnapshotError(windows::core::Error),
-    #[error("Could not snapshot process memory")]
-    ModuleSnapshotError(windows::core::Error),
+    #[error("Could not get the host module handle")]
+    ModuleHandleError(windows::core::Error),
 }
 
 pub struct Process {
@@ -26,64 +21,30 @@ pub struct Process {
 }
 
 impl Process {
-    /// Finds a process by its name.
+    /// Resolves the process this DLL is running inside, verifying its executable
+    /// file name is `name`.
+    ///
+    /// The hook runs *inside* the game process, so its own loaded-module list
+    /// already contains the game image: `GetModuleHandleW(NULL)` returns the
+    /// host EXE's base directly. We deliberately do NOT walk the system-wide
+    /// process list (`CreateToolhelp32Snapshot`/`Process32*`) — enumerating
+    /// every process from within the one we are already in is both pointless
+    /// and exactly the behavior AV heuristics score as reconnaissance. The
+    /// file-name check preserves the "am I actually in the game?" guard, so an
+    /// injection into any other host (e.g. a sandbox's `rundll32`) cleanly
+    /// returns `ProcessNotFound` instead of setting up hooks.
     pub fn with_name(name: &str) -> Result<Process, ProcessError> {
-        let mut found_process = None;
+        let module_handle =
+            unsafe { GetModuleHandleW(None) }.map_err(ProcessError::ModuleHandleError)?;
 
-        unsafe {
-            let snapshot_handle = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
-                .map_err(ProcessError::ProcessSnapshotError)?;
-
-            let mut process = PROCESSENTRY32W {
-                dwSize: std::mem::size_of::<PROCESSENTRY32W>() as u32,
-                ..PROCESSENTRY32W::default()
-            };
-
-            if Process32FirstW(snapshot_handle, &mut process).is_ok() {
-                loop {
-                    if Process32NextW(snapshot_handle, &mut process).is_ok() {
-                        let process_name = String::from_utf16_lossy(&process.szExeFile)
-                            .trim_end_matches('\u{0}')
-                            .to_string();
-
-                        if process_name == name {
-                            let module_snapshot = CreateToolhelp32Snapshot(
-                                TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32,
-                                process.th32ProcessID,
-                            )
-                            .map_err(ProcessError::ModuleSnapshotError)?;
-
-                            let mut module_entry = MODULEENTRY32W {
-                                dwSize: std::mem::size_of::<MODULEENTRY32W>() as u32,
-                                ..MODULEENTRY32W::default()
-                            };
-
-                            if Module32FirstW(module_snapshot, &mut module_entry).is_ok() {
-                                let module_name = String::from_utf16_lossy(&process.szExeFile)
-                                    .trim_end_matches('\u{0}')
-                                    .to_string();
-
-                                if module_name == name {
-                                    let base_address = module_entry.modBaseAddr as usize;
-                                    let module_handle = module_entry.hModule;
-
-                                    found_process = Some(Process {
-                                        base_address,
-                                        module_handle,
-                                    });
-                                }
-                            } else {
-                                break;
-                            }
-                        }
-                    } else {
-                        break;
-                    }
-                }
-            }
+        if !host_exe_matches(module_handle, name) {
+            return Err(ProcessError::ProcessNotFound);
         }
 
-        found_process.ok_or(ProcessError::ProcessNotFound)
+        Ok(Process {
+            base_address: module_handle.0 as usize,
+            module_handle,
+        })
     }
 
     /// Runs the pelite code scan and returns the capture array (`addrs`) of a single match:
@@ -184,4 +145,20 @@ impl Process {
         let addr = self.base_address + addrs[1] as usize;
         Ok(unsafe { (addr as *const T).read_unaligned() })
     }
+}
+
+/// Whether the host EXE's file name equals `name`, case-insensitively. The path
+/// is truncated at the buffer end by `GetModuleFileNameW`, so the buffer is
+/// sized well past `MAX_PATH` to keep the trailing file name intact; a zero
+/// return (the function's only failure signal) counts as no match.
+fn host_exe_matches(module: HMODULE, name: &str) -> bool {
+    let mut buf = [0u16; 1024];
+    let len = unsafe { GetModuleFileNameW(module, &mut buf) } as usize;
+    if len == 0 || len >= buf.len() {
+        return false;
+    }
+    String::from_utf16_lossy(&buf[..len])
+        .rsplit(['\\', '/'])
+        .next()
+        .is_some_and(|file| file.eq_ignore_ascii_case(name))
 }

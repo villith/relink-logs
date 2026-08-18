@@ -1,13 +1,13 @@
 import { MantineProvider } from "@mantine/core";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { ChartDatapoint, Label } from "../DetailCharts";
 
 import type { ChartMarker } from "./chartMarkers";
 import { TOTAL_SERIES_KEY } from "./chartSeries";
 import type { WindowKind } from "./chartWindowBands";
-import { ChartTooltip, DpsChart } from "./DpsChart";
+import { ChartTooltip, DpsChart, visibleEndLines } from "./DpsChart";
 import { SECTION_ENTRY_CAP } from "./HoverCard";
 
 const LABELS: Label = [
@@ -280,6 +280,26 @@ describe("ChartTooltip — art and a card that holds still", () => {
     expect(container.querySelector<HTMLElement>("[data-testid='chart-tooltip']")!.style.width).toBe(width);
   });
 
+  // Fixed per CHART, not per bucket. The compare overlay's rows name a whole
+  // log rather than a party member, and at the default it was exactly the part
+  // telling two runs apart that ellipsized.
+  it("lets the caller widen the card without unfixing it", () => {
+    const { container } = render(
+      <MantineProvider>
+        <ChartTooltip
+          label="03:03"
+          payload={[{ dataKey: "0", name: "0", value: 1, color: "#f00" }]}
+          format="amount"
+          labels={LABELS}
+          sectionKey="ui.logs.rows-by-player"
+          width={460}
+        />
+      </MantineProvider>
+    );
+
+    expect(container.querySelector<HTMLElement>("[data-testid='chart-tooltip']")!.style.width).toBe("460px");
+  });
+
   it("holds the breakdown at one row per plotted series as buckets empty out", () => {
     // A stack of bands is mostly zeroes at any one second. Dropping the zero
     // rows is right — they bury the few that fired — but the rows left behind
@@ -334,7 +354,10 @@ describe("ChartTooltip — art and a card that holds still", () => {
 describe("ChartTooltip — markers and battle windows as card sections", () => {
   const SERIES = [{ dataKey: "0", name: "0", value: 1000, color: "#f00" }];
 
-  const renderWith = (markers?: ChartMarker[], windowLines?: { kind: WindowKind; color: string; text: string }[]) =>
+  const renderWith = (
+    markers?: ChartMarker[],
+    windowLines?: { kind: WindowKind; color: string; text: string; tag?: { text: string; color: string } }[]
+  ) =>
     render(
       <MantineProvider>
         <ChartTooltip
@@ -372,6 +395,30 @@ describe("ChartTooltip — markers and battle windows as card sections", () => {
     expect(screen.getAllByText("ui.logs.chart-window-sba")).toHaveLength(1);
     expect(screen.getByText("01:02–01:10 · 8s")).toBeTruthy();
     expect(screen.getByText("01:05–01:13 · 8s")).toBeTruthy();
+  });
+
+  // Comparing two runs, both fights' spans land under one kind heading — and
+  // the row's swatch is that KIND's colour, so it cannot say which run a span
+  // belongs to. The tag does, in that run's own line colour.
+  it("writes a window line's log tag in the log's own colour", () => {
+    const { container } = renderWith(undefined, [
+      { kind: "break", color: "#f80", text: "01:02–01:10 · 8s", tag: { text: "#2657", color: "rgb(1, 2, 3)" } },
+      { kind: "break", color: "#f80", text: "01:05–01:13 · 8s", tag: { text: "#2661", color: "rgb(4, 5, 6)" } },
+    ]);
+
+    const tags = [...container.querySelectorAll<HTMLElement>("[data-card-tag]")];
+    expect(tags.map((tag) => tag.textContent)).toEqual(["#2657", "#2661"]);
+    expect(tags.map((tag) => tag.style.color)).toEqual(["rgb(1, 2, 3)", "rgb(4, 5, 6)"]);
+    // The swatch stays the kind's — the card groups these by kind, and two
+    // colours for one row would be two claims about what it is.
+    expect(container.querySelectorAll("[data-card-tag]")).toHaveLength(2);
+  });
+
+  // One log open, every span on the plot is the same fight's, and naming it
+  // would spend a chunk of a fixed-width row saying nothing.
+  it("writes no tag with nothing to tell apart", () => {
+    const { container } = renderWith(undefined, [{ kind: "break", color: "#f80", text: "01:02–01:10 · 8s" }]);
+    expect(container.querySelector("[data-card-tag]")).toBeNull();
   });
 
   it("heads the markers by their kind too", () => {
@@ -548,7 +595,6 @@ describe("DpsChart — the capped band tail", () => {
         <DpsChart
           data={DATA}
           labels={labels}
-          labelKey="ui.logs.chart-dps-label"
           sectionKey="ui.logs.rows-by-ability"
           format="amount"
           onScope={() => {}}
@@ -619,7 +665,6 @@ describe("DpsChart — the capped band tail", () => {
         <DpsChart
           data={DATA}
           labels={[...BANDS, { name: "t3", label: "Sword Shower", partySlotIndex: 4, color: "#f0f", tail: true }]}
-          labelKey="ui.logs.chart-dps-label"
           sectionKey="ui.logs.rows-by-ability"
           format="amount"
           onScope={() => {}}
@@ -685,7 +730,6 @@ describe("DpsChart — the header control strip", () => {
         <DpsChart
           data={DATA}
           labels={SERIES}
-          labelKey="ui.logs.chart-dps-label"
           sectionKey="ui.logs.rows-by-ability"
           format="amount"
           onScope={() => {}}
@@ -696,6 +740,72 @@ describe("DpsChart — the header control strip", () => {
       </MantineProvider>
     );
 
+  const MARKERS = [
+    { kind: "death" as const, atMs: 1000, color: "#f00", label: "Rain died" },
+    { kind: "sba" as const, atMs: 1500, color: "#0f0", label: "Rain SBA" },
+  ];
+
+  // The kind switches are CONTROLLED when the caller owns them, so several
+  // plots of one comparison share one set: the split layout draws the same
+  // fight twice, and one chart hiding deaths while the other shows them is not
+  // one reading.
+  it("reports a kind toggle to the caller instead of hiding it itself", () => {
+    const onToggleMarkerKind = vi.fn();
+    renderChart({
+      markers: MARKERS,
+      hiddenMarkerKinds: new Set(),
+      onToggleMarkerKind,
+    });
+
+    fireEvent.click(screen.getByLabelText("ui.logs.chart-marker-deaths"));
+
+    expect(onToggleMarkerKind).toHaveBeenCalledWith("death");
+  });
+
+  it("draws the caller's hidden set rather than its own", () => {
+    renderChart({
+      markers: MARKERS,
+      hiddenMarkerKinds: new Set(["death" as const]),
+      onToggleMarkerKind: () => {},
+    });
+
+    expect(screen.getByLabelText("ui.logs.chart-marker-deaths").getAttribute("aria-pressed")).toBe("false");
+    expect(screen.getByLabelText("ui.logs.chart-marker-sba").getAttribute("aria-pressed")).toBe("true");
+  });
+
+  // A lone plot still owns its own switches — the control is optional, and
+  // without it the chart must keep working on its own.
+  it("keeps its own kind state when the caller does not own it", () => {
+    renderChart({ markers: MARKERS });
+
+    fireEvent.click(screen.getByLabelText("ui.logs.chart-marker-deaths"));
+
+    expect(screen.getByLabelText("ui.logs.chart-marker-deaths").getAttribute("aria-pressed")).toBe("false");
+  });
+
+  const WINDOW_BANDS = [
+    { kind: "break" as const, color: "#f80", band: { startMs: 0, endMs: 1000, stacks: 1 } },
+    { kind: "overdrive" as const, color: "#fd0", band: { startMs: 0, endMs: 2000, stacks: 1 } },
+  ];
+
+  // Overdrive holds for most of a boss fight, so shaded from the start it tints
+  // the plot rather than marking a stretch of it out — and it sits under the
+  // Break shading a reader is usually there for.
+  it("opens with Overdrive shading off and the other kinds on", () => {
+    renderChart({ windowBands: WINDOW_BANDS });
+
+    expect(screen.getByLabelText("ui.logs.chart-window-overdrive").getAttribute("aria-pressed")).toBe("false");
+    expect(screen.getByLabelText("ui.logs.chart-window-break").getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("still lets the reader switch Overdrive on", () => {
+    renderChart({ windowBands: WINDOW_BANDS });
+
+    fireEvent.click(screen.getByLabelText("ui.logs.chart-window-overdrive"));
+
+    expect(screen.getByLabelText("ui.logs.chart-window-overdrive").getAttribute("aria-pressed")).toBe("true");
+  });
+
   /** The caller's own controls belong in the SAME strip as the chart's, not on
    * a row of their own: they are the same kind of thing — a knob that changes
    * the reading — and a second row would push the plot down and split one set
@@ -705,7 +815,16 @@ describe("DpsChart — the header control strip", () => {
 
     const strip = screen.getByTestId("chart-controls");
     expect(strip.contains(screen.getByText("merge-switch"))).toBe(true);
-    expect(strip.contains(screen.getByText("ui.logs.chart-smoothing-caption"))).toBe(true);
+    expect(strip.contains(screen.getByLabelText("ui.logs.chart-smoothing-label"))).toBe(true);
+  });
+
+  // The strip is every control that changes how the plot READS, and nothing
+  // else: the plot's own title used to open the row, restating the metric tab,
+  // the side toggle and the pins standing directly above it.
+  it("draws no title beside the controls", () => {
+    renderChart();
+
+    expect(screen.queryByText("ui.logs.chart-dps-label")).toBeNull();
   });
 
   it("draws the strip without them when the caller supplies none", () => {
@@ -713,5 +832,91 @@ describe("DpsChart — the header control strip", () => {
 
     expect(screen.queryByText("merge-switch")).toBeNull();
     expect(screen.getByTestId("chart-controls")).toBeTruthy();
+  });
+});
+
+/** Which "the other log ended here" rules a chart draws. Comparing two runs of
+ * different lengths, the shorter one's line simply stops while the longer
+ * carries on — which reads as a fight that went quiet rather than one that
+ * ended. */
+describe("visibleEndLines", () => {
+  const line = (bucket: number) => ({ bucket, color: "#abc", label: `#${bucket}` });
+
+  it("draws a rule for a log that ended before this one", () => {
+    expect(visibleEndLines([line(3)], 10).map((end) => end.bucket)).toEqual([3]);
+  });
+
+  // No "it ended here" to point at, and a clamped rule would sit on the axis
+  // edge claiming otherwise.
+  it("drops a log that outlasted this one", () => {
+    expect(visibleEndLines([line(11)], 10)).toEqual([]);
+  });
+
+  // The two runs are the same length: the axis edge already says where both
+  // stopped.
+  it("drops a log that ended exactly with this one", () => {
+    expect(visibleEndLines([line(10)], 10)).toEqual([]);
+  });
+
+  // A pane whose chart has not landed publishes a length of 0, so its end
+  // arrives as bucket -1.
+  it("drops a pane that has not drawn anything yet", () => {
+    expect(visibleEndLines([line(-1)], 10)).toEqual([]);
+  });
+
+  it("keeps every shorter log, in the order given", () => {
+    expect(visibleEndLines([line(7), line(2)], 10).map((end) => end.bucket)).toEqual([7, 2]);
+  });
+});
+
+/** The row above the plot: Merge Sup DMG, the smoothing window, the stack mode,
+ * and the band/marker switches.
+ *
+ * Its members are not the same height — a captioned `PillGroup` stands taller
+ * than a `ChartToggle` — and half of them come and go with the metric: smoothing
+ * is offered on rate charts only, the stack mode only where bands stack. So the
+ * row's height followed whichever controls the current tab happened to have, and
+ * everything below it — the plot, the strips, the whole table — stepped up and
+ * down as you moved between tabs.
+ *
+ * jsdom does no layout, so what is asserted is the MECHANISM: the row reserves
+ * its own height rather than taking it from its contents. */
+describe("DpsChart — the control strip", () => {
+  const DATA = [{ timestamp: "00:01", s1: 100 }] as unknown as ChartDatapoint[];
+  const BANDS: Label = [{ name: "s1", label: "Reginleiv", partySlotIndex: 0, color: "#f00" }];
+
+  const renderStrip = (props: Partial<React.ComponentProps<typeof DpsChart>> = {}) =>
+    render(
+      <MantineProvider>
+        <DpsChart
+          data={DATA}
+          labels={BANDS}
+          sectionKey="ui.logs.rows-by-ability"
+          format="amount"
+          onScope={() => {}}
+          {...props}
+        />
+      </MantineProvider>
+    );
+
+  /** The row the strip's height is reserved on — the one holding the chart's
+   * title and its controls. */
+  const strip = () => screen.getByTestId("chart-controls").closest("[data-chart-control-row]") as HTMLElement;
+
+  it("reserves its height with the smoothing window offered", () => {
+    renderStrip({ smoothing: 5, onSmoothingChange: () => {} });
+    expect(strip().className).toContain("min-h-control");
+  });
+
+  // The SBA gauge and the aura stacks are levels, not rates, so smoothing is
+  // withheld there — which is exactly when the row used to collapse.
+  it("reserves the same height with it withheld", () => {
+    renderStrip();
+    expect(strip().className).toContain("min-h-control");
+  });
+
+  it("keeps the row on screen even with nothing in it to draw", () => {
+    renderStrip();
+    expect(strip()).toBeTruthy();
   });
 });

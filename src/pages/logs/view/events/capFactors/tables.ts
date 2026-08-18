@@ -4,7 +4,7 @@ import { toHashString } from "@/utils";
 import type { CapClass } from "../capSources";
 
 /** Which slot of a table row holds each attack class's value. */
-const SLOT: Record<CapClass, number> = { normal: 0, skill: 1, sba: 2 };
+export const SLOT: Record<CapClass, number> = { normal: 0, skill: 1, sba: 2 };
 
 export const traitTable = capUpSources.traits as Record<string, number[][]>;
 export const conditionalTraitTable = capUpSources.conditionalTraits as Record<string, number[][]>;

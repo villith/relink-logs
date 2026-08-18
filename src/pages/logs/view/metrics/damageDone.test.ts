@@ -1,12 +1,104 @@
 import { describe, expect, it } from "vitest";
 
-import type { ComputedPlayerState, EnemyType, SkillState, SkillTargetState } from "@/types";
+import type { ComputedPlayerState, EnemyType, FactTally, SkillState, SkillTargetState } from "@/types";
 
 import { groupSkillsForRows, rowKeyingFor } from "../abilitySkills";
 import { parseEnemyRow } from "../rowKey";
 import type { SelectorPins } from "../selectorOptions";
-import { abilityRows, damageDone } from "./damageDone";
+import { abilityRows, damageDone, factCaption, factCell, factColumns, factRate, inferredShare } from "./damageDone";
 import type { MetricRow } from "./types";
+
+/** A `FactTally` with every field defaulted to 0 — spread over the fields a
+ * case cares about, so a test naming three fields cannot leave the other two
+ * to `undefined` and crash the fold. */
+const tally = (over: Partial<FactTally>): FactTally => ({
+  measuredYes: 0,
+  measuredNo: 0,
+  inferredYes: 0,
+  inferredNo: 0,
+  unknown: 0,
+  ...over,
+});
+
+describe("factRate / factCell / inferredShare — provenance-tallied rates", () => {
+  it("rates over counted hits only", () => {
+    expect(factRate(tally({ measuredYes: 3, measuredNo: 1, inferredYes: 2, inferredNo: 2, unknown: 4 }))).toBe("63%");
+  });
+
+  it("renders a dash when nothing was counted", () => {
+    expect(factRate(tally({ unknown: 9 }))).toBe("—");
+  });
+
+  it("marks inference-leaning rates with the tilde", () => {
+    expect(factCell(tally({ measuredYes: 1, measuredNo: 1, inferredYes: 1, inferredNo: 1 }))).toBe("50%~");
+  });
+
+  it("leaves fully measured rates unmarked", () => {
+    expect(factCell(tally({ measuredYes: 1, measuredNo: 1 }))).toBe("50%");
+  });
+
+  it("reports the inferred share of counted hits", () => {
+    expect(inferredShare(tally({ measuredYes: 1, measuredNo: 1, inferredYes: 1, inferredNo: 1 }))).toBe(0.5);
+  });
+
+  it("gives an absent tally the same dash as an all-unknown one", () => {
+    expect(factCell(undefined)).toBe("—");
+  });
+
+  it("gives an unrecorded tally zero inferred share, not a divide-by-zero", () => {
+    expect(inferredShare(tally({ unknown: 9 }))).toBe(0);
+  });
+
+  const facts = (crit: FactTally, weakPoint: FactTally, backAttack: FactTally) => ({
+    crit,
+    weakPoint,
+    backAttack,
+    debuffed: tally({}),
+    overdrive: tally({}),
+    break: tally({}),
+    overdriveDamage: 0,
+    breakDamage: 0,
+  });
+
+  // The `show_damage_facts` default. Empty, not dashes: `columnKeys` withholds
+  // the two headers on the same flag, so cells here would sit under nothing.
+  it("appends no cells at all while the setting is off", () => {
+    expect(factColumns(undefined)).toEqual([]);
+    expect(factColumns(facts(tally({ measuredYes: 1 }), tally({ measuredYes: 1 }), tally({ measuredYes: 1 })))).toEqual(
+      []
+    );
+  });
+
+  it("appends a dash per column for an absent facts block", () => {
+    expect(factColumns(undefined, true)).toEqual(["—", "—"]);
+  });
+
+  // Crit is tallied and shown in the hover card, but has no column: the damage
+  // row already spends six before these two.
+  it("fills weak-point/back-attack in that order, and leaves crit to the card", () => {
+    const crit = tally({ measuredYes: 1 });
+    const weakPoint = tally({ measuredYes: 3, measuredNo: 1 });
+    const backAttack = tally({ inferredYes: 1, inferredNo: 1 });
+    expect(factColumns(facts(crit, weakPoint, backAttack), true)).toEqual([factCell(weakPoint), factCell(backAttack)]);
+  });
+});
+
+describe("factCaption", () => {
+  it("captions a fully measured tally with nothing — the rate alone says enough", () => {
+    expect(factCaption(tally({ measuredYes: 1, measuredNo: 1 }))).toBeNull();
+  });
+
+  it("captions an inference-leaning tally with its rounded share", () => {
+    expect(factCaption(tally({ measuredYes: 1, inferredYes: 1 }))).toEqual({
+      key: "ui.logs.hover-fact-inferred",
+      params: { pct: 50 },
+    });
+  });
+
+  it("captions an uncounted tally as no data", () => {
+    expect(factCaption(tally({ unknown: 5 }))).toEqual({ key: "ui.logs.hover-fact-no-data" });
+  });
+});
 
 /** A per-enemy entry of a skill's breakdown, as the parser ships it. */
 const hit = (enemyType: EnemyType, totalDamage: number, hits: number): SkillTargetState => ({
@@ -92,6 +184,36 @@ describe("damageDone descriptor", () => {
     expect(rows).toHaveLength(2);
     expect(rows[0].value).toBe(300);
     expect(rows[1].value).toBe(100);
+  });
+
+  it("fills the exact players-level column shape: amount, DPS, share", () => {
+    // The header/cell parity the abilities-level test below pins, at the
+    // players level: `columnKeys("players")` promises three keys, and a row
+    // built from it must fill exactly three cells or the trailing ones render
+    // under no header at all.
+    const rows = damageDone.rows(input("players"));
+    expect(damageDone.columnKeys("players")).toEqual([
+      "ui.meter-columns.damage",
+      "ui.meter-columns.dps",
+      "ui.logs.column-share",
+    ]);
+    expect(rows[0].columns).toEqual(["300", "30", "75.0%"]);
+  });
+
+  // The `show_damage_facts` setting adds the same two headers `factColumns`
+  // fills, at both levels and nowhere else in the list.
+  it("appends the WP/BA headers, last, when damage facts are shown", () => {
+    expect(damageDone.columnKeys("players", true)).toEqual([
+      "ui.meter-columns.damage",
+      "ui.meter-columns.dps",
+      "ui.logs.column-share",
+      "ui.skill-columns.weak-point",
+      "ui.skill-columns.back-attack",
+    ]);
+    expect(damageDone.columnKeys("abilities", true).slice(-2)).toEqual([
+      "ui.skill-columns.weak-point",
+      "ui.skill-columns.back-attack",
+    ]);
   });
 
   it("makes a player row pin that player as the source", () => {
@@ -291,8 +413,9 @@ describe("damageDone descriptor", () => {
       input("skills", { source: null, targets: [], ability: 'Group:normal-attack@"Pl0000"' }, party)
     );
 
-    expect(rows[0].columns.at(-1)).toBe("75.0%");
-    expect(rows[1].columns.at(-1)).toBe("25.0%");
+    // Share is the last of the six, with the WP/BA cells off by default.
+    expect(rows[0].columns[5]).toBe("75.0%");
+    expect(rows[1].columns[5]).toBe("25.0%");
   });
 
   it("gives a party-wide row no party colour", () => {
@@ -312,10 +435,11 @@ describe("damageDone descriptor", () => {
     expect(damageDone.rows(input("skills", { source: 99, targets: [], ability: "Normal:100" }))).toEqual([]);
   });
 
-  it("carries the share of the level's total as its last column", () => {
+  it("carries the share of the level's total as its third column", () => {
     const rows = damageDone.rows(input("players"));
-    expect(rows[0].columns.at(-1)).toBe("75.0%");
-    expect(rows[1].columns.at(-1)).toBe("25.0%");
+    // Share is the last of the three, with the WP/BA cells off by default.
+    expect(rows[0].columns[2]).toBe("75.0%");
+    expect(rows[1].columns[2]).toBe("25.0%");
   });
 });
 
@@ -467,7 +591,8 @@ describe("damageDone enemy side", () => {
     ]);
     expect(rows[0].kind).toBe("enemy");
     expect(rows[0].value).toBe(800);
-    // Amount, DPS-to-party over the 100s window, share.
+    // Amount, DPS-to-party over the 100s window, share, then three dashes:
+    // DamageTakenState carries no fact tallies.
     expect(rows[0].columns).toEqual(["800", "8", "88.9%"]);
     expect(rows[0].pinOnClick).toBeNull();
   });

@@ -73,12 +73,34 @@ export const resolveGroupBy = (state: AnalysisState, caps: MetricCapabilities): 
 export const universeOf = (dim: "source" | "target", hostility: Hostility): "player" | "enemySpawn" =>
   (dim === "source") === (hostility === "friendly") ? "player" : "enemySpawn";
 
+/** What an UNPINNED selector offers, named by the UNIVERSE its dimension draws
+ * from rather than by the dimension itself.
+ *
+ * "All friendlies" is only what the source selector offers while the friendly
+ * side is showing: flip the side and that same control offers enemy spawns,
+ * while the target selector — labelled "All enemies" — offers the party. Both
+ * placeholders were fixed strings, so the side toggle appeared to do nothing to
+ * the two controls it actually swaps.
+ *
+ * One author for both selectors, keyed off the same function the group query
+ * resolves its refs through, so the label and the universe behind it cannot
+ * disagree. */
+export const selectorPlaceholderKey = (dim: "source" | "target", hostility: Hostility): string =>
+  universeOf(dim, hostility) === "player" ? "ui.logs.selector-all-friendlies" : "ui.logs.selector-all-enemies";
+
 const actorRef = (dim: "source" | "target", index: number | null, hostility: Hostility): ActorRef | null => {
   if (index === null) return null;
   return universeOf(dim, hostility) === "player" ? { kind: "player", index } : { kind: "enemySpawn", segment: index };
 };
 
-export const resolveViewSpec = (state: AnalysisState, caps: MetricCapabilities): ViewSpec => {
+export const resolveViewSpec = (
+  state: AnalysisState,
+  caps: MetricCapabilities,
+  /** The `show_damage_facts` setting. A parameter rather than a machine field:
+   * it is a stored preference about how damage READS, not part of the selection
+   * the URL carries — the same standing as `merge_supplementary`. */
+  showDamageFacts: boolean = false
+): ViewSpec => {
   const groupBy = resolveGroupBy(state, caps);
   // Effective hostility: `side=enemy` is reachable in the URL on any metric,
   // including one whose capabilities don't support it, so every field below
@@ -118,7 +140,7 @@ export const resolveViewSpec = (state: AnalysisState, caps: MetricCapabilities):
     groupBy,
     regroupTabs,
     table: {
-      columnKeys: caps.columnKeys(groupBy),
+      columnKeys: caps.columnKeys(groupBy, showDamageFacts),
       rowsLabelKey: rowsLabelKeyFor(groupBy, hostility, caps),
       ...(emptyKey === undefined ? {} : { emptyKey }),
     },

@@ -1,4 +1,5 @@
 import { useLogIndexStore } from "@/stores/useLogIndexStore";
+import { useLogLibraryStore } from "@/stores/useLogLibraryStore";
 import { ImportAnalysis, ImportLogExample, ImportProgress, ImportSummary } from "@/types";
 import { epochToLocalTime, millisecondsToElapsedFormat, translateQuestId } from "@/utils";
 import { Button, Card, Divider, Group, Progress, Stack, Table, Text, Tooltip } from "@mantine/core";
@@ -74,7 +75,10 @@ const ImportLogsModal = () => {
     try {
       const summary = await invoke<ImportSummary>("import_logs_from_file", { path });
       toast.success(t("ui.import-logs-result", { ...summary }));
-      if (summary.imported > 0) fetchLogs();
+      if (summary.imported > 0) {
+        useLogLibraryStore.getState().invalidate();
+        fetchLogs();
+      }
       modals.close(MODAL_ID);
     } catch (e) {
       toast.error(t("ui.import-logs-error", { error: String(e) }));

@@ -142,14 +142,12 @@ describe("CAPABILITIES against the real ui.json", () => {
 describe("chart declarations", () => {
   it("names each metric's own series, scale and format", () => {
     expect(CAPABILITIES.damage.chart).toEqual({
-      labelKey: "ui.logs.chart-dps-label",
       series: "dps",
       smoothing: "rate",
       scale: 1,
       format: "amount",
     });
     expect(CAPABILITIES.sba.chart).toEqual({
-      labelKey: "ui.logs.chart-sba-label",
       series: "sba",
       // A gauge LEVEL: smoothing would round off the discharge that IS the
       // reading, and the values are stored in tenths of a percent.

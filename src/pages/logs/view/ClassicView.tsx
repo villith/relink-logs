@@ -135,6 +135,7 @@ import {
   HP_SERIES_COLORS,
   OverviewChart,
   brushShade,
+  bucketLabel,
   type ChartDatapoint,
   type HpDatapoint,
   type Label,
@@ -449,6 +450,7 @@ export const ClassicView = () => {
     legality: storedLegality,
     setSelectedTargetSpans,
     loadFromResponse,
+    resetEncounterState,
   } = useEncounterStore((state) => ({
     encounter: state.encounterState,
     dpsChart: state.dpsChart,
@@ -468,6 +470,7 @@ export const ClassicView = () => {
     imported: state.imported,
     setSelectedTargetSpans: state.setSelectedTargetSpans,
     loadFromResponse: state.loadFromResponse,
+    resetEncounterState: state.resetEncounterState,
   }));
   // The app-wide switch is honoured once, here, rather than at each of the
   // dozen marks below: with no findings in hand every LegalityMark, FlaggedGear
@@ -555,9 +558,17 @@ export const ClassicView = () => {
   useEffect(() => {
     const idChanged = lastLoadedId.current !== id;
     lastLoadedId.current = id;
-    if (idChanged && selectedTargetSpans.length > 0) {
-      setSelectedTargetSpans([]);
-      return;
+    if (idChanged) {
+      // Synchronous and before the fetch below starts: `encounter` gates the
+      // whole render (see the `!encounter` guard further down), so clearing
+      // it here — not in the `.then()` — is what stops a log swap from
+      // painting the previous log's party and damage under the new log's
+      // breadcrumbs for the length of the round trip.
+      resetEncounterState();
+      if (selectedTargetSpans.length > 0) {
+        setSelectedTargetSpans([]);
+        return;
+      }
     }
 
     const generation = ++loadGeneration.current;
@@ -716,7 +727,7 @@ export const ClassicView = () => {
     const rows: ChartDatapoint[] = [];
     for (let i = 0; i < chartLen + 1; i++) {
       const datapoint: ChartDatapoint = {};
-      datapoint["timestamp"] = millisecondsToElapsedFormat(i * DPS_BUCKET_MS);
+      datapoint["timestamp"] = bucketLabel(i);
       datapoint["party"] = 0;
       rows.push(datapoint);
     }
@@ -860,7 +871,7 @@ export const ClassicView = () => {
     const rows: ({ timestamp?: string } & { [key: string]: number })[] = [];
     for (let i = 0; i < sbaChartLen; i++) {
       const sbaDatapoint: { timestamp?: string } & { [key: string]: number } = {};
-      sbaDatapoint["timestamp"] = millisecondsToElapsedFormat(i * DPS_BUCKET_MS);
+      sbaDatapoint["timestamp"] = bucketLabel(i);
 
       for (const playerIndex in sbaChart) {
         sbaDatapoint[seriesNames.get(playerIndex) as string] = sbaChart[playerIndex][i] / 10.0;
@@ -939,10 +950,10 @@ export const ClassicView = () => {
   }
 
   const windowActive = isWindowed || pendingRange !== null;
-  const windowStart = millisecondsToElapsedFormat(shownRange[0] * DPS_BUCKET_MS);
-  const windowEnd = millisecondsToElapsedFormat(shownRange[1] * DPS_BUCKET_MS);
-  const windowDuration = millisecondsToElapsedFormat((shownRange[1] - shownRange[0]) * DPS_BUCKET_MS);
-  const fullDuration = millisecondsToElapsedFormat(maxIndex * DPS_BUCKET_MS);
+  const windowStart = bucketLabel(shownRange[0]);
+  const windowEnd = bucketLabel(shownRange[1]);
+  const windowDuration = bucketLabel(shownRange[1] - shownRange[0]);
+  const fullDuration = bucketLabel(maxIndex);
 
   return (
     <Box>
@@ -1091,7 +1102,7 @@ export const ClassicView = () => {
                       value={shownRange}
                       onChange={setPendingRange}
                       onChangeEnd={handleRangeCommit}
-                      label={(value) => millisecondsToElapsedFormat(value * DPS_BUCKET_MS)}
+                      label={(value) => bucketLabel(value)}
                       style={{ marginLeft: CHART_MARGIN + CHART_Y_AXIS_WIDTH, marginRight: CHART_MARGIN }}
                     />
                   </Box>

@@ -17,6 +17,9 @@ pub mod game_mem;
 pub mod hook_dll;
 pub mod legality;
 pub mod linux_support;
+// The decoded-log cache behind `fetch_encounter_state`. Pure and
+// platform-independent, so it tests on Linux CI too.
+pub mod log_cache;
 pub mod overmastery;
 pub mod parser;
 pub mod rpc;
