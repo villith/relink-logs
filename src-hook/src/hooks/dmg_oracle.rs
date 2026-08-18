@@ -18,6 +18,7 @@ use anyhow::{anyhow, Result};
 use retour::static_detour;
 
 use crate::hooks::cap_oracle::BuildGuard;
+use crate::hooks::damage::within_module_image;
 use crate::hooks::diag::{
     first_n_per_key, read_bytes_guarded, read_f32_guarded, read_i32_opt_guarded, read_ptr_guarded,
     read_u32_guarded, read_u64_guarded, MODULE_BASE,
@@ -139,9 +140,13 @@ fn player_record(slice: usize) -> Option<usize> {
     }
     let holder = read_ptr_guarded(slice, SLICE_STATUS_HOLDER).filter(|h| *h != 0)?;
     let vtable = read_ptr_guarded(holder, 0).filter(|v| *v != 0)?;
-    vtable.checked_sub(module_base)?;
+    if !within_module_image(vtable, module_base) {
+        return None;
+    }
     let slot = read_ptr_guarded(vtable, HOLDER_PLAYER_RECORD_SLOT).filter(|s| *s != 0)?;
-    slot.checked_sub(module_base)?;
+    if !within_module_image(slot, module_base) {
+        return None;
+    }
     let get_record: unsafe extern "system" fn(usize) -> usize =
         unsafe { std::mem::transmute(slot) };
     let record = unsafe { get_record(holder) };

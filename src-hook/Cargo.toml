@@ -5,7 +5,7 @@ name = "hook"
 # different version as OutOfDate even on a matching wire, and this is the
 # version stamped into the DLL's resource block — so an unbumped change ships
 # a hook indistinguishable from the previous one.
-version = "0.2.2"
+version = "0.2.3"
 edition = "2021"
 
 [lib]
@@ -17,15 +17,16 @@ console = []
 # re-derive shifted field offsets (action_id, damage_cap, ...) after a game patch.
 dmgdiag = []
 # Per-hit capture for the UNFINISHED cap / damage-head models: the DamageEvent's
-# `source_statuses`, `source_snapshot` and `record_snapshot` fields. Unlike every
-# other diagnostic here this one rides the EVENT STREAM, not the fern log, so
-# without a gate it lands in every user's logs.db forever — and nothing in
-# `src-tauri` reads any of the three (2026-08-15: grep every reference; they are
-# all `: None` event-construction boilerplate). It also costs a per-hit ExStatus
-# list walk with a heap Vec, plus a holder->vtable->virtual chain for the record.
+# `source_snapshot` and `record_snapshot` fields (NOT `source_statuses` — that
+# ships unconditionally, see `hooks/damage.rs::SourceState::capture`, because
+# `src/pages/logs/view/events/capFactors/conditions.ts` reads it for every hit).
+# Unlike every other diagnostic here this rides the EVENT STREAM, not the fern
+# log, so without a gate it lands in every user's logs.db forever — and nothing
+# reads either field yet. It also costs a raw window copy per hit, plus a
+# holder->vtable->virtual chain for the record.
 # `instance_snapshot` is deliberately NOT here: `parser::v1::damage_facts` reads
 # it for the Analysis view's crit / back-attack / weak-point / Break facts, so it
-# has graduated and ships. When one of these three graduates the same way, move
+# has graduated and ships. When one of these two graduates the same way, move
 # it out of the gate and delete its line from the doc table.
 capresearch = []
 # Runtime-address logger for re-deriving broken FUNCTION hooks after a game patch.

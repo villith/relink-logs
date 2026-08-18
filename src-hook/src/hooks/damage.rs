@@ -1738,31 +1738,35 @@ impl SourceState {
         Self {
             current_hp,
             max_hp,
+            statuses: super::status::snapshot_player_statuses(body),
             ..Self::research(body)
         }
     }
 
-    /// The three fields the unfinished cap / damage-head models want, and
-    /// nothing else reads: `source_statuses`, `source_snapshot`,
-    /// `record_snapshot`. Off (the default), this is [`Default`] and none of
-    /// the work below runs — no `ExStatus` list walk, no heap `Vec`, no
-    /// holder->vtable->virtual chain.
+    /// The two heavier fields the unfinished cap / damage-head models want,
+    /// and nothing else reads: `source_snapshot`, `record_snapshot`. Off (the
+    /// default), this is [`Default`] and none of the work below runs — no raw
+    /// window copy, no holder->vtable->virtual chain for the record.
+    ///
+    /// `source_statuses` is NOT one of these two: it ships unconditionally
+    /// from [`capture`](Self::capture), not from here — the Events tab's
+    /// cap-factor explanations (`capFactors/conditions.ts`) read it for every
+    /// hit, gated build or not.
     ///
     /// The gate is a `const` rather than `#[cfg]` on the body so the capture
     /// stays type-checked by a plain `cargo test`, the same reason
     /// `hooks/assist.rs` carries a dev-dependency to stay compiled. What that
     /// buys is the guarantee users need — [`RESEARCH_CAPTURE`] is `false`, so
     /// this returns [`Default`] and does no work — NOT a claim about the
-    /// shipped bytes: two release builds of this file differ by 7,680 bytes
-    /// with the capture-off one the LARGER, so whether the unreachable tail
-    /// survives is unmeasured. If a release DLL ever needs to provably not
-    /// CONTAIN this code, `#[cfg]` is the tool; it costs the type-checking.
+    /// shipped bytes: release builds with and without the gate can differ in
+    /// size with the capture-off one the LARGER, so whether the unreachable
+    /// tail survives is unmeasured. If a release DLL ever needs to provably
+    /// not CONTAIN this code, `#[cfg]` is the tool; it costs the type-checking.
     fn research(body: *const usize) -> Self {
         if !RESEARCH_CAPTURE {
             return Self::default();
         }
         Self {
-            statuses: super::status::snapshot_player_statuses(body),
             source_snapshot: snapshot_window(
                 body as usize,
                 SOURCE_SNAPSHOT_START,
@@ -1995,9 +1999,12 @@ pub(crate) const RECORD_SNAPSHOT_LEN: usize = 0x10;
 /// thread instead of failing closed.
 const MODULE_IMAGE_SPAN: usize = 0x1000_0000;
 
-/// Floor-and-span "is this address inside the game module" test, shared by
-/// both pointers `resolve_player_record` is about to call through.
-fn within_module_image(addr: usize, module_base: usize) -> bool {
+/// Floor-and-span "is this address inside the game module" test. Shared by
+/// both pointers `resolve_player_record` is about to call through, and by
+/// `dmg_oracle::player_record` / `cap_oracle::overmastery_terms`, which
+/// resolve the same vtable-slot pointer chain before their own transmuted
+/// calls.
+pub(crate) fn within_module_image(addr: usize, module_base: usize) -> bool {
     addr > module_base && addr - module_base < MODULE_IMAGE_SPAN
 }
 
@@ -2136,13 +2143,16 @@ mod tests {
 
     /// The research capture must be OFF unless someone asks for it.
     ///
-    /// `source_statuses`, `source_snapshot` and `record_snapshot` exist for the
-    /// unfinished cap / damage-head models, which live offline — nothing in
-    /// `src-tauri` reads any of them. Until one of them graduates the way
-    /// `instance_snapshot` did (into `parser::v1::damage_facts`), a user's
-    /// logs.db must not carry them and a user's game thread must not pay for
-    /// them. This test is what stops the feature from quietly becoming a
-    /// default.
+    /// `source_snapshot` and `record_snapshot` exist for the unfinished cap /
+    /// damage-head models, which live offline — nothing reads either yet.
+    /// Until one of them graduates the way `instance_snapshot` did (into
+    /// `parser::v1::damage_facts`), a user's logs.db must not carry them and a
+    /// user's game thread must not pay for them. This test is what stops the
+    /// feature from quietly becoming a default.
+    ///
+    /// `source_statuses` is deliberately NOT one of these: it ships
+    /// unconditionally from `SourceState::capture` because the Events tab's
+    /// cap-factor explanations already read it for every hit.
     #[test]
     fn research_capture_is_off_in_a_default_build() {
         assert!(!RESEARCH_CAPTURE);
