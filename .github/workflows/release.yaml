@@ -428,8 +428,28 @@ jobs:
       # on two of three Linux testers; same pin as gitbutler#5301).
       - name: Install Tauri v1 Linux dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --allow-downgrades \
+          # A stalled mirror can hang apt with no output and no error for as
+          # long as CI lets it run — the 2026-08-18 build-linux runs sat for
+          # 45+ minutes on a stalled archive.ubuntu.com fetch after the local
+          # azure mirror failed. Acquire::Retries doesn't cover this — it only
+          # retries an acquire that already failed, not one that never
+          # returns — so `timeout` is the actual backstop, retried from
+          # outside since a mirror stall is often transient.
+          retry() {
+            local attempt=1
+            until "$@"; do
+              if [ "$attempt" -ge 3 ]; then
+                echo "::error::giving up after 3 attempts: $*" >&2
+                return 1
+              fi
+              echo "attempt $attempt failed, retrying in 10s: $*" >&2
+              attempt=$((attempt + 1))
+              sleep 10
+            done
+          }
+
+          retry sudo timeout 60 apt-get update
+          retry sudo timeout 120 apt-get install -y --allow-downgrades \
             libwebkit2gtk-4.0-dev=2.36.0-2ubuntu1 \
             libwebkit2gtk-4.0-37=2.36.0-2ubuntu1 \
             libjavascriptcoregtk-4.0-dev=2.36.0-2ubuntu1 \
