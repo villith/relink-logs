@@ -9,7 +9,13 @@ vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => k
 const renderIt = (props: Partial<React.ComponentProps<typeof QuestSummary>> = {}) =>
   render(
     <MantineProvider>
-      <QuestSummary title={<button type="button">picker</button>} roomIndex={null} imported={false} {...props} />
+      <QuestSummary
+        title={<button type="button">picker</button>}
+        roomIndex={null}
+        imported={false}
+        questCompleted={null}
+        {...props}
+      />
     </MantineProvider>
   );
 
@@ -44,10 +50,25 @@ describe("QuestSummary", () => {
     expect(screen.queryByText("ui.logs.total-damage")).toBeNull();
   });
 
-  it("says nothing about whether the quest was cleared", () => {
-    renderIt();
+  // null is the caller's way of saying there is nothing to report — no quest,
+  // a Conflux room, or the log has not loaded yet — and covers the default
+  // above as well as the loading case explicitly.
+  it("says nothing when there is no quest status to report", () => {
+    renderIt({ questCompleted: null });
     expect(screen.queryByText("ui.logs.quest-cleared")).toBeNull();
     expect(screen.queryByText("ui.logs.quest-failed")).toBeNull();
+  });
+
+  it("shows the quest as cleared", () => {
+    renderIt({ questCompleted: true });
+    expect(screen.getByText("ui.logs.quest-cleared")).toBeTruthy();
+    expect(screen.queryByText("ui.logs.quest-failed")).toBeNull();
+  });
+
+  it("shows the quest as not cleared", () => {
+    renderIt({ questCompleted: false });
+    expect(screen.getByText("ui.logs.quest-failed")).toBeTruthy();
+    expect(screen.queryByText("ui.logs.quest-cleared")).toBeNull();
   });
 
   // A Conflux run carries no quest id the picker can name, so the room is the

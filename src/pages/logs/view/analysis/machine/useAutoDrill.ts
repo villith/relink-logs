@@ -40,8 +40,12 @@ export type AutoDrillInput = {
  * that pinned any single-row table it ever saw would make that pin impossible to
  * clear — clearing it returns to the one-row table the rule just fired on, so
  * the ✕ would silently undo itself. So only a drill drills: `armDrill` is called
- * where the user pins, and the walk stops at the first table that offers a real
- * choice.
+ * where the user pins, and a pin dimension landing on a fresh non-null value
+ * arms it the same way — which is what lets a SHARED write (the compare
+ * overlay's `linkedWrite`, applied to every linked pane at once) arm a pane
+ * whose own click handler never ran. Only `pinRow` ever produces that shape of
+ * change; every other transition clears a dimension or leaves it alone, so the
+ * walk stops at the first table that offers a real choice, same as before.
  */
 export const useAutoDrill = ({ rows, state, setState, settled, enabled, applyPin }: AutoDrillInput) => {
   // A ref, not state: arming happens inside the click that pins, and a render
@@ -52,7 +56,21 @@ export const useAutoDrill = ({ rows, state, setState, settled, enabled, applyPin
     armed.current = true;
   }, []);
 
+  // What this hook last saw pinned, so a pin that arrived via someone ELSE's
+  // `armDrill` — a linked write from another pane — still arms here. Compared
+  // by value and updated every run, not just while armed, so the moment is
+  // never missed while `settled` holds the walk off.
+  const lastPins = useRef({ source: state.source, target: state.target, ability: state.ability });
+
   useEffect(() => {
+    const prior = lastPins.current;
+    lastPins.current = { source: state.source, target: state.target, ability: state.ability };
+    const justPinned =
+      (state.source !== null && state.source !== prior.source) ||
+      (state.target !== null && state.target !== prior.target) ||
+      (state.ability !== null && state.ability !== prior.ability);
+    if (justPinned) armed.current = true;
+
     if (!armed.current) return;
     if (!enabled) {
       armed.current = false;

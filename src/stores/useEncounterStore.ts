@@ -75,6 +75,11 @@ interface EncounterStore {
   setSelectedTargetSpans: (targetSpans: TargetSpan[]) => void;
   setSelectedPlayers: (playerNames: string[]) => void;
   loadFromResponse: (response: EncounterStateResponse) => void;
+  /** Back to no fight loaded, leaving the target/player selection untouched.
+   * The Classic view calls this synchronously on an id change, before its
+   * fetch starts, so a log swap never renders the previous log's data under
+   * the new one's breadcrumbs while the fetch is in flight. */
+  resetEncounterState: () => void;
 }
 
 export interface EncounterStateResponse {
@@ -170,7 +175,12 @@ export const encounterFromResponse = (response: EncounterStateResponse): Encount
  * the selection state or the setters. */
 export type EncounterFacts = Omit<
   EncounterStore,
-  "selectedTargetSpans" | "selectedPlayers" | "setSelectedTargetSpans" | "setSelectedPlayers" | "loadFromResponse"
+  | "selectedTargetSpans"
+  | "selectedPlayers"
+  | "setSelectedTargetSpans"
+  | "setSelectedPlayers"
+  | "loadFromResponse"
+  | "resetEncounterState"
 >;
 
 /** No fight loaded. Exported and shared with the store's own initial state so
@@ -211,4 +221,5 @@ export const useEncounterStore = create<EncounterStore>((set) => ({
   setSelectedTargetSpans: (targetSpans: TargetSpan[]) => set({ selectedTargetSpans: targetSpans }),
   setSelectedPlayers: (playerNames: string[]) => set({ selectedPlayers: playerNames }),
   loadFromResponse: (response: EncounterStateResponse) => set(encounterFromResponse(response)),
+  resetEncounterState: () => set(EMPTY_ENCOUNTER_FACTS),
 }));

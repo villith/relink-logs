@@ -35,6 +35,22 @@ const Pane = ({
 const row = (key: string, pin: MetricRow["pinOnClick"]): MetricRow =>
   ({ key, label: key, value: 1, pinOnClick: pin }) as MetricRow;
 
+/** A stand-in for a pane that never calls its own `armDrill` — standing in for
+ * the OTHER pane in a linked compare, whose pin moves because a shared write
+ * landed on it, not because it was clicked here. */
+const SilentPane = ({
+  rows,
+  state,
+  setState,
+}: {
+  rows: MetricRow[];
+  state: AnalysisState;
+  setState: (next: AnalysisState) => void;
+}) => {
+  useAutoDrill({ rows, state, setState, settled: true, enabled: true });
+  return null;
+};
+
 describe("useAutoDrill", () => {
   // A single-row table under a fresh pin descends into that row too.
   it("pins the lone row through setState by default", () => {
@@ -72,6 +88,38 @@ describe("useAutoDrill", () => {
     );
 
     expect(applyPin).not.toHaveBeenCalled();
+    expect(setState).not.toHaveBeenCalled();
+  });
+
+  // The bug this hook closes: a linked write (the compare overlay's
+  // `linkedWrite`) changes another pane's `state` directly, so that pane's own
+  // `armDrill` never runs. The pin landing is what has to arm it.
+  it("arms from a pin that lands via a state change alone, with armDrill never called", () => {
+    const setState = vi.fn();
+    const { rerender } = render(<SilentPane rows={[]} state={DEFAULT_STATE} setState={setState} />);
+
+    rerender(
+      <SilentPane
+        rows={[row("skill:xyz", { ability: "skill:xyz" })]}
+        state={{ ...DEFAULT_STATE, target: 1 }}
+        setState={setState}
+      />
+    );
+
+    expect(setState).toHaveBeenCalledTimes(1);
+    expect(setState.mock.calls[0][0].ability).toBe("skill:xyz");
+  });
+
+  // Clearing a pin must not read as landing one, or the ✕ would immediately
+  // re-drill into the row it just backed out of.
+  it("does not arm when a pin only clears", () => {
+    const setState = vi.fn();
+    const { rerender } = render(
+      <SilentPane rows={[row("player:1", { source: 1 })]} state={{ ...DEFAULT_STATE, target: 1 }} setState={setState} />
+    );
+
+    rerender(<SilentPane rows={[row("player:1", { source: 1 })]} state={DEFAULT_STATE} setState={setState} />);
+
     expect(setState).not.toHaveBeenCalled();
   });
 });

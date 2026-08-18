@@ -67,8 +67,6 @@ import { useStatusNaming } from "./model/useStatusNaming";
 import { useHeldContent } from "./useHeldContent";
 import { useUrlQueryString } from "./useUrlQueryString";
 
-const SHOW_DEBUG_BAR: boolean = false;
-
 export type ChartControls = {
   stackMode: StackMode;
   setStackMode: (mode: StackMode) => void;
@@ -135,6 +133,8 @@ export const AnalysisPane = ({
     groupReference: baseGroupReference,
     statusIntervals,
     players: playerData,
+    questId,
+    questCompleted,
     roomIndex,
     imported,
   } = loaded;
@@ -515,11 +515,18 @@ export const AnalysisPane = ({
     ...(isStatusMetric && statusIntervals.length > 0 ? {} : { emptyKey: spec.table.emptyKey }),
   };
 
+  // null hides the indicator: no quest to report, a Conflux room (whose own
+  // clear/fail line in QuestHeader also skips it), or the log has not finished
+  // loading — `EMPTY_ENCOUNTER_FACTS.questId` is null until then, same as a
+  // non-quest log.
+  const questStatus = questId !== null && roomIndex === null ? questCompleted : null;
+
   const header = (
     <>
       <QuestSummary
         roomIndex={roomIndex}
         imported={imported}
+        questCompleted={questStatus}
         title={
           <LogPicker
             logs={logs}
@@ -582,7 +589,7 @@ export const AnalysisPane = ({
         />
       )}
 
-      {SHOW_DEBUG_BAR && import.meta.env.DEV && <DebugBar search={search} readout={debugReadout} actions={actions} />}
+      {import.meta.env.DEV && <DebugBar search={search} readout={debugReadout} actions={actions} />}
 
       <WindowStrip
         groups={windowFilterGroups}

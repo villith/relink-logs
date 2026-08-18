@@ -829,6 +829,8 @@
       "chart-stack-hint": "Normal overlaps the areas so each can be read on its own; Stacked sums them, so the stack's height is the total.",
       "chart-stack-normal": "Normal",
       "chart-stack-stacked": "Stacked",
+      "quest-cleared": "Cleared",
+      "quest-failed": "Not cleared",
       "no-rows": "Nothing matches the current pins. Clear one to see more.",
       "saved-count_zero": "No logs saved",
       "saved-count_one": "{{count}} log saved",

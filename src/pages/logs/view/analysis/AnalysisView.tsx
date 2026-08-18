@@ -100,7 +100,10 @@ export const AnalysisView = () => {
   const [rateSmoothing, setRateSmoothing] = useState<number>(DPS_SMOOTHING_WINDOW);
   const [hiddenMarkerKinds, setHiddenMarkerKinds] = useState<ReadonlySet<MarkerKind>>(EMPTY_MARKER_KINDS);
   const [hiddenWindowKinds, setHiddenWindowKinds] = useState<ReadonlySet<WindowKind>>(DEFAULT_HIDDEN_WINDOW_KINDS);
-  useEffect(() => setStackMode("normal"), [state.metric]);
+  // `paneLogIds` is memoized on `[id, compare]` above, so it is referentially
+  // stable across renders that touch neither — this fires on a metric change
+  // AND whenever any pane's log does, never on an unrelated re-render.
+  useEffect(() => setStackMode("normal"), [state.metric, paneLogIds]);
 
   const toggleMarkerKind = useCallback((kind: MarkerKind) => setHiddenMarkerKinds((set) => toggled(set, kind)), []);
   const toggleWindowKind = useCallback((kind: WindowKind) => setHiddenWindowKinds((set) => toggled(set, kind)), []);

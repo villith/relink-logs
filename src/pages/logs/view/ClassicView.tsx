@@ -450,6 +450,7 @@ export const ClassicView = () => {
     legality: storedLegality,
     setSelectedTargetSpans,
     loadFromResponse,
+    resetEncounterState,
   } = useEncounterStore((state) => ({
     encounter: state.encounterState,
     dpsChart: state.dpsChart,
@@ -469,6 +470,7 @@ export const ClassicView = () => {
     imported: state.imported,
     setSelectedTargetSpans: state.setSelectedTargetSpans,
     loadFromResponse: state.loadFromResponse,
+    resetEncounterState: state.resetEncounterState,
   }));
   // The app-wide switch is honoured once, here, rather than at each of the
   // dozen marks below: with no findings in hand every LegalityMark, FlaggedGear
@@ -556,9 +558,17 @@ export const ClassicView = () => {
   useEffect(() => {
     const idChanged = lastLoadedId.current !== id;
     lastLoadedId.current = id;
-    if (idChanged && selectedTargetSpans.length > 0) {
-      setSelectedTargetSpans([]);
-      return;
+    if (idChanged) {
+      // Synchronous and before the fetch below starts: `encounter` gates the
+      // whole render (see the `!encounter` guard further down), so clearing
+      // it here — not in the `.then()` — is what stops a log swap from
+      // painting the previous log's party and damage under the new log's
+      // breadcrumbs for the length of the round trip.
+      resetEncounterState();
+      if (selectedTargetSpans.length > 0) {
+        setSelectedTargetSpans([]);
+        return;
+      }
     }
 
     const generation = ++loadGeneration.current;
