@@ -55,7 +55,7 @@ use phantom_targets::{is_excluded_target_type, PhantomTargets};
 use player_state::{PlayerState, SbaSourceKind};
 pub use status::{assemble_intervals, StatusInterval};
 pub use windows::{
-    assemble_chart_windows, corroborated_sba_activations, ChartWindow, ChartWindowKind,
+    assemble_chart_windows, sba_activations, ChartWindow, ChartWindowKind, SbaActivation,
 };
 
 pub struct AdjustedDamageInstance<'a> {

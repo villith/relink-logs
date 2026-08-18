@@ -1981,26 +1981,31 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
 
     let sba_chart = parser.generate_sba_chart(SBA_INTERVAL);
 
-    // Activations pass only when same-actor SBA damage corroborates them: the
-    // per-frame perform capture can re-fire the previous fight's leftover
-    // casting state once at a Repeat Quest boundary, and that phantom drew an
-    // "X used their art" marker at the first millisecond of the next log. The
-    // SBA chart windows drop the same events by the same rule, so a marker and
-    // its window can never disagree about whether an art was real.
-    let corroborated = v1::corroborated_sba_activations(&parser.encounter.raw_event_log);
-    let sba_events = parser
+    // One entry per art the fight actually contains, recovered from the SBA
+    // damage: the hook records an activation event for only some arts, and one
+    // for no art at all at a Repeat Quest boundary (see `sba_activations`).
+    // Attempts are the button press and pass through as recorded.
+    let mut sba_events: Vec<(i64, Message)> = parser
         .encounter
         .event_log()
-        .enumerate()
-        .filter(|(index, (_, e))| match e {
-            Message::OnAttemptSBA(_) => true,
-            Message::OnPerformSBA(_) | Message::OnContinueSBAChain(_) => {
-                corroborated.contains(index)
-            }
-            _ => false,
-        })
-        .map(|(_, (ts, e))| (*ts - start_time, e.clone()))
+        .filter(|(_, e)| matches!(e, Message::OnAttemptSBA(_)))
+        .map(|(ts, e)| (*ts - start_time, e.clone()))
         .collect();
+    sba_events.extend(
+        v1::sba_activations(&parser.encounter.raw_event_log)
+            .into_iter()
+            .map(|activation| match activation {
+                v1::SbaActivation::Recorded(index) => {
+                    let (ts, event) = &parser.encounter.raw_event_log[index];
+                    (*ts - start_time, event.clone())
+                }
+                v1::SbaActivation::Derived { at, actor_index } => (
+                    at - start_time,
+                    Message::OnPerformSBA(protocol::OnPerformSBAEvent { actor_index }),
+                ),
+            }),
+    );
+    sba_events.sort_by_key(|(ts, _)| *ts);
 
     let death_events = parser
         .encounter

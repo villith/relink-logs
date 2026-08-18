@@ -98,6 +98,101 @@ pub fn corroborated_sba_activations(events: &[(i64, Message)]) -> HashSet<usize>
         .collect()
 }
 
+/// One Skybound Art a fight contains, as the response should report it.
+pub enum SbaActivation {
+    /// The raw-log index of the activation event the hook did record.
+    Recorded(usize),
+    /// An art the hook recorded no activation event for: its performer, and
+    /// the timestamp of the art's first SBA hit.
+    Derived { at: i64, actor_index: u32 },
+}
+
+/// Every art the fight contains, recovered from its DAMAGE rather than from
+/// the activation events alone.
+///
+/// The hook does not record an activation for every art. Its surviving
+/// producer walks the four party slots' gauges and calls an art when it
+/// SAMPLES a slot at exactly zero, and it samples only from inside the
+/// gauge-update detour — so a performer whose bar has already begun refilling
+/// by the next update is never seen at zero. Measured on log 2698: one
+/// activation recorded across a four-art chain, the other three first sampled
+/// at 2.7, 0.9 and 2.8 out of a full 800.
+///
+/// An art's damage is always recorded, so one per-performer damage cluster
+/// (the same [`SBA_CLUSTER_GAP_MS`] the windows cluster by — one actor cannot
+/// refill a bar inside it) is one art. A corroborated activation event lying
+/// within the corroboration window of that cluster IS that art's, and is kept
+/// verbatim so the recorded timestamp and the perform/chain distinction
+/// survive; an art with none gets one derived at its first hit. An activation
+/// no cluster claims is the phantom [`corroborated_sba_activations`] already
+/// describes, and is dropped.
+pub fn sba_activations(events: &[(i64, Message)]) -> Vec<SbaActivation> {
+    let corroborated = corroborated_sba_activations(events);
+    let recorded: Vec<(usize, i64, u32)> = events
+        .iter()
+        .enumerate()
+        .filter_map(|(index, (ts, message))| {
+            if !corroborated.contains(&index) {
+                return None;
+            }
+            match message {
+                Message::OnPerformSBA(event) => Some((index, *ts, event.actor_index)),
+                Message::OnContinueSBAChain(event) => Some((index, *ts, event.actor_index)),
+                _ => None,
+            }
+        })
+        .collect();
+
+    // Per-performer SBA damage clusters, as (performer, first hit, last hit).
+    let mut clusters: Vec<(u32, i64, i64)> = Vec::new();
+    let mut open: HashMap<u32, usize> = HashMap::new();
+    for (ts, message) in events {
+        let Message::DamageEvent(event) = message else {
+            continue;
+        };
+        if event.action_id != ActionType::SBA {
+            continue;
+        }
+        let actor = event.source.parent_index;
+        match open.get(&actor) {
+            Some(&cluster) if ts - clusters[cluster].2 <= SBA_CLUSTER_GAP_MS => {
+                clusters[cluster].2 = *ts
+            }
+            _ => {
+                open.insert(actor, clusters.len());
+                clusters.push((actor, *ts, *ts));
+            }
+        }
+    }
+
+    let mut claimed: HashSet<usize> = HashSet::new();
+    let mut activations: Vec<(i64, SbaActivation)> = Vec::with_capacity(clusters.len());
+    for (actor_index, first, last) in clusters {
+        let recorded = recorded.iter().find(|(index, ts, actor)| {
+            *actor == actor_index
+                && !claimed.contains(index)
+                && *ts >= first - SBA_CORROBORATION_BEFORE_MS
+                && *ts <= last + SBA_CORROBORATION_AFTER_MS
+        });
+        match recorded {
+            Some(&(index, ts, _)) => {
+                claimed.insert(index);
+                activations.push((ts, SbaActivation::Recorded(index)));
+            }
+            None => activations.push((
+                first,
+                SbaActivation::Derived {
+                    at: first,
+                    actor_index,
+                },
+            )),
+        }
+    }
+
+    activations.sort_by_key(|(ts, _)| *ts);
+    activations.into_iter().map(|(_, art)| art).collect()
+}
+
 /// Walks the raw log and pairs each state's transitions into windows.
 ///
 /// Link, Overdrive and Break come from the hook's latched transition events;
@@ -412,6 +507,102 @@ mod tests {
         let windows = assemble_chart_windows(&events, 0, 300_000);
         assert_eq!(windows.len(), 1);
         assert_eq!((windows[0].start_ms, windows[0].end_ms), (180_000, 188_001));
+    }
+
+    /// `(timestamp, performer)` per activation, whichever way it was recovered
+    /// — what the response ends up carrying.
+    fn activations(events: &[(i64, Message)]) -> Vec<(i64, u32)> {
+        sba_activations(events)
+            .into_iter()
+            .map(|activation| match activation {
+                SbaActivation::Recorded(index) => match &events[index].1 {
+                    Message::OnPerformSBA(event) => (events[index].0, event.actor_index),
+                    Message::OnContinueSBAChain(event) => (events[index].0, event.actor_index),
+                    other => panic!("not an activation: {other:?}"),
+                },
+                SbaActivation::Derived { at, actor_index } => (at, actor_index),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn an_art_the_hook_recorded_no_activation_for_still_reports_one() {
+        // The 2.0.4 shape (log 2698): four arts, one recorded activation. The
+        // three the gauge poll never sampled at zero are recovered from their
+        // damage, each at the hit its art opened with.
+        let events = vec![
+            sba_damage(221_870, 3),
+            sba_damage(226_153, 3),
+            perform(229_087, 0),
+            sba_damage(229_503, 0),
+            sba_damage(234_170, 0),
+            sba_damage(236_870, 1),
+            sba_damage(238_604, 1),
+            sba_damage(241_537, 2),
+            sba_damage(244_953, 2),
+        ];
+        assert_eq!(
+            activations(&events),
+            vec![(221_870, 3), (229_087, 0), (236_870, 1), (241_537, 2)]
+        );
+    }
+
+    #[test]
+    fn a_recorded_activation_is_kept_rather_than_derived_beside() {
+        // The perform lands after its art's opening hits (measured up to ~2.5s
+        // either way), and is still that art's — one activation, at the
+        // recorded time, not one per source.
+        let events = vec![
+            sba_damage(235_241, 3),
+            sba_damage(238_124, 3),
+            chain(238_425, 3),
+            sba_damage(239_174, 3),
+        ];
+        assert_eq!(activations(&events), vec![(238_425, 3)]);
+    }
+
+    #[test]
+    fn two_activations_recorded_for_one_art_report_it_once() {
+        let events = vec![
+            perform(20_000, 0),
+            sba_damage(20_400, 0),
+            chain(21_000, 0),
+            sba_damage(27_000, 0),
+        ];
+        assert_eq!(activations(&events), vec![(20_000, 0)]);
+    }
+
+    #[test]
+    fn a_phantom_activation_reports_no_art() {
+        // The Repeat Quest boundary perform, and the real art minutes later.
+        let events = vec![
+            perform(0, 1),
+            sba_damage(180_000, 1),
+            perform(181_000, 1),
+            sba_damage(188_000, 1),
+        ];
+        assert_eq!(activations(&events), vec![(181_000, 1)]);
+    }
+
+    #[test]
+    fn one_actor_arting_twice_reports_two() {
+        let events = vec![
+            sba_damage(20_000, 0),
+            sba_damage(27_000, 0),
+            sba_damage(160_000, 0),
+            sba_damage(167_000, 0),
+        ];
+        assert_eq!(activations(&events), vec![(20_000, 0), (160_000, 0)]);
+    }
+
+    #[test]
+    fn an_activation_is_not_claimed_by_another_actors_art() {
+        let events = vec![
+            sba_damage(10_000, 0),
+            perform(11_000, 1),
+            sba_damage(17_000, 0),
+        ];
+        assert_eq!(activations(&events), vec![(10_000, 0)]);
     }
 
     #[test]
