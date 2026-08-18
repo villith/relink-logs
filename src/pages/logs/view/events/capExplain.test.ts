@@ -278,6 +278,57 @@ describe("the cap-up section", () => {
     const sections = explainCapHit(input({ characterType: undefined }));
     expect(section(sections, "capup").unavailableKey).not.toBeNull();
   });
+
+  // Bug: capClassOf never tests the summon flag (0x80) and falls through to
+  // "normal", so a summon hit's cap-up was explained with the owning PLAYER's
+  // own (large) normal-class record and DMG Cap trait — never what a summon
+  // actually draws on, which is none of it.
+  it("treats a summon hit as having no attributable player record", () => {
+    // cap == trunc(base) exactly (the summon-hit ground truth), so the game's
+    // own total for this hit is 0%.
+    const base = line(explainCapHit(input({ hit: { ...input().hit, class_flags: 0x80 } })), "base", "result").value;
+    const baseCount = (base as { kind: "count"; value: number }).value;
+    const sections = explainCapHit(
+      input({
+        hit: { ...input().hit, class_flags: 0x80, damage_cap: baseCount, base_damage: 2_000_000 },
+        capUp: { normal: 6.84, skill: 0, sba: 0 },
+        loadout: loadout({ sigils: [sigil(DMG_CAP_TRAIT, 63)] }),
+      })
+    );
+    expect(line(sections, "capup", "game").value).toEqual({ kind: "percent", value: 0 });
+    // Never the owning player's own (large) normal-class record — not even a
+    // "none captured" row keyed against the wrong class.
+    expect(line(sections, "capup", "record").value).toEqual({ kind: "absent" });
+    expect(line(sections, "capup", "record").source).toEqual({ kind: "key", value: "ui.debug.cap-no-class" });
+    // Not even the DMG Cap trait the loadout carries — no rows at all.
+    expect(section(sections, "capup").lines.some((l) => l.key.startsWith("trait-"))).toBe(false);
+    expect(section(sections, "capup").lines.some((l) => l.key === "record-explained")).toBe(false);
+    expect(line(sections, "capup", "unaccounted").value).toEqual({ kind: "percent", value: 0 });
+  });
+
+  // Bug: capExplain.ts's unaccounted line never ported capBreakdown.ts's
+  // easing relabel, so a mid-ease hit showed a bare "Unaccounted" row right
+  // under a "Grid check: no / Eased: transition" line explaining the same gap.
+  it("relabels the unaccounted remainder as the easing gap on a mid-ease hit", () => {
+    const states = (ks: number[]) => new Map([["normal" as const, new Map(ks.map((k) => [k, 1]))]]);
+    // 46,773 at base 5399 is K 866.33, strictly between the states 800/900.
+    const off = input({ hit: { ...input().hit, damage_cap: 46_773 }, gridStates: states([800, 900]) });
+    expect(line(explainCapHit(off), "capup", "unaccounted").name).toEqual({
+      kind: "key",
+      value: "ui.debug.cap-easing-gap",
+    });
+    // A plain grid failure (no states to vouch for it) keeps the old label.
+    const noStates = input({ hit: { ...input().hit, damage_cap: 46_773 } });
+    expect(line(explainCapHit(noStates), "capup", "unaccounted").name).toEqual({
+      kind: "key",
+      value: "ui.debug.cap-unaccounted",
+    });
+    // A clean pass keeps it too.
+    expect(line(explainCapHit(input()), "capup", "unaccounted").name).toEqual({
+      kind: "key",
+      value: "ui.debug.cap-unaccounted",
+    });
+  });
 });
 
 describe("the clamp section", () => {
@@ -295,6 +346,14 @@ describe("the clamp section", () => {
     const sections = explainCapHit(under);
     expect(line(sections, "clamp", "bound").value).toEqual({ kind: "count", value: 1_000 });
     expect(line(sections, "clamp", "capped").value).toEqual({ kind: "verdict", value: false });
+  });
+
+  // Bug: this verdict used `base >= cap`, contradicting the Rust authority
+  // (`cap_detection::is_capped`), which is strict `>` — a hit exactly at cap
+  // is not over it.
+  it("is not capped when the pre-cap base sits exactly at the cap", () => {
+    const atCap = input({ hit: { ...input().hit, base_damage: 152_737 } }); // damage_cap is 152_737 too
+    expect(line(explainCapHit(atCap), "clamp", "capped").value).toEqual({ kind: "verdict", value: false });
   });
 });
 
@@ -372,6 +431,18 @@ describe("the predicted cap section (remote hits)", () => {
     expect(line(sections, "predicted", "predicted").value).toEqual(base);
     // None of the player's terms apply on the summon path — not even as rows.
     expect(section(sections, "predicted").lines.some((entry) => entry.key === "record")).toBe(false);
+  });
+
+  // Bug: the gate checked record/loadout before isSummonClass, even though
+  // the summon branch just below never reads either — over-suppressing the
+  // section for a summon hit whose owning player has no captured record.
+  it("predicts the bare ladder base for a summon hit with no record or loadout at all", () => {
+    const sections = explainCapHit(
+      capless({ capUp: undefined, loadout: undefined, hit: { ...capless().hit, class_flags: 0x80 } })
+    );
+    expect(section(sections, "predicted").unavailableKey).toBeNull();
+    const base = line(sections, "base", "result").value;
+    expect(line(sections, "predicted", "predicted").value).toEqual(base);
   });
 
   it("declines to predict for a denylisted character", () => {

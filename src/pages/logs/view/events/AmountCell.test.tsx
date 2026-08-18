@@ -215,6 +215,38 @@ describe("AmountCell", () => {
     expect(card.querySelector('[data-cap-row="unaccounted"]')?.textContent).toContain("1,400.99%");
   });
 
+  // Bug: capClassOf never tests the summon flag (0x80) and falls through to
+  // "normal", so a summon hit's cap-up was explained with the owning PLAYER's
+  // own (large) normal-class record and DMG Cap trait — never what a summon
+  // actually draws on, which is none of it.
+  it.skipIf(!SHOWS_CAP_CARD)("treats a measured summon hit as having no attributable player record", () => {
+    // Ground truth: log 2654's summon hits at rate f32(98.883) log cap
+    // 1,186,595 — exactly the SO0000 curve base (see the predicted-card test
+    // below), so the game's own cap-up total for this hit is 0%.
+    renderCell({
+      amount: 1_186_595,
+      capHit: {
+        damage: 1_186_595,
+        damage_cap: 1_186_595,
+        base_damage: 2_000_000,
+        attack_rate: 98.883003234863281,
+        class_flags: 0x81,
+      },
+      playerCapUp: { normal: 6.84, skill: 0, sba: 0 },
+      loadout: sigilLoadout(0xdc584f60, 65),
+      width: 78,
+    });
+    hover("1,186,595");
+    const card = screen.getByTestId("cap-card");
+    expect(card.querySelector('[data-cap-row="basecap"]')?.textContent).toContain("1,186,595");
+    // Never the owning player's own (large) normal-class record or trait.
+    expect(card.querySelector('[data-cap-row="capup"]')).toBeNull();
+    expect(card.querySelector('[data-cap-row="dmgcap"]')).toBeNull();
+    // cap == base exactly, so nothing should be unaccounted either.
+    expect(card.querySelector('[data-cap-row="gamecapup"]')?.textContent).toContain("0%");
+    expect(card.querySelector('[data-cap-row="unaccounted"]')?.textContent).toContain("0%");
+  });
+
   // A damage row from a log recorded before the cap capture carries the shape
   // with null members. `capCardRows` returns its lone `damage` row for that, and
   // a one-row card would only restate the number already in the cell.
@@ -277,6 +309,22 @@ describe("AmountCell", () => {
     expect(card.querySelector('[data-cap-row="predicted"]')?.textContent).toContain("≈ 1,186,595");
     expect(card.querySelector('[data-cap-row="capup"]')).toBeNull();
     expect(card.querySelector('[data-cap-row="dmgcap"]')).toBeNull();
+  });
+
+  // Bug: the gate checked `record === null || loadout === undefined` before
+  // isSummonClass, even though predictedCapRows proves the summon branch never
+  // reads either — over-suppressing the card for a summon hit whose owning
+  // player has no captured per-class record.
+  it.skipIf(!SHOWS_CAP_CARD)("predicts a summon-class hit even without the player's own record or loadout", () => {
+    renderCell({
+      ...remoteProps,
+      playerCapUp: undefined,
+      loadout: undefined,
+      capHit: { ...remoteHit, attack_rate: 98.883003234863281, class_flags: 0x81 },
+    });
+    hover("80,000");
+    const card = screen.getByTestId("cap-card");
+    expect(card.querySelector('[data-cap-row="predicted"]')?.textContent).toContain("≈ 1,186,595");
   });
 
   it("shows no predicted card without the captured store", () => {

@@ -113,6 +113,13 @@ describe("hit section", () => {
     expect(line("dmg-hit", "capped", { base_damage: 900_000 }).value).toEqual({ kind: "verdict", value: false });
   });
 
+  // Bug: this verdict used `base >= cap`, contradicting the Rust authority
+  // (`cap_detection::is_capped`), which is strict `>` — a hit exactly at cap
+  // is not over it.
+  it("is not capped when base sits exactly at the cap", () => {
+    expect(line("dmg-hit", "capped", { base_damage: 1_000_000 }).value).toEqual({ kind: "verdict", value: false });
+  });
+
   it("degrades to absent on an old log, never to zero", () => {
     expect(line("dmg-hit", "capped", { base_damage: null }).value).toEqual({ kind: "absent" });
   });
@@ -421,6 +428,8 @@ describe("postcap section", () => {
   it("renders the overflow row only on capped hits", () => {
     expect(section("dmg-postcap").lines.some((l) => l.key === "overflow")).toBe(true);
     expect(section("dmg-postcap", { base_damage: 900_000 }).lines.some((l) => l.key === "overflow")).toBe(false);
+    // Exactly at the cap is not capped (strict >, matching the Rust authority).
+    expect(section("dmg-postcap", { base_damage: 1_000_000 }).lines.some((l) => l.key === "overflow")).toBe(false);
   });
 
   it("degrades the ratio to absent and the section to unsubstituted when base_damage is unrecorded", () => {

@@ -56,6 +56,14 @@ describe("HitPipeline", () => {
     expect(screen.getByTestId("cap-pipe-bar-label").textContent).toContain("2.62");
   });
 
+  // Bug: this verdict used `precap >= cap`, contradicting the Rust authority
+  // (`cap_detection::is_capped`), which is strict `>` — a hit exactly at cap
+  // is not over it.
+  it("reports uncapped when the pre-cap base sits exactly at the cap", () => {
+    renderIt({ ...capped, base_damage: 152_737 }); // damage_cap is 152_737 too
+    expect(screen.getByTestId("cap-pipe-verdict").textContent).toBe("ui.debug.cap-pipe-uncapped");
+  });
+
   it("shows headroom instead of overrun for an uncapped hit", () => {
     renderIt({ ...capped, base_damage: 100_000, damage_cap: 200_000, damage: 100_000 });
     expect(screen.getByTestId("cap-pipe-fill").style.width).toBe("50.00%");

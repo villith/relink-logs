@@ -66,7 +66,9 @@ export const HitPipeline = ({ hit }: { hit: ExplainHit }) => {
   // `postCapSection` in capExplain.ts.
   const bound = precap === null ? null : cap === null ? precap : Math.min(precap, cap);
   const multiplier = bound !== null && bound > 0 ? hit.damage / bound : null;
-  const capped = precap !== null && cap !== null ? precap >= cap : null;
+  // Strict > : a hit exactly at cap is NOT capped (matches the Rust authority,
+  // `cap_detection::is_capped`).
+  const capped = precap !== null && cap !== null ? precap > cap : null;
 
   const dash = "—";
   const format = (value: number | null) => (value === null ? dash : value.toLocaleString(i18n.language));

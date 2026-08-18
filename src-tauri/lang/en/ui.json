@@ -307,6 +307,7 @@
       "cap-om-source": "magnitude read off the log",
       "cap-conditional-source": "maximum; runtime state unknown",
       "cap-unaccounted": "Unaccounted",
+      "cap-easing-gap": "Easing gap",
       "cap-no-row": "no table row",
       "cap-precap": "Pre-cap base damage",
       "cap-bound": "Clamp bound",

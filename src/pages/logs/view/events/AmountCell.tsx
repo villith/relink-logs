@@ -129,7 +129,13 @@ export const AmountCell = ({
     // scrolling; a hidden card must not pay for ladder curves and record
     // decomposition on every one of them.
     if (!SHOWS_CAP_CARD || capHit === null) return NONE;
-    const capClass = capClassOf(capHit.class_flags);
+    const summonClass = isSummonClass(capHit.class_flags);
+    // A summon hit reads none of the acting player's own cap-up terms — the
+    // ladder path already treats it this way (`ladderCurveFor`); `capClass`
+    // null here carries that same "no attributable class" fact into every
+    // record/trait/channel lookup below, which already treat a null class as
+    // nothing to attribute (see capSources.ts / capFactors).
+    const capClass = summonClass ? null : capClassOf(capHit.class_flags);
     const curve = ladderCurveFor(characterType, capHit.class_flags);
 
     if (capHit.damage_cap === null && predictable === true) {
@@ -139,7 +145,9 @@ export const AmountCell = ({
       // substituted term would be a guess wearing a formula's clothes.
       if (capHit.attack_rate === null || curve === null) return NONE;
       const record = selectCapUp(playerCapUp, capHit.class_flags);
-      if (record === null || loadout === undefined) return NONE;
+      // The summon branch needs neither: predictedCapRows computes trunc(base)
+      // alone for a summon-class hit and never reads record/loadout.
+      if (!summonClass && (record === null || loadout === undefined)) return NONE;
       if (typeof characterType !== "string" || PREDICTED_CAP_DENYLIST.has(characterType)) return NONE;
       const predictedBase = gameLadderBase(curve, capHit.attack_rate);
       if (predictedBase <= 0) return NONE;
@@ -147,9 +155,9 @@ export const AmountCell = ({
       return {
         predicted: true,
         rows: predictedCapRows(capHit, {
-          summonClass: isSummonClass(capHit.class_flags),
+          summonClass,
           ladderBase: predictedBase,
-          record,
+          record: record ?? 0,
           dmgCapTrait: dmgCapTraitValue(loadout, capClass),
           channelActive: channel.active,
           channelUnresolved: channel.unresolved,
@@ -181,7 +189,11 @@ export const AmountCell = ({
     const context: CapContext = {
       ladderBase: hasLadder ? ladderBase : null,
       verdict,
-      record: selectCapUp(playerCapUp, capHit.class_flags),
+      // A summon hit's owning player has no meaningful record to attribute
+      // against it (the summon actor carries no store, traits or channel) —
+      // never the player's own normal-class record it would otherwise fall
+      // through to.
+      record: summonClass ? null : selectCapUp(playerCapUp, capHit.class_flags),
       recordComponents: deriveRecordComponents(loadout, capClass),
       dmgCapTrait: dmgCapTraitValue(loadout, capClass),
       conditional: deriveConditionalSources(loadout, capClass),

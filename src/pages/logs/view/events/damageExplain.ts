@@ -160,7 +160,7 @@ const clampedPrecap = (hit: ExplainHit): number | null => {
 
 const hitSection = (hit: ExplainHit): ExplainSection => {
   const clamped = clampedPrecap(hit);
-  const capped = hit.base_damage !== null && hit.damage_cap !== null ? hit.base_damage >= hit.damage_cap : null;
+  const capped = hit.base_damage !== null && hit.damage_cap !== null ? hit.base_damage > hit.damage_cap : null;
   return {
     key: "dmg-hit",
     titleKey: "ui.debug.dmg-sec-hit",
@@ -191,7 +191,7 @@ const hitSection = (hit: ExplainHit): ExplainSection => {
         key: "capped",
         name: { kind: "key", value: "ui.debug.dmg-line-capped" },
         value: capped === null ? absent : { kind: "verdict", value: capped },
-        source: { kind: "literal", value: "base_damage >= damage_cap" },
+        source: { kind: "literal", value: "base_damage > damage_cap" },
       },
       {
         key: "mv",
@@ -525,7 +525,7 @@ const postcapSection = (
   snapshot: ParsedSnapshot | null
 ): ExplainSection => {
   const clamped = clampedPrecap(hit);
-  const capped = hit.base_damage !== null && hit.damage_cap !== null && hit.base_damage >= hit.damage_cap;
+  const capped = hit.base_damage !== null && hit.damage_cap !== null && hit.base_damage > hit.damage_cap;
   const ratio = clamped !== null && clamped > 0 ? hit.damage / clamped : null;
   const heldAmplify = (conditions.buffs ?? []).filter((id) => amplifyIds.has(id));
   const lines: ExplainLine[] = [
