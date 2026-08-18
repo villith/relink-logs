@@ -9,9 +9,23 @@ type LogLibraryState = {
   logs: LogSummary[];
   loaded: boolean;
   loading: boolean;
+  /** How many times the library has been invalidated — the generation an
+   * in-flight fetch checks itself against before claiming to be current. */
+  invalidations: number;
   /** Fetch the library, at most once. Idempotent because the picker renders
    * once per pane and every one of them calls this on mount. */
   load: () => Promise<void>;
+  /** Forget that the library was fetched, so the next `load()` asks again.
+   * Called wherever the log SET changes — a fight saved, logs deleted, an
+   * import — because nothing else would ever refresh this: the logs window
+   * lives in the tray for the whole session, so a load-once cache goes stale
+   * by exactly the runs recorded since it loaded, and a picker asked to draw
+   * one of those has no summary for it and shows a bare id.
+   *
+   * The logs stay in place until the refetch lands: a picker that emptied
+   * itself for a moment on every save would flicker. Mounted views re-ask
+   * because they watch `loaded` (see `AnalysisView`). */
+  invalidate: () => void;
 };
 
 /** The pickable log library. Its OWN store rather than a corner of the panes
@@ -23,13 +37,24 @@ export const useLogLibraryStore = create<LogLibraryState>((set, get) => ({
   logs: [],
   loaded: false,
   loading: false,
+  invalidations: 0,
   load: async () => {
     const { loaded, loading } = get();
     if (loaded || loading) return;
     set({ loading: true });
     try {
-      const logs = await invoke<LogSummary[]>("fetch_log_summaries");
-      set({ logs, loaded: true, loading: false });
+      // Re-asks when a save or a delete landed WHILE the fetch was in flight:
+      // that response was already stale on arrival, and the invalidation it
+      // raced would otherwise be lost behind the `loading` guard above.
+      for (;;) {
+        const asked = get().invalidations;
+        const logs = await invoke<LogSummary[]>("fetch_log_summaries");
+        if (get().invalidations === asked) {
+          set({ logs, loaded: true, loading: false });
+          return;
+        }
+        set({ logs });
+      }
     } catch (e) {
       // A backend older than the command (dev HMR skew) leaves the picker
       // empty rather than throwing the page away — the same degrade-at-the-
@@ -44,4 +69,5 @@ export const useLogLibraryStore = create<LogLibraryState>((set, get) => ({
       set({ logs: [], loaded: false, loading: false });
     }
   },
+  invalidate: () => set((state) => ({ loaded: false, invalidations: state.invalidations + 1 })),
 }));

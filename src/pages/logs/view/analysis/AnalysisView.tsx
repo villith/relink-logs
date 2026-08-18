@@ -47,9 +47,14 @@ export const AnalysisView = () => {
 
   const logs = useLogLibraryStore((state) => state.logs);
   const loadLibrary = useLogLibraryStore((state) => state.load);
+  // `loaded` is a dependency so an invalidation reaches a picker that is
+  // already on screen: `load` itself is a no-op while the library is held, and
+  // a fight saved (or logs deleted) under an open analysis view has to make it
+  // ask again rather than wait for the next mount.
+  const libraryLoaded = useLogLibraryStore((state) => state.loaded);
   useEffect(() => {
     void loadLibrary();
-  }, [loadLibrary]);
+  }, [loadLibrary, libraryLoaded]);
 
   const [compare, setCompare] = useQueryState("compare", { history: "replace" });
   const paneLogIds = useMemo(() => [Number(id), ...decodeCompare(compare)], [id, compare]);

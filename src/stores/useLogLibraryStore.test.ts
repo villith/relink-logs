@@ -22,7 +22,7 @@ const row = (id: number) => ({
 describe("useLogLibraryStore", () => {
   beforeEach(() => {
     vi.mocked(invoke).mockReset();
-    useLogLibraryStore.setState({ logs: [], loaded: false, loading: false });
+    useLogLibraryStore.setState({ logs: [], loaded: false, loading: false, invalidations: 0 });
   });
 
   it("loads the library once, however many pickers ask", async () => {
@@ -44,6 +44,43 @@ describe("useLogLibraryStore", () => {
     await useLogLibraryStore.getState().load();
     await useLogLibraryStore.getState().load();
     expect(invoke).toHaveBeenCalledTimes(1);
+  });
+
+  // What makes the cache follow the database: a run recorded (or logs deleted)
+  // after the load is what the picker is most likely to be asked for next, and
+  // without this it can never see it — the window lives in the tray all session.
+  it("asks again after an invalidation", async () => {
+    vi.mocked(invoke).mockResolvedValue([row(1)]);
+    await useLogLibraryStore.getState().load();
+    useLogLibraryStore.getState().invalidate();
+    vi.mocked(invoke).mockResolvedValue([row(1), row(2)]);
+    await useLogLibraryStore.getState().load();
+    expect(invoke).toHaveBeenCalledTimes(2);
+    expect(useLogLibraryStore.getState().logs).toHaveLength(2);
+  });
+
+  // A save landing while the first fetch is in flight would otherwise be lost:
+  // the invalidation it raised is swallowed by the in-flight guard, and the
+  // response that arrives after it was already missing the run.
+  it("asks again when an invalidation races the fetch", async () => {
+    vi.mocked(invoke).mockImplementationOnce(async () => {
+      useLogLibraryStore.getState().invalidate();
+      return [row(1)];
+    });
+    vi.mocked(invoke).mockResolvedValue([row(1), row(2)]);
+    await useLogLibraryStore.getState().load();
+    expect(invoke).toHaveBeenCalledTimes(2);
+    expect(useLogLibraryStore.getState().logs).toHaveLength(2);
+    expect(useLogLibraryStore.getState().loaded).toBe(true);
+  });
+
+  // A picker drawing the library it has must not blank while the refetch is in
+  // flight; only `loaded` comes down.
+  it("keeps the library it holds while the refetch is in flight", async () => {
+    vi.mocked(invoke).mockResolvedValue([row(1)]);
+    await useLogLibraryStore.getState().load();
+    useLogLibraryStore.getState().invalidate();
+    expect(useLogLibraryStore.getState().logs).toHaveLength(1);
   });
 
   it("degrades to an empty library when the running backend has no such command", async () => {
