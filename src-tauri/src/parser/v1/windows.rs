@@ -171,8 +171,8 @@ pub fn sba_activations(events: &[(i64, Message)]) -> Vec<SbaActivation> {
         let recorded = recorded.iter().find(|(index, ts, actor)| {
             *actor == actor_index
                 && !claimed.contains(index)
-                && *ts >= first - SBA_CORROBORATION_BEFORE_MS
-                && *ts <= last + SBA_CORROBORATION_AFTER_MS
+                && *ts >= first - SBA_CORROBORATION_AFTER_MS
+                && *ts <= last + SBA_CORROBORATION_BEFORE_MS
         });
         match recorded {
             Some(&(index, ts, _)) => {
@@ -603,6 +603,24 @@ mod tests {
             sba_damage(17_000, 0),
         ];
         assert_eq!(activations(&events), vec![(10_000, 0)]);
+    }
+
+    #[test]
+    fn a_perform_before_its_clusters_first_hit_is_still_recorded() {
+        // A corroborating hit can land up to AFTER_MS=10s after its event, so
+        // a perform can sit BEFORE the one-hit cluster that damage forms.
+        // Matching an event against a cluster is the same relation read in
+        // reverse, so the cluster's lower bound must reach back by AFTER_MS,
+        // not BEFORE_MS: this perform at ts=0, corroborated by same-actor
+        // damage at ts=8_000 (8_000 <= 0 + 10_000), must come back as the
+        // real `Recorded` event at 0 — not a `Derived` one synthesized at the
+        // cluster's own ts=8_000, which would silently drop the recorded
+        // timestamp and the perform/chain distinction.
+        let events = vec![perform(0, 4), sba_damage(8_000, 4)];
+        let result = sba_activations(&events);
+        assert_eq!(result.len(), 1);
+        assert!(matches!(result[0], SbaActivation::Recorded(0)));
+        assert_eq!(activations(&events), vec![(0, 4)]);
     }
 
     #[test]
