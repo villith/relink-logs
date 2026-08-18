@@ -16,6 +16,7 @@
 //! cloned — the reparse resets the derived state it writes, so successive
 //! requests can share one decoded encounter, but only one at a time.
 
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 /// A bounded, least-recently-used cache.
@@ -28,6 +29,11 @@ pub struct LogCache<V> {
     capacity: usize,
     /// Least-recently-used FIRST, most-recently-used LAST.
     entries: Vec<(u64, Arc<Mutex<V>>)>,
+    /// Bumped by [`Self::clear`]. A decode runs with no lock held (see
+    /// [`Self::insert`]'s doc), so it can straddle a clear; comparing the
+    /// generation from before and after is how [`Self::insert_if_current`]
+    /// notices and refuses to resurrect what the clear was meant to drop.
+    generation: AtomicU64,
 }
 
 impl<V> LogCache<V> {
@@ -35,7 +41,15 @@ impl<V> LogCache<V> {
         Self {
             capacity,
             entries: Vec::new(),
+            generation: AtomicU64::new(0),
         }
+    }
+
+    /// A token for what [`Self::clear`] has dropped so far. Unrelated to any
+    /// one id — it exists to be captured before an unlocked decode and
+    /// compared after, in [`Self::insert_if_current`].
+    pub fn generation(&self) -> u64 {
+        self.generation.load(Ordering::Relaxed)
     }
 
     /// The cached value for `id`, marking it most-recently-used.
@@ -72,6 +86,17 @@ impl<V> LogCache<V> {
         handle
     }
 
+    /// Like [`Self::insert`], but discarded rather than stored if `at_generation`
+    /// no longer matches [`Self::generation`] — a [`Self::clear`] landed during
+    /// the unlocked decode that produced `value`, so it is handed back for the
+    /// caller to use but not kept where a later request would find it.
+    pub fn insert_if_current(&mut self, id: u64, value: V, at_generation: u64) -> Arc<Mutex<V>> {
+        if self.generation() != at_generation {
+            return Arc::new(Mutex::new(value));
+        }
+        self.insert(id, value)
+    }
+
     /// Forget one log. A handle already taken stays alive and usable — whoever
     /// holds it is mid-request — it simply stops being handed out.
     pub fn invalidate(&mut self, id: u64) {
@@ -83,6 +108,7 @@ impl<V> LogCache<V> {
     /// a stale fight under a live title.
     pub fn clear(&mut self) {
         self.entries.clear();
+        self.generation.fetch_add(1, Ordering::Relaxed);
     }
 
     pub fn len(&self) -> usize {
@@ -233,5 +259,52 @@ mod tests {
         assert!(cache.get(2657).is_none());
         // The caller still gets a usable value — it simply is not kept.
         assert_eq!(*handle.lock().unwrap(), "fight");
+    }
+
+    #[test]
+    fn clearing_bumps_the_generation() {
+        let mut cache: LogCache<()> = LogCache::new(2);
+        let generation = cache.generation();
+        cache.clear();
+
+        assert_ne!(cache.generation(), generation);
+    }
+
+    #[test]
+    fn reading_or_inserting_does_not_bump_the_generation() {
+        let mut cache = LogCache::new(2);
+        let generation = cache.generation();
+        cache.insert(1, ());
+        cache.get(1);
+        cache.invalidate(1);
+
+        assert_eq!(cache.generation(), generation);
+    }
+
+    /// The race `insert_if_current` exists for: a decode starts, a delete/import
+    /// clears the cache before it finishes, and the decode's result must not
+    /// resurrect an entry the clear was meant to drop.
+    #[test]
+    fn a_decode_racing_a_clear_is_handed_back_but_not_cached() {
+        let mut cache: LogCache<String> = LogCache::new(2);
+        let generation = cache.generation();
+
+        cache.clear();
+
+        let handle = cache.insert_if_current(2657, String::from("stale"), generation);
+
+        assert_eq!(*handle.lock().unwrap(), "stale");
+        assert!(cache.get(2657).is_none());
+    }
+
+    #[test]
+    fn insert_if_current_behaves_like_insert_when_nothing_raced_it() {
+        let mut cache = LogCache::new(2);
+        let generation = cache.generation();
+
+        let handle = cache.insert_if_current(2657, String::from("fresh"), generation);
+
+        assert_eq!(*handle.lock().unwrap(), "fresh");
+        assert!(cache.get(2657).is_some());
     }
 }

@@ -1745,12 +1745,19 @@ fn decode_log(id: u64) -> Result<CachedLog, String> {
 /// Two panes can both miss and both decode — the read above deliberately runs
 /// unlocked — and `insert` settles that by keeping whichever landed first, so
 /// they end up sharing one entry rather than reparsing each other's work away.
+/// The generation captured before that unlocked read guards a rarer case: a
+/// `forget_decoded_logs` landing mid-decode, which must not let this decode's
+/// now-stale result back into the cache once it finishes.
 fn decoded_log(id: u64) -> Result<Arc<Mutex<CachedLog>>, String> {
-    if let Some(cached) = lock_decoded_logs().get(id) {
+    let mut cache = lock_decoded_logs();
+    if let Some(cached) = cache.get(id) {
         return Ok(cached);
     }
+    let generation = cache.generation();
+    drop(cache);
+
     let decoded = decode_log(id)?;
-    Ok(lock_decoded_logs().insert(id, decoded))
+    Ok(lock_decoded_logs().insert_if_current(id, decoded, generation))
 }
 
 /// One log's stored legality verdicts, regrouped from the flat rows into one
@@ -2716,6 +2723,9 @@ fn connect_and_run_parser(app: AppHandle) {
     // start either side of the frontend's first push, and the parser outlives
     // game reconnects, so it must not depend on being pushed to again.
     state.filters = *app.state::<MeterFilterState>().current.lock().unwrap();
+    // A live save can hand out an id SQLite recycled from a deleted log — see
+    // forget_decoded_logs.
+    state.on_saved = Some(forget_decoded_logs);
 
     let (reset_tx, mut reset_rx) = tokio::sync::mpsc::unbounded_channel::<()>();
     *app.state::<ResetChannel>().0.lock().unwrap() = Some(reset_tx);

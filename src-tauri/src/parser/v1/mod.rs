@@ -2807,6 +2807,12 @@ pub struct Parser {
     #[serde(skip)]
     db: Option<Connection>,
 
+    /// Called after a successful save. The binary crate keeps a decoded-log
+    /// cache this crate cannot see, and a save can hand out an id SQLite has
+    /// reused from a deleted row — this is that cache's only way to hear about it.
+    #[serde(skip)]
+    pub on_saved: Option<fn()>,
+
     /// Active Conflux run id (None when not in a run). Assigned on run-start.
     #[serde(skip)]
     active_run_id: Option<i64>,
@@ -4499,6 +4505,10 @@ impl Parser {
             // agrees with the sweep by construction rather than by coincidence.
             if crate::legality::should_audit(start_datetime.timestamp_millis()) {
                 self.encounter.write_legality_findings(conn, id)?;
+            }
+
+            if let Some(on_saved) = self.on_saved {
+                on_saved();
             }
 
             return Ok(Some(id));
