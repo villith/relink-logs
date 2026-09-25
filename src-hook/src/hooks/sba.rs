@@ -209,8 +209,8 @@ impl OnSBARegisterHitHook {
 //   component = std-map-find(specified + 0xC0, type_id)    [FUN_140936870]
 //               where type_id = DAT_147ab3f50 (runtime static-init counter;
 //               its _Init_thread guard at +0x54 reads -1 once initialized)
-//   gauge     = *(f32*)(component + 0x7C)   (same field the local update hook
-//               reads; component+0x10 = specified instance backref)
+//   gauge     = *(f32*)(component + SBA_GAUGE_OFFSET)   (same field the local
+//               update hook reads; component+0x10 = specified instance backref)
 //
 // All of it is plain data walking — replicated below with guarded reads, no
 // game code called. SBAPOLL probe first; production events once live-verified.
@@ -226,6 +226,11 @@ impl OnSBARegisterHitHook {
 /// at +0x70, and looks the component up in the +0xC0 map.
 const SBA_SLOT_HANDLES_RVA: usize = 0x7035ca0; // 2.0.5: 0x7034c60
 const SBA_SLOT_HANDLE_STRIDE: usize = 0x18;
+/// Gauge float inside the SBA component; its max sits 4 bytes after it. 2.0.6
+/// moved both by +4: the gauge-update entry's caller now reads `[rsi+0x80]` /
+/// `[rsi+0x84]`, and the party-wide ratio readers (2.0.5 fns 0x259a7c0 /
+/// 0x2606db0, `vmovss [rax+0x7c]; vdivss [rax+0x80]`) read `+0x80` / `+0x84`.
+const SBA_GAUGE_OFFSET: usize = 0x80; // 2.0.5: 0x7C
 const ENTITY_TABLE_RVA: usize = 0x7020988; // 2.0.5: 0x701f948
 const SBA_COMPONENT_TYPE_RVA: usize = 0x7ab35f0; // 2.0.5: 0x7ab25b0
 /// Session-mode global: `DAT_147c54810` is a pointer; the game's own online checks
@@ -381,7 +386,7 @@ fn log_sba_slot_poll() {
         else {
             continue;
         };
-        let gauge = read_f32_guarded(component, 0x7C).unwrap_or(f32::NAN);
+        let gauge = read_f32_guarded(component, SBA_GAUGE_OFFSET).unwrap_or(f32::NAN);
         let backref = read_ptr_guarded(component, 0x10).unwrap_or(0);
         let idx170 = read_u32_guarded(specified, 0x170);
         // Session mode (see SESSION_MODE_PTR_RVA): 3 = online per the game's own
@@ -434,7 +439,8 @@ fn poll_slots_and_emit(tx: &event::Tx) {
         else {
             continue;
         };
-        let Some(gauge) = read_f32_guarded(component, 0x7C).filter(|g| g.is_finite()) else {
+        let Some(gauge) = read_f32_guarded(component, SBA_GAUGE_OFFSET).filter(|g| g.is_finite())
+        else {
             continue;
         };
 
@@ -1184,11 +1190,10 @@ impl OnHandleSBAUpdateHook {
             log_sba_slot_poll();
         }
 
-        // The gauge before the game's own grant. `a1` is the SBA component;
-        // +0x7C is the gauge float (+0x80 its max) — the same offsets
-        // `poll_slots_and_emit`/`log_sba_slot_poll` read per slot.
+        // The gauge before the game's own grant. `a1` is the SBA component,
+        // the same object `poll_slots_and_emit`/`log_sba_slot_poll` read per slot.
         use crate::hooks::diag::read_f32_guarded;
-        let before = read_f32_guarded(a1 as usize, 0x7C);
+        let before = read_f32_guarded(a1 as usize, SBA_GAUGE_OFFSET);
 
         let ret = unsafe { OnSBAUpdate.call(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11) };
 
@@ -1196,7 +1201,7 @@ impl OnHandleSBAUpdateHook {
         // the register-hit gate (OnSBARegisterHitHook), so the damage instance
         // parked on this thread IS the hit that moved the gauge — no map, no
         // timing window.
-        let after = read_f32_guarded(a1 as usize, 0x7C);
+        let after = read_f32_guarded(a1 as usize, SBA_GAUGE_OFFSET);
         if let (Some(before), Some(after)) = (before, after) {
             let amount = after - before;
             // A burst resetting the bar reads as a large negative; only
@@ -1427,7 +1432,8 @@ impl OnSBAGrantHook {
 
     fn run(actor: *const usize, damage_instance: *const usize, mode: u32) -> usize {
         #[cfg(feature = "hookdiag")]
-        let before = crate::hooks::diag::read_f32_guarded(actor as usize + 0x23B0, 0x7C);
+        let before =
+            crate::hooks::diag::read_f32_guarded(actor as usize + 0x23B0, SBA_GAUGE_OFFSET);
 
         // Defer to an enclosing named cause, the same precedence rule as the
         // percent API: this is the shared taken-side grant, so an outer frame
@@ -1443,7 +1449,7 @@ impl OnSBAGrantHook {
             use crate::hooks::diag::{read_f32_guarded, read_u32_guarded};
             use std::sync::atomic::{AtomicU32, Ordering as AtomicOrdering};
 
-            let after = read_f32_guarded(actor as usize + 0x23B0, 0x7C);
+            let after = read_f32_guarded(actor as usize + 0x23B0, SBA_GAUGE_OFFSET);
             static N: AtomicU32 = AtomicU32::new(0);
             let n = N.fetch_add(1, AtomicOrdering::Relaxed) + 1;
             if n <= 32 || n % 16 == 0 {

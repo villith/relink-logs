@@ -105,6 +105,8 @@ Always **round-trip**: feed each recovered vtable RVA back through the walk and 
 
 The AOB sig is fine but a field *inside* the struct moved. Confirm with a wide live dump: build with the `dmgdiag` feature (`cargo build -p hook --features dmgdiag`) — `damage.rs` then logs every nonzero u32 in a window per real hit. Match the known value (a skill ID, a cap magnitude) to its new offset, update `ffi.rs`.
 
+**Static shortcut (2.0.6):** every hardcoded `read_*_guarded(obj, 0xNN)` in the hook is a struct field the sweep above cannot see. Scan the new exe for the game's own read idiom of that field with the offset wildcarded — the SBA gauge's `vmovss xmm0,[rax+0x7c]; vdivss xmm7,xmm0,[rax+0x80]` became `[rax+0x80]` / `[rax+0x84]`, and `Decompile.java` on the gauge-update entry confirmed the `+0x80` store. Live symptom was `SBAPOLL` resolving every slot by name with `gauge=0.0` for 300+ updates — the walk was right, only the leaf offset was stale.
+
 ## Ghidra: finding a function's true entry
 
 Needed only for **function-hook targets** (the thing you detour). One-time setup already done (Ghidra 12.1.2 at `C:\ghidra\ghidra_12.1.2_PUBLIC`, JDK 21 wired via `support\launch.properties`).

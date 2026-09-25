@@ -5,6 +5,12 @@ version without a section here, and the section body becomes the GitHub
 release body — which the in-app update prompt shows as patch notes. Renders
 markdown in the app.
 
+## 1.12.18
+
+### Bug Fixes
+
+- Fix SBA Gauge tracking
+
 ## 1.12.17
 
 ### Notes
